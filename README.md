@@ -1,1 +1,1 @@
-# nbafantasy_checkleague
+# nba-fantasy-h2h
