@@ -1,37 +1,133 @@
 """
 NBA Fantasy API 客户端
+添加熔断器和重试机制
 
-AI修改指引：
-- 修改API超时: 修改timeout参数
-- 修改重试次数: 修改retries参数
-- 添加新API: 添加新方法
+修改日期: 2026-03-20
+修改点:
+1. 添加类变量记录失败状态
+2. 连续失败3次后进入5分钟熔断期
+3. API调用添加try-except，超时10秒
+4. 失败时记录error日志
 """
 
 import asyncio
+import logging
 from typing import Optional, Any, Tuple, List, Dict
 from datetime import datetime, timezone, timedelta
 
 import httpx
 
 from backend.config import BASE_URL, POSITION_MAP
-from backend.cache import CACHE, LocalCache
+from backend.cache import CACHE, LocalCache, save_cache_timestamp, get_cache_timestamp
 from backend.config import STATIC_JSON
+
+logger = logging.getLogger(__name__)
+
+# 熔断器状态
+class CircuitBreaker:
+    """简单熔断器"""
+    failures_count: int = 0
+    last_failure_time: Optional[datetime] = None
+    circuit_open: bool = False
+    
+    # 配置
+    FAILURE_THRESHOLD: int = 3
+    CIRCUIT_TIMEOUT_SECONDS: int = 300  # 5分钟
+    
+    @classmethod
+    def record_failure(cls):
+        """记录失败"""
+        cls.failures_count += 1
+        cls.last_failure_time = datetime.now()
+        logger.error(f"[CircuitBreaker] Failure recorded. Count: {cls.failures_count}")
+        
+        if cls.failures_count >= cls.FAILURE_THRESHOLD:
+            cls.circuit_open = True
+            logger.error(f"[CircuitBreaker] Circuit OPENED! Will block requests for {cls.CIRCUIT_TIMEOUT_SECONDS}s")
+    
+    @classmethod
+    def record_success(cls):
+        """记录成功，重置失败计数"""
+        if cls.failures_count > 0:
+            cls.failures_count = 0
+            cls.circuit_open = False
+            cls.last_failure_time = None
+            logger.info("[CircuitBreaker] Failure count reset after success")
+    
+    @classmethod
+    def is_circuit_open(cls) -> bool:
+        """检查熔断器是否打开"""
+        if not cls.circuit_open:
+            return False
+        
+        # 检查是否超过熔断时间
+        if cls.last_failure_time:
+            elapsed = (datetime.now() - cls.last_failure_time).total_seconds()
+            if elapsed > cls.CIRCUIT_TIMEOUT_SECONDS:
+                # 熔断期结束，半开状态
+                cls.circuit_open = False
+                cls.failures_count = 0
+                logger.info("[CircuitBreaker] Circuit HALF-OPEN, allowing request through")
+                return False
+        
+        return True
+    
+    @classmethod
+    def get_fallback_message(cls) -> str:
+        """获取熔断期间的降级消息"""
+        return "使用缓存数据（API服务暂时不可用）"
 
 
 async def fetch(client: httpx.AsyncClient, url: str, retries: int = 3) -> Optional[Any]:
-    """带重试的HTTP请求"""
+    """带重试和熔断的HTTP请求
+    
+    Args:
+        client: HTTP客户端
+        url: 请求URL
+        retries: 重试次数
+        
+    Returns:
+        响应数据或None
+    """
+    # 检查熔断器
+    if CircuitBreaker.is_circuit_open():
+        logger.warning(f"[CircuitBreaker] Request blocked for {url}")
+        raise Exception(CircuitBreaker.get_fallback_message())
+    
     for i in range(retries):
         try:
-            resp = await client.get(url, timeout=15.0, headers={
+            resp = await client.get(url, timeout=10.0, headers={
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             })
             resp.raise_for_status()
+            
+            # 成功，重置熔断器
+            CircuitBreaker.record_success()
+            
             return resp.json()
-        except Exception as e:
+            
+        except httpx.TimeoutException as e:
+            logger.error(f"[Error] Timeout fetching {url}: {e}")
             if i == retries - 1:
-                print(f"[Error] Failed to fetch {url}: {e}")
+                CircuitBreaker.record_failure()
                 return None
             await asyncio.sleep(1 * (i + 1))
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"[Error] HTTP error fetching {url}: {e.response.status_code}")
+            if i == retries - 1:
+                CircuitBreaker.record_failure()
+                return None
+            await asyncio.sleep(1 * (i + 1))
+            
+        except Exception as e:
+            logger.error(f"[Error] Failed to fetch {url}: {e}")
+            if i == retries - 1:
+                CircuitBreaker.record_failure()
+                return None
+            await asyncio.sleep(1 * (i + 1))
+    
+    return None
 
 
 def get_current_event(events: List[Dict]) -> Tuple[int, str]:
@@ -129,7 +225,7 @@ def load_static_data() -> bool:
     """
     json_data = LocalCache.load_bootstrap_json()
     if json_data:
-        print("[Cache] Loading from local JSON...")
+        print("[Cache] Loading from local SQLite...")
         _parse_bootstrap(json_data)
         return True
     
@@ -137,7 +233,7 @@ def load_static_data() -> bool:
     players = LocalCache.load_players_csv()
     
     if teams and players:
-        print("[Cache] Loading from local CSV...")
+        print("[Cache] Loading from local SQLite...")
         CACHE.teams = teams
         CACHE.elements = players
         return True
@@ -150,7 +246,15 @@ async def update_static_data(client: httpx.AsyncClient, force: bool = False):
     获取静态数据，优先使用缓存
     force=True 强制刷新缓存
     """
-    if not force and LocalCache.is_fresh(STATIC_JSON, hours=24):
+    # 检查缓存是否新鲜（使用cache_meta表）
+    cache_key = 'bootstrap_static'
+    last_update = get_cache_timestamp(cache_key)
+    is_fresh = False
+    if last_update:
+        age = (datetime.now() - last_update).total_seconds()
+        is_fresh = age < (24 * 3600)  # 24小时
+    
+    if not force and is_fresh:
         json_data = LocalCache.load_bootstrap_json()
         if json_data:
             print("[Cache] Using fresh local cache")
@@ -159,7 +263,15 @@ async def update_static_data(client: httpx.AsyncClient, force: bool = False):
     
     print("[API] Fetching bootstrap-static...")
     url = f"{BASE_URL}/bootstrap-static/"
-    data = await fetch(client, url)
+    
+    try:
+        data = await fetch(client, url)
+    except Exception as e:
+        logger.error(f"[API] Fetch failed: {e}")
+        if load_static_data():
+            print("[Cache] Using stale local cache due to API failure")
+            return
+        raise Exception("Failed to load static data")
     
     if not data:
         if load_static_data():
@@ -179,7 +291,12 @@ async def update_static_data(client: httpx.AsyncClient, force: bool = False):
 async def update_live_data(client: httpx.AsyncClient):
     """获取实时 live 数据"""
     url = f"{BASE_URL}/event/{CACHE.current_event}/live/"
-    data = await fetch(client, url)
+    
+    try:
+        data = await fetch(client, url)
+    except Exception as e:
+        logger.error(f"[Live] Failed to fetch live data: {e}")
+        return
     
     if not data:
         return
@@ -200,7 +317,12 @@ async def update_fixtures(client: httpx.AsyncClient):
     """获取赛程"""
     url = f"{BASE_URL}/fixtures/?event={CACHE.current_event}"
     print(f"[Fixtures] Fetching from {url}")
-    data = await fetch(client, url)
+    
+    try:
+        data = await fetch(client, url)
+    except Exception as e:
+        logger.error(f"[Fixtures] Failed to fetch fixtures: {e}")
+        return
     
     if not data:
         print(f"[Fixtures] No data returned from API")

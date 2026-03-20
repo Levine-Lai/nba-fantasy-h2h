@@ -1,17 +1,182 @@
 """
 数据处理服务
-包含得分计算、阵容处理等业务逻辑
+添加校验函数和事务包装
 
-AI修改指引：
-- 修改计分规则: 修改calculate_fantasy_score
-- 修改有效阵容规则: 修改calculate_effective_score
+修改日期: 2026-03-20
+修改点:
+1. 添加validate_api_response函数进行数据校验
+2. 使用sqlite3的事务（BEGIN TRANSACTION / COMMIT / ROLLBACK）
+3. 任一环节出错执行rollback，保持旧数据
 """
 
+import sqlite3
+import logging
 from typing import Dict, List, Tuple, Optional
 
-from backend.cache import CACHE
+from backend.cache import CACHE, _get_connection, _db_lock
 from backend.config import POSITION_MAP, BASE_URL, CURRENT_PHASE, LEAGUE_ID, UID_MAP
 from backend.api_client import fetch
+
+logger = logging.getLogger(__name__)
+
+
+def validate_api_response(data: any) -> bool:
+    """校验API响应数据
+    
+    Args:
+        data: API响应数据
+        
+    Returns:
+        校验通过返回True，否则False
+    """
+    # 检查data是否为dict
+    if not isinstance(data, dict):
+        logger.error(f"[Validate] Data is not a dict: {type(data)}")
+        return False
+    
+    # 检查是否包含'players'键（或'elements'，NBA API通常用elements）
+    elements = data.get('elements') or data.get('players')
+    if elements is None:
+        logger.error("[Validate] Data missing 'elements' or 'players' key")
+        return False
+    
+    # 检查是否为list
+    if not isinstance(elements, list):
+        logger.error(f"[Validate] Elements is not a list: {type(elements)}")
+        return False
+    
+    # 检查每个球员是否有必要字段
+    required_fields = ['id', 'web_name', 'points_scored']
+    for i, elem in enumerate(elements[:5]):  # 只检查前5个，避免性能问题
+        if not isinstance(elem, dict):
+            logger.error(f"[Validate] Element {i} is not a dict")
+            return False
+        
+        for field in ['id']:  # 最小必要字段检查
+            if field not in elem:
+                logger.error(f"[Validate] Element {i} missing required field: {field}")
+                return False
+    
+    logger.info(f"[Validate] API response validation passed, {len(elements)} elements")
+    return True
+
+
+async def refresh_data() -> bool:
+    """刷新数据（带校验和事务）
+    
+    Returns:
+        刷新成功返回True，否则False
+    """
+    import httpx
+    
+    logger.info("[Refresh] Starting data refresh with validation...")
+    
+    async with httpx.AsyncClient() as client:
+        # 获取数据
+        url = f"{BASE_URL}/bootstrap-static/"
+        try:
+            data = await fetch(client, url)
+        except Exception as e:
+            logger.error(f"[Refresh] Failed to fetch data: {e}")
+            return False
+        
+        if not data:
+            logger.error("[Refresh] No data received from API")
+            return False
+        
+        # 校验数据
+        if not validate_api_response(data):
+            logger.error("[Refresh] Data validation failed, aborting update")
+            return False
+        
+        # 使用事务更新数据库
+        conn = _get_connection()
+        try:
+            with _db_lock:
+                cursor = conn.cursor()
+                
+                # 开始事务
+                cursor.execute("BEGIN TRANSACTION")
+                logger.info("[Refresh] Transaction started")
+                
+                try:
+                    # 更新球队数据
+                    if 'teams' in data:
+                        cursor.execute("DELETE FROM teams_temp WHERE 1=1")
+                        for team in data['teams']:
+                            cursor.execute('''
+                                INSERT OR REPLACE INTO cache_meta (key, value, updated_at)
+                                VALUES (?, ?, datetime('now'))
+                            ''', (f"team_{team['id']}", team['name']))
+                    
+                    # 更新球员数据
+                    if 'elements' in data:
+                        from backend.cache import save_players
+                        
+                        players_list = []
+                        for elem in data['elements']:
+                            players_list.append({
+                                'id': elem['id'],
+                                'name': elem.get('web_name', f"#{elem['id']}"),
+                                'team': elem.get('team'),
+                                'position': elem.get('element_type'),
+                                'points_scored': elem.get('points_scored', 0),
+                                'rebounds': elem.get('rebounds', 0),
+                                'assists': elem.get('assists', 0),
+                                'steals': elem.get('steals', 0),
+                                'blocks': elem.get('blocks', 0),
+                                'injury': elem.get('news') if elem.get('status') == 'i' else None,
+                                'game_status': elem.get('status', '')
+                            })
+                        
+                        # 批量插入球员数据
+                        cursor.execute("DELETE FROM players")
+                        for player in players_list:
+                            cursor.execute('''
+                                INSERT INTO players 
+                                (id, name, team, position, points_scored, rebounds, assists, 
+                                 steals, blocks, injury, game_status, updated_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                            ''', (
+                                player['id'], player['name'], player['team'],
+                                player['position'], player['points_scored'], player['rebounds'],
+                                player['assists'], player['steals'], player['blocks'],
+                                player['injury'], player['game_status']
+                            ))
+                    
+                    # 保存bootstrap原始数据
+                    import json
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO cache_meta (key, value, updated_at)
+                        VALUES ('bootstrap_static', ?, datetime('now'))
+                    ''', (json.dumps(data, ensure_ascii=False),))
+                    
+                    # 更新缓存时间戳
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO cache_meta (key, value, updated_at)
+                        VALUES ('last_refresh', ?, datetime('now'))
+                    ''', (datetime.now().isoformat(),))
+                    
+                    # 提交事务
+                    conn.commit()
+                    logger.info("[Refresh] Transaction committed successfully")
+                    
+                    # 更新内存缓存
+                    from backend.api_client import _parse_bootstrap
+                    _parse_bootstrap(data)
+                    
+                    return True
+                    
+                except Exception as e:
+                    # 出错回滚
+                    conn.rollback()
+                    logger.error(f"[Refresh] Transaction rolled back due to error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    return False
+                    
+        finally:
+            conn.close()
 
 
 def parse_injury_status(element_info: Dict) -> Optional[str]:

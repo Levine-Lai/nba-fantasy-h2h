@@ -134,12 +134,6 @@ python run.py --reload
 - 主页: http://127.0.0.1:8000
 - API文档: http://127.0.0.1:8000/docs
 
-## 🔧 技术栈
-
-- **后端**: FastAPI + httpx
-- **前端**: 原生 HTML + CSS + JavaScript
-- **缓存**: 本地 JSON/CSV 文件
-
 ## 📌 注意事项
 
 1. **不要直接修改 main_v1.py**，它是备份文件
