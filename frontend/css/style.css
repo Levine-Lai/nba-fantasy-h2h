@@ -1,0 +1,663 @@
+/*
+ * NBA Fantasy H2H Dashboard 样式表
+ * 
+ * AI修改指引：
+ * - 修改颜色主题: 搜索颜色代码修改
+ * - 修改布局: 调整grid/flex相关属性
+ * - 添加新组件: 在文件末尾添加
+ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #ffffff;
+    color: #1a1a1a;
+    line-height: 1.5;
+}
+
+/* ===== Header ===== */
+.header {
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 16px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.brand h1 {
+    font-size: 20px;
+    font-weight: 800;
+    color: #1a1a1a;
+}
+
+.brand span {
+    font-size: 13px;
+    color: #999;
+    margin-left: 12px;
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status {
+    font-size: 12px;
+    color: #888;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pulse {
+    width: 6px;
+    height: 6px;
+    background: #00c853;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.btn {
+    padding: 6px 14px;
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    background: #f5f5f5;
+    border-color: #ccc;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ===== Layout ===== */
+.container {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+    padding: 24px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.column {
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #f0f0f0;
+    padding: 20px;
+    min-height: 700px;
+}
+
+.col-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f5f5f5;
+}
+
+.col-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #1a1a1a;
+}
+
+.col-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    background: #f5f5f5;
+    color: #666;
+    border-radius: 12px;
+    font-weight: 700;
+}
+
+/* ===== Game List ===== */
+.game-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.game-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 12px;
+    border-radius: 8px;
+    border: 1px solid #f5f5f5;
+    background: #fafafa;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.game-item:hover {
+    background: #f0f0f0;
+    transform: translateX(3px);
+    border-color: #e0e0e0;
+}
+
+.game-teams { flex: 1; }
+
+.game-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 2px 0;
+}
+
+.game-team {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+}
+
+.game-score {
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.game-score.winning { color: #00c853; }
+.game-score.losing { color: #ff1744; }
+
+.game-meta {
+    text-align: right;
+    min-width: 50px;
+}
+
+.game-time {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.game-status {
+    font-size: 10px;
+    color: #888;
+    margin-top: 2px;
+}
+
+/* ===== H2H Match Cards ===== */
+.h2h-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.match-card {
+    display: flex;
+    height: 100px;
+    border-radius: 12px;
+    border: 2px solid #e8e8e8;
+    overflow: hidden;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.match-card:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border-color: #d0d0d0;
+    z-index: 10;
+}
+
+.team-side {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 12px;
+    position: relative;
+    gap: 6px;
+}
+
+.team-side.winning { border-left: 4px solid #00c853; }
+.team-side.losing { border-left: 4px solid #ff1744; }
+.team-side:last-child.winning { border-right: 4px solid #00c853; border-left: none; }
+.team-side:last-child.losing { border-right: 4px solid #ff1744; border-left: none; }
+
+.team-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #444;
+}
+
+.score-main {
+    font-size: 36px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    color: #1a1a1a;
+    line-height: 1;
+}
+
+.score-main.winning { color: #00c853; }
+.score-main.losing { color: #ff1744; }
+
+.score-sub {
+    font-size: 12px;
+    color: #888;
+    font-weight: 600;
+    background: #f5f5f5;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.vs-divider {
+    width: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #ccc;
+    font-weight: 800;
+    background: #f8f8f8;
+    border-left: 1px solid #f0f0f0;
+    border-right: 1px solid #f0f0f0;
+}
+
+/* ===== FDR Table ===== */
+.fdr-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 11px;
+}
+
+.fdr-table th {
+    font-size: 10px;
+    color: #bbb;
+    font-weight: 500;
+    padding: 8px 2px;
+    text-align: center;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.fdr-table td {
+    padding: 2px;
+    text-align: center;
+}
+
+.fdr-table .t-name {
+    text-align: left;
+    font-size: 12px;
+    font-weight: 700;
+    color: #242424;
+    width: 70px;
+    padding-left: 0;
+}
+
+.fdr-table .avg-col {
+    font-size: 11px;
+    font-weight: 800;
+    color: #666;
+    text-align: right;
+    padding-right: 0;
+}
+
+.box {
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: white;
+}
+
+.fdr-1 { background: #02894e; }
+.fdr-2 { background: #00ff85; color: #242424; }
+.fdr-3 { background: #ebebeb; color: #444; }
+.fdr-4 { background: #ff003c; }
+.fdr-5 { background: #6b001a; }
+
+/* ===== Modal ===== */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+}
+
+.modal-overlay.active { display: flex; }
+
+.modal {
+    background: white;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 900px;
+    max-height: 85vh;
+    overflow: hidden;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+}
+
+.modal-header {
+    padding: 20px 24px;
+    background: #f8f9fa;
+    color: #1a1a1a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-title {
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.modal-close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: #e0e0e0;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    color: #333;
+}
+
+.modal-close:hover {
+    background: #d0d0d0;
+    transform: rotate(90deg);
+}
+
+.modal-body {
+    padding: 20px;
+    max-height: 65vh;
+    overflow-y: auto;
+    background: #f8f9fa;
+}
+
+.game-detail-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.team-section h3 {
+    font-size: 16px;
+    font-weight: 800;
+    color: #1a1a1a;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+/* ===== Stats Table ===== */
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.stats-table th {
+    background: #f5f5f5;
+    padding: 10px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #666;
+    text-align: center;
+}
+
+.stats-table td {
+    padding: 10px 8px;
+    font-size: 12px;
+    text-align: center;
+    border-bottom: 1px solid #f5f5f5;
+}
+
+.stats-table tr:hover { background: #fafafa; }
+
+.stats-table .player-name {
+    text-align: left;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.stats-table .fantasy-score {
+    font-weight: 900;
+    color: #00c853;
+    font-size: 14px;
+}
+
+/* ===== Lineup ===== */
+.lineup-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.lineup-section h4 {
+    font-size: 14px;
+    font-weight: 800;
+    color: #666;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.lineup-section.starters h4 { color: #00c853; }
+.lineup-section.bench h4 { color: #888; }
+
+.player-card {
+    display: flex;
+    align-items: center;
+    background: white;
+    border-radius: 10px;
+    padding: 12px 16px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    border: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.player-card:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.player-card.effective {
+    border-color: #00c853;
+    background: linear-gradient(135deg, #fff 0%, #f0fff4 100%);
+}
+
+.player-card.ineffective { opacity: 0.6; }
+
+.pos-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 900;
+    color: white;
+    margin-right: 12px;
+}
+
+.pos-BC { background: #1e88e5; }
+.pos-FC { background: #e53935; }
+
+.player-info { flex: 1; }
+
+.player-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.player-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.captain-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    background: #ffd700;
+    color: #333;
+    border-radius: 4px;
+    font-weight: 800;
+}
+
+.player-stats {
+    font-size: 12px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.player-score { text-align: right; }
+
+.score-final {
+    font-size: 20px;
+    font-weight: 900;
+    color: #1a1a1a;
+}
+
+.score-base {
+    font-size: 11px;
+    color: #999;
+}
+
+.formation-info {
+    background: #e8f5e9;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: #2e7d32;
+    font-weight: 600;
+}
+
+/* ===== Loading ===== */
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f0f0f0;
+    border-top-color: #1a1a1a;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 12px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1200px) {
+    .container {
+        grid-template-columns: 1fr;
+        padding: 16px;
+    }
+    .game-detail-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Dual Lineup (VS Mode) ===== */
+.dual-lineup-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.dual-lineup-side {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #f0f0f0;
+}
+
+.dual-lineup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    border: 1px solid #e0e0e0;
+}
+
+.dual-team-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: #1a1a1a;
+}
+
+.dual-team-score {
+    font-size: 24px;
+    font-weight: 900;
+    color: #00c853;
+}
+
+.dual-team-formation {
+    font-size: 12px;
+    color: #666;
+    background: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+@media (max-width: 1200px) {
+    .dual-lineup-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Injury Badge ===== */
+.injury-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    background: #ff1744;
+    color: white;
+    border-radius: 4px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
