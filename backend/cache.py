@@ -316,6 +316,94 @@ class Cache:
 CACHE = Cache()
 
 
+class CacheManager:
+    """内存缓存持久化管理器"""
+
+    def __init__(self, cache: Cache):
+        self.cache = cache
+        self.file_path = os.path.join(CACHE_DIR, "latest_data.json")
+        self._file_lock = threading.Lock()
+
+    def _serialize(self) -> Dict[str, Any]:
+        return {
+            "teams": self.cache.teams,
+            "elements": self.cache.elements,
+            "live_elements": self.cache.live_elements,
+            "user_picks": self.cache.user_picks,
+            "standings": self.cache.standings,
+            "fixtures": self.cache.fixtures,
+            "fixture_details": self.cache.fixture_details,
+            "last_update": self.cache.last_update.isoformat() if self.cache.last_update else None,
+            "current_event": self.cache.current_event,
+            "current_event_name": self.cache.current_event_name,
+            "events_data": self.cache.events_data,
+        }
+
+    def save_to_disk(self):
+        """将当前内存缓存保存到磁盘"""
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        payload = self._serialize()
+        with self._file_lock:
+            with open(self.file_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    def load_from_disk(self) -> bool:
+        """从磁盘恢复最近一次缓存"""
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        if not os.path.exists(self.file_path):
+            with self._file_lock:
+                with open(self.file_path, "w", encoding="utf-8") as f:
+                    json.dump({}, f, ensure_ascii=False)
+            return False
+
+        try:
+            with self._file_lock:
+                with open(self.file_path, "r", encoding="utf-8") as f:
+                    raw_data = json.load(f) or {}
+        except Exception as e:
+            print(f"[Cache] Failed to load persisted cache: {e}")
+            return False
+
+        def _int_key_dict(data: Any) -> Any:
+            if not isinstance(data, dict):
+                return data
+            parsed = {}
+            for key, value in data.items():
+                try:
+                    parsed[int(key)] = value
+                except (TypeError, ValueError):
+                    parsed[key] = value
+            return parsed
+
+        self.cache.teams = _int_key_dict(raw_data.get("teams", {}))
+        self.cache.elements = _int_key_dict(raw_data.get("elements", {}))
+        self.cache.live_elements = _int_key_dict(raw_data.get("live_elements", {}))
+        self.cache.user_picks = _int_key_dict(raw_data.get("user_picks", {}))
+        self.cache.standings = _int_key_dict(raw_data.get("standings", {}))
+        self.cache.fixtures = raw_data.get("fixtures", [])
+        self.cache.fixture_details = _int_key_dict(raw_data.get("fixture_details", {}))
+        self.cache.current_event = raw_data.get("current_event", self.cache.current_event)
+        self.cache.current_event_name = raw_data.get("current_event_name", self.cache.current_event_name)
+        self.cache.events_data = raw_data.get("events_data", [])
+
+        last_update = raw_data.get("last_update")
+        if last_update:
+            try:
+                self.cache.last_update = datetime.fromisoformat(last_update)
+            except ValueError:
+                self.cache.last_update = None
+
+        return True
+
+    def set(self, key: str, value: Any):
+        """更新缓存字段并自动落盘"""
+        setattr(self.cache, key, value)
+        self.save_to_disk()
+
+
+cache = CacheManager(CACHE)
+
+
 class LocalCache:
     """本地文件缓存管理（保持兼容，迁移到SQLite）"""
     

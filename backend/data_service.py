@@ -13,7 +13,7 @@ import sqlite3
 import logging
 from typing import Dict, List, Tuple, Optional
 
-from backend.cache import CACHE, _get_connection, _db_lock
+from backend.cache import CACHE, cache, _get_connection, _db_lock
 from backend.config import POSITION_MAP, BASE_URL, CURRENT_PHASE, LEAGUE_ID, UID_MAP
 from backend.api_client import fetch
 
@@ -259,12 +259,36 @@ def calculate_fantasy_score(stats: Dict) -> int:
 def get_player_stats(element_id: int) -> Dict:
     """获取球员统计数据"""
     live_info = CACHE.live_elements.get(element_id, {})
+    element_info = CACHE.elements.get(element_id, {})
+
+    historical_total = int(
+        element_info.get('points_scored')
+        or element_info.get('total_points')
+        or 0
+    )
+
     if not isinstance(live_info, dict):
-        return {}
+        return {
+            'points': historical_total,
+            'rebounds': 0,
+            'assists': 0,
+            'steals': 0,
+            'blocks': 0,
+            'minutes': 0,
+            'fantasy': historical_total
+        }
     
     stats = live_info.get('stats', {})
     if not isinstance(stats, dict):
-        return {}
+        return {
+            'points': historical_total,
+            'rebounds': 0,
+            'assists': 0,
+            'steals': 0,
+            'blocks': 0,
+            'minutes': 0,
+            'fantasy': historical_total
+        }
     
     return {
         'points': int(stats.get('points_scored', 0)),
@@ -435,6 +459,10 @@ async def update_user_picks(client, uid: int) -> Tuple[Optional[int], List[Dict]
     data = await fetch(client, url)
     
     if not data or 'picks' not in data:
+        cached_picks = CACHE.user_picks.get(uid, [])
+        cached_score = CACHE.standings.get(uid, {}).get('today_live')
+        if cached_picks or cached_score is not None:
+            return cached_score if cached_score is not None else 0, cached_picks
         return None, []
     
     picks = []
@@ -475,6 +503,7 @@ async def update_user_picks(client, uid: int) -> Tuple[Optional[int], List[Dict]
     
     CACHE.user_picks[uid] = picks
     effective_score, _, _ = calculate_effective_score(picks)
+    cache.save_to_disk()
     return effective_score, picks
 
 
@@ -493,10 +522,12 @@ async def update_standings(client):
         uid = entry.get('entry')
         if uid in UID_MAP:
             total = int(float(entry.get('total', 0)) / 10)
+            existing = CACHE.standings.get(uid, {})
             CACHE.standings[uid] = {
                 'total': total, 
-                'today_live': 0,
-                'effective_players': []
+                'today_live': existing.get('today_live', 0),
+                'effective_players': existing.get('effective_players', []),
+                'picks': existing.get('picks', [])
             }
             uids_to_fetch.append(uid)
     
@@ -511,6 +542,8 @@ async def update_standings(client):
             await asyncio.sleep(0.5)
         except Exception as e:
             print(f"[Error] Failed to fetch picks for {uid}: {e}")
+    
+    cache.save_to_disk()
 
 
 async def update_all(force_static: bool = False):
@@ -533,6 +566,7 @@ async def update_all(force_static: bool = False):
             await update_standings(client)
             await update_fixtures(client)
             CACHE.last_update = datetime.now()
+            cache.save_to_disk()
             print(f"[OK] Updated at {CACHE.last_update.strftime('%H:%M:%S')}")
             print(f"[OK] Current Event: {CACHE.current_event_name} (ID: {CACHE.current_event})")
             return True

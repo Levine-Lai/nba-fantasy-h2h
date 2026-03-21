@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from backend.config import LEAGUE_ID, CACHE_DIR, FDR_HTML
-from backend.cache import CACHE, LocalCache, _ensure_db, get_cache_timestamp, DB_PATH
+from backend.cache import CACHE, LocalCache, _ensure_db, get_cache_timestamp, DB_PATH, cache
 from backend.api_client import load_static_data, update_static_data, update_live_data
 from backend.api_client import update_fixtures, CircuitBreaker
 from backend.data_service import update_fixture_details, update_standings
@@ -110,6 +110,8 @@ async def background_task():
 async def startup():
     """启动事件"""
     logger.info("[Startup] Starting up...")
+    persisted_loaded = cache.load_from_disk()
+    logger.info(f"[Startup] Persisted memory cache loaded: {persisted_loaded}")
     
     # 1. 检查SQLite文件是否存在，不存在则初始化
     if not os.path.exists(DB_PATH):
