@@ -86,11 +86,72 @@ def _count_transfers_in_event(transfers: List[Dict], current_event: int) -> int:
     return count
 
 
+def _extract_transfer_day(transfer: Dict) -> Optional[int]:
+    """从转会记录提取 game day（支持 22.1 / day / game_day 等格式）"""
+    if not isinstance(transfer, dict):
+        return None
+
+    for key in ("day", "game_day", "gameday"):
+        value = transfer.get(key)
+        if value is None:
+            continue
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            continue
+
+    event_value = transfer.get("event")
+    if isinstance(event_value, (int, float)):
+        event_float = float(event_value)
+        day = int(round((event_float - int(event_float)) * 10))
+        if day > 0:
+            return day
+    if isinstance(event_value, str) and "." in event_value:
+        part = event_value.split(".", 1)[1]
+        match = re.search(r"(\d+)", part)
+        if match:
+            try:
+                return int(match.group(1))
+            except ValueError:
+                return None
+    return None
+
+
+def _count_transfers_in_gd1(transfers: List[Dict], current_event: int) -> int:
+    """统计当前 GW 的 GD1 转会数"""
+    current_gw = _extract_gw_number(CACHE.current_event_name) or _extract_gw_number(current_event)
+    count = 0
+    for transfer in transfers:
+        if not isinstance(transfer, dict):
+            continue
+        transfer_event = transfer.get("event")
+        transfer_gw = transfer.get("gw") or transfer.get("gameweek") or _extract_gw_number(transfer_event)
+        if transfer_gw != current_gw and transfer_event != current_event:
+            continue
+        day = _extract_transfer_day(transfer)
+        if day == 1:
+            count += 1
+    return count
+
+
 def _calculate_transfer_penalty(transfer_count: int, wildcard_active: bool) -> int:
     """每 GW 免费 2 次，超出每次扣 100；wildcard 激活时不扣"""
     if wildcard_active:
         return 0
     return max(0, transfer_count - 2) * 100
+
+
+def _calculate_gd1_missing_penalty(transfer_count: int, gd1_transfer_count: int, wildcard_active: bool) -> int:
+    """
+    仅修复网站 GD1 漏扣分 bug：
+    网站近似按“忽略 GD1 转会”计罚，缺失量 = 正确罚分 - 网站已计罚分
+    """
+    if wildcard_active:
+        return 0
+    non_gd1_count = max(0, transfer_count - gd1_transfer_count)
+    correct_penalty = max(0, transfer_count - 2) * 100
+    website_penalty = max(0, non_gd1_count - 2) * 100
+    return max(0, correct_penalty - website_penalty)
 
 
 def validate_api_response(data: any) -> bool:
@@ -544,12 +605,19 @@ async def update_user_picks(client, uid: int) -> Tuple[Optional[int], List[Dict]
     
     existing = CACHE.standings.get(uid, {})
     transfer_count = _count_transfers_in_event(transfers_data, CACHE.current_event)
+    gd1_transfer_count = _count_transfers_in_gd1(transfers_data, CACHE.current_event)
     wildcard_active = _is_wildcard_active_from_history(history_data, CACHE.current_event)
     if not transfers_data and 'transfer_count' in existing:
         transfer_count = existing.get('transfer_count', 0)
+        gd1_transfer_count = existing.get('gd1_transfer_count', 0)
     if not history_data and 'wildcard_active' in existing:
         wildcard_active = existing.get('wildcard_active', False)
     penalty_score = _calculate_transfer_penalty(transfer_count, wildcard_active)
+    gd1_missing_penalty = _calculate_gd1_missing_penalty(
+        transfer_count,
+        gd1_transfer_count,
+        wildcard_active
+    )
 
     picks = []
     for pick in data['picks']:
@@ -594,6 +662,8 @@ async def update_user_picks(client, uid: int) -> Tuple[Optional[int], List[Dict]
     CACHE.standings[uid]['raw_today_live'] = effective_score
     CACHE.standings[uid]['penalty_score'] = penalty_score
     CACHE.standings[uid]['transfer_count'] = transfer_count
+    CACHE.standings[uid]['gd1_transfer_count'] = gd1_transfer_count
+    CACHE.standings[uid]['gd1_missing_penalty'] = gd1_missing_penalty
     CACHE.standings[uid]['wildcard_active'] = wildcard_active
     cache.save_to_disk()
     return final_score, picks
@@ -621,6 +691,8 @@ async def update_standings(client):
                 'raw_today_live': existing.get('raw_today_live', existing.get('today_live', 0)),
                 'penalty_score': existing.get('penalty_score', 0),
                 'transfer_count': existing.get('transfer_count', 0),
+                'gd1_transfer_count': existing.get('gd1_transfer_count', 0),
+                'gd1_missing_penalty': existing.get('gd1_missing_penalty', 0),
                 'wildcard_active': existing.get('wildcard_active', False),
                 'effective_players': existing.get('effective_players', []),
                 'picks': existing.get('picks', [])
@@ -635,6 +707,10 @@ async def update_standings(client):
             if score is not None:
                 CACHE.standings[uid]['today_live'] = score
                 CACHE.standings[uid]['picks'] = picks
+                # 修复网站 GD1 漏扣：仅扣除“缺失差额”，不影响其他天已计入的扣分
+                api_total = CACHE.standings[uid].get('total', 0)
+                missing_penalty = CACHE.standings[uid].get('gd1_missing_penalty', 0)
+                CACHE.standings[uid]['total'] = api_total - missing_penalty
             await asyncio.sleep(0.5)
         except Exception as e:
             print(f"[Error] Failed to fetch picks for {uid}: {e}")

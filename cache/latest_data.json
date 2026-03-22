@@ -16088,13 +16088,13 @@
     "322": {
       "id": 322,
       "stats": {
-        "minutes": 13,
-        "points_scored": 2,
-        "rebounds": 1,
+        "minutes": 20,
+        "points_scored": 7,
+        "rebounds": 3,
         "assists": 0,
-        "blocks": 1,
+        "blocks": 2,
         "steals": 1,
-        "total_points": 90,
+        "total_points": 190,
         "in_dreamteam": false
       },
       "explain": [
@@ -16104,25 +16104,25 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 13,
+              "value": 20,
               "points_modification": 0
             },
             {
               "identifier": "points_scored",
-              "points": 20,
-              "value": 2,
+              "points": 70,
+              "value": 7,
               "points_modification": 0
             },
             {
               "identifier": "rebounds",
-              "points": 10,
-              "value": 1,
+              "points": 30,
+              "value": 3,
               "points_modification": 0
             },
             {
               "identifier": "blocks",
-              "points": 30,
-              "value": 1,
+              "points": 60,
+              "value": 2,
               "points_modification": 0
             },
             {
@@ -16166,13 +16166,13 @@
     "324": {
       "id": 324,
       "stats": {
-        "minutes": 19,
+        "minutes": 27,
         "points_scored": 5,
-        "rebounds": 2,
-        "assists": 2,
+        "rebounds": 5,
+        "assists": 3,
         "blocks": 1,
         "steals": 0,
-        "total_points": 140,
+        "total_points": 190,
         "in_dreamteam": false
       },
       "explain": [
@@ -16182,7 +16182,7 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 19,
+              "value": 27,
               "points_modification": 0
             },
             {
@@ -16193,14 +16193,14 @@
             },
             {
               "identifier": "rebounds",
-              "points": 20,
-              "value": 2,
+              "points": 50,
+              "value": 5,
               "points_modification": 0
             },
             {
               "identifier": "assists",
-              "points": 40,
-              "value": 2,
+              "points": 60,
+              "value": 3,
               "points_modification": 0
             },
             {
@@ -16469,13 +16469,13 @@
     "333": {
       "id": 333,
       "stats": {
-        "minutes": 25,
-        "points_scored": 17,
-        "rebounds": 6,
-        "assists": 5,
+        "minutes": 33,
+        "points_scored": 26,
+        "rebounds": 10,
+        "assists": 7,
         "blocks": 0,
         "steals": 3,
-        "total_points": 420,
+        "total_points": 590,
         "in_dreamteam": false
       },
       "explain": [
@@ -16485,25 +16485,25 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 25,
+              "value": 33,
               "points_modification": 0
             },
             {
               "identifier": "points_scored",
-              "points": 170,
-              "value": 17,
+              "points": 260,
+              "value": 26,
               "points_modification": 0
             },
             {
               "identifier": "rebounds",
-              "points": 60,
-              "value": 6,
+              "points": 100,
+              "value": 10,
               "points_modification": 0
             },
             {
               "identifier": "assists",
-              "points": 100,
-              "value": 5,
+              "points": 140,
+              "value": 7,
               "points_modification": 0
             },
             {
@@ -16520,13 +16520,13 @@
     "334": {
       "id": 334,
       "stats": {
-        "minutes": 15,
-        "points_scored": 8,
-        "rebounds": 0,
+        "minutes": 23,
+        "points_scored": 11,
+        "rebounds": 1,
         "assists": 0,
         "blocks": 0,
         "steals": 0,
-        "total_points": 80,
+        "total_points": 120,
         "in_dreamteam": false
       },
       "explain": [
@@ -16536,13 +16536,19 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 15,
+              "value": 23,
               "points_modification": 0
             },
             {
               "identifier": "points_scored",
-              "points": 80,
-              "value": 8,
+              "points": 110,
+              "value": 11,
+              "points_modification": 0
+            },
+            {
+              "identifier": "rebounds",
+              "points": 10,
+              "value": 1,
               "points_modification": 0
             }
           ]
@@ -18680,13 +18686,13 @@
     "416": {
       "id": 416,
       "stats": {
-        "minutes": 25,
-        "points_scored": 7,
+        "minutes": 32,
+        "points_scored": 11,
         "rebounds": 2,
         "assists": 2,
         "blocks": 0,
-        "steals": 0,
-        "total_points": 130,
+        "steals": 1,
+        "total_points": 200,
         "in_dreamteam": false
       },
       "explain": [
@@ -18696,13 +18702,13 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 25,
+              "value": 32,
               "points_modification": 0
             },
             {
               "identifier": "points_scored",
-              "points": 70,
-              "value": 7,
+              "points": 110,
+              "value": 11,
               "points_modification": 0
             },
             {
@@ -18715,6 +18721,12 @@
               "identifier": "assists",
               "points": 40,
               "value": 2,
+              "points_modification": 0
+            },
+            {
+              "identifier": "steals",
+              "points": 30,
+              "value": 1,
               "points_modification": 0
             }
           ]
@@ -20600,13 +20612,13 @@
     "470": {
       "id": 470,
       "stats": {
-        "minutes": 29,
-        "points_scored": 22,
+        "minutes": 35,
+        "points_scored": 24,
         "rebounds": 3,
-        "assists": 1,
+        "assists": 2,
         "blocks": 0,
         "steals": 0,
-        "total_points": 270,
+        "total_points": 310,
         "in_dreamteam": false
       },
       "explain": [
@@ -20616,13 +20628,13 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 29,
+              "value": 35,
               "points_modification": 0
             },
             {
               "identifier": "points_scored",
-              "points": 220,
-              "value": 22,
+              "points": 240,
+              "value": 24,
               "points_modification": 0
             },
             {
@@ -20633,8 +20645,8 @@
             },
             {
               "identifier": "assists",
-              "points": 20,
-              "value": 1,
+              "points": 40,
+              "value": 2,
               "points_modification": 0
             }
           ]
@@ -20672,13 +20684,13 @@
     "472": {
       "id": 472,
       "stats": {
-        "minutes": 20,
-        "points_scored": 7,
-        "rebounds": 4,
+        "minutes": 27,
+        "points_scored": 11,
+        "rebounds": 7,
         "assists": 4,
         "blocks": 0,
         "steals": 1,
-        "total_points": 220,
+        "total_points": 290,
         "in_dreamteam": false
       },
       "explain": [
@@ -20688,19 +20700,19 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 20,
+              "value": 27,
               "points_modification": 0
             },
             {
               "identifier": "points_scored",
-              "points": 70,
-              "value": 7,
+              "points": 110,
+              "value": 11,
               "points_modification": 0
             },
             {
               "identifier": "rebounds",
-              "points": 40,
-              "value": 4,
+              "points": 70,
+              "value": 7,
               "points_modification": 0
             },
             {
@@ -20750,7 +20762,7 @@
     "474": {
       "id": 474,
       "stats": {
-        "minutes": 25,
+        "minutes": 33,
         "points_scored": 18,
         "rebounds": 4,
         "assists": 6,
@@ -20766,7 +20778,7 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 25,
+              "value": 33,
               "points_modification": 0
             },
             {
@@ -20849,13 +20861,13 @@
     "477": {
       "id": 477,
       "stats": {
-        "minutes": 28,
-        "points_scored": 10,
+        "minutes": 35,
+        "points_scored": 14,
         "rebounds": 4,
-        "assists": 6,
-        "blocks": 0,
-        "steals": 1,
-        "total_points": 290,
+        "assists": 7,
+        "blocks": 1,
+        "steals": 2,
+        "total_points": 410,
         "in_dreamteam": false
       },
       "explain": [
@@ -20865,13 +20877,13 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 28,
+              "value": 35,
               "points_modification": 0
             },
             {
               "identifier": "points_scored",
-              "points": 100,
-              "value": 10,
+              "points": 140,
+              "value": 14,
               "points_modification": 0
             },
             {
@@ -20882,14 +20894,20 @@
             },
             {
               "identifier": "assists",
-              "points": 120,
-              "value": 6,
+              "points": 140,
+              "value": 7,
+              "points_modification": 0
+            },
+            {
+              "identifier": "blocks",
+              "points": 30,
+              "value": 1,
               "points_modification": 0
             },
             {
               "identifier": "steals",
-              "points": 30,
-              "value": 1,
+              "points": 60,
+              "value": 2,
               "points_modification": 0
             }
           ]
@@ -20900,13 +20918,13 @@
     "478": {
       "id": 478,
       "stats": {
-        "minutes": 21,
-        "points_scored": 10,
-        "rebounds": 7,
+        "minutes": 23,
+        "points_scored": 12,
+        "rebounds": 8,
         "assists": 3,
         "blocks": 1,
-        "steals": 0,
-        "total_points": 260,
+        "steals": 1,
+        "total_points": 320,
         "in_dreamteam": false
       },
       "explain": [
@@ -20916,19 +20934,19 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 21,
+              "value": 23,
               "points_modification": 0
             },
             {
               "identifier": "points_scored",
-              "points": 100,
-              "value": 10,
+              "points": 120,
+              "value": 12,
               "points_modification": 0
             },
             {
               "identifier": "rebounds",
-              "points": 70,
-              "value": 7,
+              "points": 80,
+              "value": 8,
               "points_modification": 0
             },
             {
@@ -20942,6 +20960,12 @@
               "points": 30,
               "value": 1,
               "points_modification": 0
+            },
+            {
+              "identifier": "steals",
+              "points": 30,
+              "value": 1,
+              "points_modification": 0
             }
           ]
         }
@@ -20951,13 +20975,13 @@
     "479": {
       "id": 479,
       "stats": {
-        "minutes": 24,
-        "points_scored": 10,
-        "rebounds": 3,
+        "minutes": 31,
+        "points_scored": 12,
+        "rebounds": 5,
         "assists": 3,
         "blocks": 0,
         "steals": 1,
-        "total_points": 220,
+        "total_points": 260,
         "in_dreamteam": false
       },
       "explain": [
@@ -20967,19 +20991,19 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 24,
+              "value": 31,
               "points_modification": 0
             },
             {
               "identifier": "points_scored",
-              "points": 100,
-              "value": 10,
+              "points": 120,
+              "value": 12,
               "points_modification": 0
             },
             {
               "identifier": "rebounds",
-              "points": 30,
-              "value": 3,
+              "points": 50,
+              "value": 5,
               "points_modification": 0
             },
             {
@@ -21044,13 +21068,13 @@
     "482": {
       "id": 482,
       "stats": {
-        "minutes": 18,
+        "minutes": 19,
         "points_scored": 8,
         "rebounds": 2,
         "assists": 0,
         "blocks": 1,
-        "steals": 2,
-        "total_points": 190,
+        "steals": 1,
+        "total_points": 160,
         "in_dreamteam": false
       },
       "explain": [
@@ -21060,7 +21084,7 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 18,
+              "value": 19,
               "points_modification": 0
             },
             {
@@ -21083,8 +21107,8 @@
             },
             {
               "identifier": "steals",
-              "points": 60,
-              "value": 2,
+              "points": 30,
+              "value": 1,
               "points_modification": 0
             }
           ]
@@ -21194,7 +21218,7 @@
     "486": {
       "id": 486,
       "stats": {
-        "minutes": 8,
+        "minutes": 9,
         "points_scored": 0,
         "rebounds": 1,
         "assists": 0,
@@ -21210,7 +21234,7 @@
             {
               "identifier": "minutes",
               "points": 0,
-              "value": 8,
+              "value": 9,
               "points_modification": 0
             },
             {
@@ -26020,7 +26044,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -26286,7 +26310,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -26552,7 +26576,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -26762,16 +26786,16 @@
         "is_captain": true,
         "is_vice": false,
         "multiplier": 1,
-        "base_points": 42,
-        "final_points": 42,
+        "base_points": 59,
+        "final_points": 59,
         "stats": {
-          "points": 17,
-          "rebounds": 6,
-          "assists": 5,
+          "points": 26,
+          "rebounds": 10,
+          "assists": 7,
           "steals": 3,
           "blocks": 0,
-          "minutes": 25,
-          "fantasy": 42
+          "minutes": 33,
+          "fantasy": 59
         },
         "injury": null,
         "team_id": 17,
@@ -26980,16 +27004,16 @@
         "is_captain": false,
         "is_vice": false,
         "multiplier": 1,
-        "base_points": 27,
-        "final_points": 27,
+        "base_points": 31,
+        "final_points": 31,
         "stats": {
-          "points": 22,
+          "points": 24,
           "rebounds": 3,
-          "assists": 1,
+          "assists": 2,
           "steals": 0,
           "blocks": 0,
-          "minutes": 29,
-          "fantasy": 27
+          "minutes": 35,
+          "fantasy": 31
         },
         "injury": null,
         "team_id": 24,
@@ -27278,7 +27302,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -27472,7 +27496,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -27584,16 +27608,16 @@
         "is_captain": false,
         "is_vice": false,
         "multiplier": 0,
-        "base_points": 42,
-        "final_points": 42,
+        "base_points": 59,
+        "final_points": 59,
         "stats": {
-          "points": 17,
-          "rebounds": 6,
-          "assists": 5,
+          "points": 26,
+          "rebounds": 10,
+          "assists": 7,
           "steals": 3,
           "blocks": 0,
-          "minutes": 25,
-          "fantasy": 42
+          "minutes": 33,
+          "fantasy": 59
         },
         "injury": null,
         "team_id": 17,
@@ -27882,7 +27906,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -28198,7 +28222,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -28310,16 +28334,16 @@
         "is_captain": false,
         "is_vice": false,
         "multiplier": 0,
-        "base_points": 42,
-        "final_points": 42,
+        "base_points": 59,
+        "final_points": 59,
         "stats": {
-          "points": 17,
-          "rebounds": 6,
-          "assists": 5,
+          "points": 26,
+          "rebounds": 10,
+          "assists": 7,
           "steals": 3,
           "blocks": 0,
-          "minutes": 25,
-          "fantasy": 42
+          "minutes": 33,
+          "fantasy": 59
         },
         "injury": null,
         "team_id": 17,
@@ -28464,7 +28488,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -28648,16 +28672,16 @@
         "is_captain": false,
         "is_vice": false,
         "multiplier": 0,
-        "base_points": 42,
-        "final_points": 42,
+        "base_points": 59,
+        "final_points": 59,
         "stats": {
-          "points": 17,
-          "rebounds": 6,
-          "assists": 5,
+          "points": 26,
+          "rebounds": 10,
+          "assists": 7,
           "steals": 3,
           "blocks": 0,
-          "minutes": 25,
-          "fantasy": 42
+          "minutes": 33,
+          "fantasy": 59
         },
         "injury": null,
         "team_id": 17,
@@ -28722,16 +28746,16 @@
         "is_captain": false,
         "is_vice": false,
         "multiplier": 1,
-        "base_points": 42,
-        "final_points": 42,
+        "base_points": 59,
+        "final_points": 59,
         "stats": {
-          "points": 17,
-          "rebounds": 6,
-          "assists": 5,
+          "points": 26,
+          "rebounds": 10,
+          "assists": 7,
           "steals": 3,
           "blocks": 0,
-          "minutes": 25,
-          "fantasy": 42
+          "minutes": 33,
+          "fantasy": 59
         },
         "injury": null,
         "team_id": 17,
@@ -29190,7 +29214,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -29424,16 +29448,16 @@
         "is_captain": false,
         "is_vice": false,
         "multiplier": 1,
-        "base_points": 42,
-        "final_points": 42,
+        "base_points": 59,
+        "final_points": 59,
         "stats": {
-          "points": 17,
-          "rebounds": 6,
-          "assists": 5,
+          "points": 26,
+          "rebounds": 10,
+          "assists": 7,
           "steals": 3,
           "blocks": 0,
-          "minutes": 25,
-          "fantasy": 42
+          "minutes": 33,
+          "fantasy": 59
         },
         "injury": null,
         "team_id": 17,
@@ -29576,7 +29600,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -29666,16 +29690,16 @@
         "is_captain": false,
         "is_vice": false,
         "multiplier": 1,
-        "base_points": 42,
-        "final_points": 42,
+        "base_points": 59,
+        "final_points": 59,
         "stats": {
-          "points": 17,
-          "rebounds": 6,
-          "assists": 5,
+          "points": 26,
+          "rebounds": 10,
+          "assists": 7,
           "steals": 3,
           "blocks": 0,
-          "minutes": 25,
-          "fantasy": 42
+          "minutes": 33,
+          "fantasy": 59
         },
         "injury": null,
         "team_id": 17,
@@ -30254,7 +30278,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -30270,16 +30294,16 @@
         "is_captain": false,
         "is_vice": false,
         "multiplier": 0,
-        "base_points": 42,
-        "final_points": 42,
+        "base_points": 59,
+        "final_points": 59,
         "stats": {
-          "points": 17,
-          "rebounds": 6,
-          "assists": 5,
+          "points": 26,
+          "rebounds": 10,
+          "assists": 7,
           "steals": 3,
           "blocks": 0,
-          "minutes": 25,
-          "fantasy": 42
+          "minutes": 33,
+          "fantasy": 59
         },
         "injury": null,
         "team_id": 17,
@@ -30488,16 +30512,16 @@
         "is_captain": false,
         "is_vice": false,
         "multiplier": 0,
-        "base_points": 42,
-        "final_points": 42,
+        "base_points": 59,
+        "final_points": 59,
         "stats": {
-          "points": 17,
-          "rebounds": 6,
-          "assists": 5,
+          "points": 26,
+          "rebounds": 10,
+          "assists": 7,
           "steals": 3,
           "blocks": 0,
-          "minutes": 25,
-          "fantasy": 42
+          "minutes": 33,
+          "fantasy": 59
         },
         "injury": null,
         "team_id": 17,
@@ -30852,16 +30876,16 @@
         "is_captain": false,
         "is_vice": false,
         "multiplier": 1,
-        "base_points": 42,
-        "final_points": 42,
+        "base_points": 59,
+        "final_points": 59,
         "stats": {
-          "points": 17,
-          "rebounds": 6,
-          "assists": 5,
+          "points": 26,
+          "rebounds": 10,
+          "assists": 7,
           "steals": 3,
           "blocks": 0,
-          "minutes": 25,
-          "fantasy": 42
+          "minutes": 33,
+          "fantasy": 59
         },
         "injury": null,
         "team_id": 17,
@@ -30980,7 +31004,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -31368,7 +31392,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -31948,7 +31972,7 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
         },
         "injury": null,
@@ -32302,6 +32326,8 @@
       "raw_today_live": 183,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -32322,7 +32348,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -32548,11 +32574,13 @@
       ]
     },
     "42": {
-      "total": 1249,
+      "total": 1254,
       "today_live": 198,
       "raw_today_live": 198,
       "penalty_score": 0,
       "transfer_count": 1,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -32597,7 +32625,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -32799,11 +32827,13 @@
       ]
     },
     "4319": {
-      "total": 1250,
+      "total": 1252,
       "today_live": 205,
       "raw_today_live": 205,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -32872,7 +32902,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -33050,11 +33080,13 @@
       ]
     },
     "17": {
-      "total": 1249,
-      "today_live": 213,
-      "raw_today_live": 213,
+      "total": 1266,
+      "today_live": 230,
+      "raw_today_live": 230,
       "penalty_score": 0,
       "transfer_count": 1,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -33091,16 +33123,16 @@
           "is_captain": true,
           "is_vice": false,
           "multiplier": 1,
-          "base_points": 42,
-          "final_points": 42,
+          "base_points": 59,
+          "final_points": 59,
           "stats": {
-            "points": 17,
-            "rebounds": 6,
-            "assists": 5,
+            "points": 26,
+            "rebounds": 10,
+            "assists": 7,
             "steals": 3,
             "blocks": 0,
-            "minutes": 25,
-            "fantasy": 42
+            "minutes": 33,
+            "fantasy": 59
           },
           "injury": null,
           "team_id": 17,
@@ -33301,11 +33333,13 @@
       ]
     },
     "23": {
-      "total": 1204,
-      "today_live": 190,
-      "raw_today_live": 190,
+      "total": 1215,
+      "today_live": 194,
+      "raw_today_live": 194,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -33318,16 +33352,16 @@
           "is_captain": false,
           "is_vice": false,
           "multiplier": 1,
-          "base_points": 27,
-          "final_points": 27,
+          "base_points": 31,
+          "final_points": 31,
           "stats": {
-            "points": 22,
+            "points": 24,
             "rebounds": 3,
-            "assists": 1,
+            "assists": 2,
             "steals": 0,
             "blocks": 0,
-            "minutes": 29,
-            "fantasy": 27
+            "minutes": 35,
+            "fantasy": 31
           },
           "injury": null,
           "team_id": 24,
@@ -33557,6 +33591,8 @@
       "raw_today_live": 197,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -33625,7 +33661,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -33808,6 +33844,8 @@
       "raw_today_live": 190,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -33828,7 +33866,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -33940,16 +33978,16 @@
           "is_captain": false,
           "is_vice": false,
           "multiplier": 0,
-          "base_points": 42,
-          "final_points": 42,
+          "base_points": 59,
+          "final_points": 59,
           "stats": {
-            "points": 17,
-            "rebounds": 6,
-            "assists": 5,
+            "points": 26,
+            "rebounds": 10,
+            "assists": 7,
             "steals": 3,
             "blocks": 0,
-            "minutes": 25,
-            "fantasy": 42
+            "minutes": 33,
+            "fantasy": 59
           },
           "injury": null,
           "team_id": 17,
@@ -34059,6 +34097,8 @@
       "raw_today_live": 146,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -34247,7 +34287,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -34310,6 +34350,8 @@
       "raw_today_live": 207,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -34557,10 +34599,12 @@
     },
     "5467": {
       "total": 1095,
-      "today_live": 174,
-      "raw_today_live": 174,
+      "today_live": 191,
+      "raw_today_live": 191,
       "penalty_score": 0,
       "transfer_count": 2,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -34581,7 +34625,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -34693,16 +34737,16 @@
           "is_captain": false,
           "is_vice": false,
           "multiplier": 0,
-          "base_points": 42,
-          "final_points": 42,
+          "base_points": 59,
+          "final_points": 59,
           "stats": {
-            "points": 17,
-            "rebounds": 6,
-            "assists": 5,
+            "points": 26,
+            "rebounds": 10,
+            "assists": 7,
             "steals": 3,
             "blocks": 0,
-            "minutes": 25,
-            "fantasy": 42
+            "minutes": 33,
+            "fantasy": 59
           },
           "injury": null,
           "team_id": 17,
@@ -34812,6 +34856,8 @@
       "raw_today_live": 147,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -34856,7 +34902,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -35040,16 +35086,16 @@
           "is_captain": false,
           "is_vice": false,
           "multiplier": 0,
-          "base_points": 42,
-          "final_points": 42,
+          "base_points": 59,
+          "final_points": 59,
           "stats": {
-            "points": 17,
-            "rebounds": 6,
-            "assists": 5,
+            "points": 26,
+            "rebounds": 10,
+            "assists": 7,
             "steals": 3,
             "blocks": 0,
-            "minutes": 25,
-            "fantasy": 42
+            "minutes": 33,
+            "fantasy": 59
           },
           "injury": null,
           "team_id": 17,
@@ -35058,11 +35104,13 @@
       ]
     },
     "6562": {
-      "total": 1120,
-      "today_live": 163,
-      "raw_today_live": 163,
+      "total": 1137,
+      "today_live": 180,
+      "raw_today_live": 180,
       "penalty_score": 0,
       "transfer_count": 1,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -35123,16 +35171,16 @@
           "is_captain": false,
           "is_vice": false,
           "multiplier": 1,
-          "base_points": 42,
-          "final_points": 42,
+          "base_points": 59,
+          "final_points": 59,
           "stats": {
-            "points": 17,
-            "rebounds": 6,
-            "assists": 5,
+            "points": 26,
+            "rebounds": 10,
+            "assists": 7,
             "steals": 3,
             "blocks": 0,
-            "minutes": 25,
-            "fantasy": 42
+            "minutes": 33,
+            "fantasy": 59
           },
           "injury": null,
           "team_id": 17,
@@ -35309,11 +35357,13 @@
       ]
     },
     "5095": {
-      "total": 1171,
+      "total": 1173,
       "today_live": 183,
       "raw_today_live": 183,
       "penalty_score": 0,
       "transfer_count": 2,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -35560,11 +35610,13 @@
       ]
     },
     "4": {
-      "total": 1182,
+      "total": 1184,
       "today_live": 199,
       "raw_today_live": 199,
       "penalty_score": 0,
       "transfer_count": 2,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -35609,7 +35661,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -35811,11 +35863,13 @@
       ]
     },
     "11": {
-      "total": 1178,
-      "today_live": 205,
-      "raw_today_live": 205,
+      "total": 1195,
+      "today_live": 222,
+      "raw_today_live": 222,
       "penalty_score": 0,
       "transfer_count": 2,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -35852,16 +35906,16 @@
           "is_captain": false,
           "is_vice": false,
           "multiplier": 1,
-          "base_points": 42,
-          "final_points": 42,
+          "base_points": 59,
+          "final_points": 59,
           "stats": {
-            "points": 17,
-            "rebounds": 6,
-            "assists": 5,
+            "points": 26,
+            "rebounds": 10,
+            "assists": 7,
             "steals": 3,
             "blocks": 0,
-            "minutes": 25,
-            "fantasy": 42
+            "minutes": 33,
+            "fantasy": 59
           },
           "injury": null,
           "team_id": 17,
@@ -36004,7 +36058,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -36062,11 +36116,13 @@
       ]
     },
     "9": {
-      "total": 1126,
-      "today_live": 169,
-      "raw_today_live": 169,
+      "total": 1143,
+      "today_live": 186,
+      "raw_today_live": 186,
       "penalty_score": 0,
       "transfer_count": 1,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -36103,16 +36159,16 @@
           "is_captain": false,
           "is_vice": false,
           "multiplier": 1,
-          "base_points": 42,
-          "final_points": 42,
+          "base_points": 59,
+          "final_points": 59,
           "stats": {
-            "points": 17,
-            "rebounds": 6,
-            "assists": 5,
+            "points": 26,
+            "rebounds": 10,
+            "assists": 7,
             "steals": 3,
             "blocks": 0,
-            "minutes": 25,
-            "fantasy": 42
+            "minutes": 33,
+            "fantasy": 59
           },
           "injury": null,
           "team_id": 17,
@@ -36313,11 +36369,13 @@
       ]
     },
     "32": {
-      "total": 1120,
+      "total": 1122,
       "today_live": 192,
       "raw_today_live": 192,
       "penalty_score": 0,
       "transfer_count": 1,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -36565,10 +36623,12 @@
     },
     "4224": {
       "total": 1021,
-      "today_live": 187,
-      "raw_today_live": 187,
+      "today_live": 204,
+      "raw_today_live": 204,
       "penalty_score": 0,
       "transfer_count": 1,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -36709,7 +36769,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -36725,16 +36785,16 @@
           "is_captain": false,
           "is_vice": false,
           "multiplier": 0,
-          "base_points": 42,
-          "final_points": 42,
+          "base_points": 59,
+          "final_points": 59,
           "stats": {
-            "points": 17,
-            "rebounds": 6,
-            "assists": 5,
+            "points": 26,
+            "rebounds": 10,
+            "assists": 7,
             "steals": 3,
             "blocks": 0,
-            "minutes": 25,
-            "fantasy": 42
+            "minutes": 33,
+            "fantasy": 59
           },
           "injury": null,
           "team_id": 17,
@@ -36816,10 +36876,12 @@
     },
     "16447": {
       "total": 1040,
-      "today_live": 212,
-      "raw_today_live": 212,
+      "today_live": 229,
+      "raw_today_live": 229,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -36952,16 +37014,16 @@
           "is_captain": false,
           "is_vice": false,
           "multiplier": 0,
-          "base_points": 42,
-          "final_points": 42,
+          "base_points": 59,
+          "final_points": 59,
           "stats": {
-            "points": 17,
-            "rebounds": 6,
-            "assists": 5,
+            "points": 26,
+            "rebounds": 10,
+            "assists": 7,
             "steals": 3,
             "blocks": 0,
-            "minutes": 25,
-            "fantasy": 42
+            "minutes": 33,
+            "fantasy": 59
           },
           "injury": null,
           "team_id": 17,
@@ -37071,6 +37133,8 @@
       "raw_today_live": 150,
       "penalty_score": 0,
       "transfer_count": 1,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -37317,11 +37381,13 @@
       ]
     },
     "8580": {
-      "total": 1101,
-      "today_live": 175,
-      "raw_today_live": 175,
+      "total": 1118,
+      "today_live": 192,
+      "raw_today_live": 192,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -37334,16 +37400,16 @@
           "is_captain": false,
           "is_vice": false,
           "multiplier": 1,
-          "base_points": 42,
-          "final_points": 42,
+          "base_points": 59,
+          "final_points": 59,
           "stats": {
-            "points": 17,
-            "rebounds": 6,
-            "assists": 5,
+            "points": 26,
+            "rebounds": 10,
+            "assists": 7,
             "steals": 3,
             "blocks": 0,
-            "minutes": 25,
-            "fantasy": 42
+            "minutes": 33,
+            "fantasy": 59
           },
           "injury": null,
           "team_id": 17,
@@ -37462,7 +37528,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -37573,6 +37639,8 @@
       "raw_today_live": 164,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -37819,11 +37887,13 @@
       ]
     },
     "5410": {
-      "total": 945,
+      "total": 947,
       "today_live": 140,
       "raw_today_live": 140,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -37868,7 +37938,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -38075,6 +38145,8 @@
       "raw_today_live": 215,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -38326,6 +38398,8 @@
       "raw_today_live": 278,
       "penalty_score": 0,
       "transfer_count": 1,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -38466,7 +38540,7 @@
             "assists": 6,
             "steals": 0,
             "blocks": 0,
-            "minutes": 25,
+            "minutes": 33,
             "fantasy": 34
           },
           "injury": null,
@@ -38577,6 +38651,8 @@
       "raw_today_live": 135,
       "penalty_score": 0,
       "transfer_count": 0,
+      "gd1_transfer_count": 0,
+      "gd1_missing_penalty": 0,
       "wildcard_active": false,
       "effective_players": [],
       "picks": [
@@ -38918,8 +38994,8 @@
       "id": 1031,
       "home_team": "Phoenix Suns",
       "away_team": "Milwaukee Bucks",
-      "home_score": 91,
-      "away_score": 87,
+      "home_score": 105,
+      "away_score": 108,
       "started": true,
       "finished": false,
       "kickoff": "10:00"
@@ -47683,6 +47759,19 @@
       "away_team": "Milwaukee Bucks",
       "home_players": [
         {
+          "id": 477,
+          "name": "D.Booker",
+          "position": 1,
+          "position_name": "BC",
+          "points": 14,
+          "rebounds": 4,
+          "assists": 7,
+          "steals": 2,
+          "blocks": 1,
+          "minutes": 35,
+          "fantasy": 41
+        },
+        {
           "id": 474,
           "name": "C.Gillespie",
           "position": 1,
@@ -47692,73 +47781,60 @@
           "assists": 6,
           "steals": 0,
           "blocks": 0,
-          "minutes": 25,
+          "minutes": 33,
           "fantasy": 34
-        },
-        {
-          "id": 477,
-          "name": "D.Booker",
-          "position": 1,
-          "position_name": "BC",
-          "points": 10,
-          "rebounds": 4,
-          "assists": 6,
-          "steals": 1,
-          "blocks": 0,
-          "minutes": 28,
-          "fantasy": 29
-        },
-        {
-          "id": 470,
-          "name": "J.Green",
-          "position": 1,
-          "position_name": "BC",
-          "points": 22,
-          "rebounds": 3,
-          "assists": 1,
-          "steals": 0,
-          "blocks": 0,
-          "minutes": 29,
-          "fantasy": 27
         },
         {
           "id": 478,
           "name": "R.Dunn",
           "position": 2,
           "position_name": "FC",
-          "points": 10,
-          "rebounds": 7,
+          "points": 12,
+          "rebounds": 8,
           "assists": 3,
-          "steals": 0,
+          "steals": 1,
           "blocks": 1,
-          "minutes": 21,
-          "fantasy": 26
+          "minutes": 23,
+          "fantasy": 32
+        },
+        {
+          "id": 470,
+          "name": "J.Green",
+          "position": 1,
+          "position_name": "BC",
+          "points": 24,
+          "rebounds": 3,
+          "assists": 2,
+          "steals": 0,
+          "blocks": 0,
+          "minutes": 35,
+          "fantasy": 31
         },
         {
           "id": 472,
           "name": "J.Goodwin",
           "position": 1,
           "position_name": "BC",
-          "points": 7,
-          "rebounds": 4,
+          "points": 11,
+          "rebounds": 7,
           "assists": 4,
           "steals": 1,
           "blocks": 0,
-          "minutes": 20,
-          "fantasy": 22
+          "minutes": 27,
+          "fantasy": 29
         },
         {
           "id": 479,
           "name": "O.Ighodaro",
           "position": 2,
           "position_name": "FC",
-          "points": 10,
-          "rebounds": 3,
+          "points": 12,
+          "rebounds": 5,
           "assists": 3,
           "steals": 1,
           "blocks": 0,
-          "minutes": 24,
-          "fantasy": 22
+          "minutes": 31,
+          "fantasy": 26
         },
         {
           "id": 482,
@@ -47768,10 +47844,10 @@
           "points": 8,
           "rebounds": 2,
           "assists": 0,
-          "steals": 2,
+          "steals": 1,
           "blocks": 1,
-          "minutes": 18,
-          "fantasy": 19
+          "minutes": 19,
+          "fantasy": 16
         },
         {
           "id": 337,
@@ -47809,7 +47885,7 @@
           "assists": 0,
           "steals": 1,
           "blocks": 0,
-          "minutes": 8,
+          "minutes": 9,
           "fantasy": 4
         },
         {
@@ -47988,13 +48064,13 @@
           "name": "R.Rollins",
           "position": 1,
           "position_name": "BC",
-          "points": 17,
-          "rebounds": 6,
-          "assists": 5,
+          "points": 26,
+          "rebounds": 10,
+          "assists": 7,
           "steals": 3,
           "blocks": 0,
-          "minutes": 25,
-          "fantasy": 42
+          "minutes": 33,
+          "fantasy": 59
         },
         {
           "id": 338,
@@ -48023,6 +48099,45 @@
           "fantasy": 22
         },
         {
+          "id": 416,
+          "name": "O.Dieng",
+          "position": 2,
+          "position_name": "FC",
+          "points": 11,
+          "rebounds": 2,
+          "assists": 2,
+          "steals": 1,
+          "blocks": 0,
+          "minutes": 32,
+          "fantasy": 20
+        },
+        {
+          "id": 322,
+          "name": "M.Turner",
+          "position": 2,
+          "position_name": "FC",
+          "points": 7,
+          "rebounds": 3,
+          "assists": 0,
+          "steals": 1,
+          "blocks": 2,
+          "minutes": 20,
+          "fantasy": 19
+        },
+        {
+          "id": 324,
+          "name": "P.Nance",
+          "position": 2,
+          "position_name": "FC",
+          "points": 5,
+          "rebounds": 5,
+          "assists": 3,
+          "steals": 0,
+          "blocks": 1,
+          "minutes": 27,
+          "fantasy": 19
+        },
+        {
           "id": 330,
           "name": "A.Green",
           "position": 1,
@@ -48036,19 +48151,6 @@
           "fantasy": 17
         },
         {
-          "id": 324,
-          "name": "P.Nance",
-          "position": 2,
-          "position_name": "FC",
-          "points": 5,
-          "rebounds": 2,
-          "assists": 2,
-          "steals": 0,
-          "blocks": 1,
-          "minutes": 19,
-          "fantasy": 14
-        },
-        {
           "id": 45,
           "name": "C.Thomas",
           "position": 1,
@@ -48059,19 +48161,6 @@
           "steals": 1,
           "blocks": 0,
           "minutes": 15,
-          "fantasy": 13
-        },
-        {
-          "id": 416,
-          "name": "O.Dieng",
-          "position": 2,
-          "position_name": "FC",
-          "points": 7,
-          "rebounds": 2,
-          "assists": 2,
-          "steals": 0,
-          "blocks": 0,
-          "minutes": 25,
           "fantasy": 13
         },
         {
@@ -48088,30 +48177,17 @@
           "fantasy": 12
         },
         {
-          "id": 322,
-          "name": "M.Turner",
-          "position": 2,
-          "position_name": "FC",
-          "points": 2,
-          "rebounds": 1,
-          "assists": 0,
-          "steals": 1,
-          "blocks": 1,
-          "minutes": 13,
-          "fantasy": 9
-        },
-        {
           "id": 334,
           "name": "G.Trent Jr.",
           "position": 1,
           "position_name": "BC",
-          "points": 8,
-          "rebounds": 0,
+          "points": 11,
+          "rebounds": 1,
           "assists": 0,
           "steals": 0,
           "blocks": 0,
-          "minutes": 15,
-          "fantasy": 8
+          "minutes": 23,
+          "fantasy": 12
         },
         {
           "id": 325,
@@ -48246,7 +48322,7 @@
       ]
     }
   },
-  "last_update": "2026-03-22T12:01:55.354645",
+  "last_update": "2026-03-22T12:43:22.110267",
   "current_event": 143,
   "current_event_name": "Gameweek 22 - Day 6",
   "events_data": [

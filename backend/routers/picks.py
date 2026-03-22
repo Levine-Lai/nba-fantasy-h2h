@@ -35,6 +35,8 @@ def get_picks(uid: int):
         "raw_total_live": standings.get('raw_today_live', standings.get('today_live', 0)),
         "penalty_score": standings.get('penalty_score', 0),
         "transfer_count": standings.get('transfer_count', 0),
+        "gd1_transfer_count": standings.get('gd1_transfer_count', 0),
+        "gd1_missing_penalty": standings.get('gd1_missing_penalty', 0),
         "wildcard_active": standings.get('wildcard_active', False),
         "event_total": standings.get('total', 0),
         "formation": formation,

@@ -1,0 +1,10 @@
+﻿name = "nba-fantasy-api"
+main = "src/index.js"
+compatibility_date = "2026-03-22"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[kv_namespaces]]
+binding = "NBA_CACHE"
+id = "99c5f75da5e4461cbb3661c1c5484b5a"

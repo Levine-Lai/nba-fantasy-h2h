@@ -10,6 +10,7 @@
 
 const POSITION_NAME = {1: 'BC', 2: 'FC'};
 let currentEventName = "";
+const API_BASE = (window.__API_BASE__ || '').replace(/\/+$/, '');
 
 // ===== 错误提示组件 =====
 const ErrorBanner = {
@@ -37,7 +38,8 @@ const ErrorBanner = {
 const API = {
     async fetch(url, options = {}) {
         try {
-            const res = await fetch(url, options);
+            const target = /^https?:\/\//.test(url) ? url : `${API_BASE}${url}`;
+            const res = await fetch(target, options);
             
             // 统一处理错误状态码
             if (!res.ok) {
@@ -520,6 +522,7 @@ function closeModal(e, modalId) {
 // 全局暴露（保持HTML中的onclick兼容）
 window.App = App;
 window.closeModal = closeModal;
+window.manualRefresh = () => App.manualRefresh();
 
 // 启动应用
 App.init();
