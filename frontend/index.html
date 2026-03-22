@@ -1,0 +1,113 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA Fantasy H2H Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script>
+        // 閮ㄧ讲鍒?Cloudflare Pages 鏃讹紝濉叆浣犵殑 Worker 鍩熷悕锛屼緥濡?
+        // window.__API_BASE__ = "https://nba-fantasy-api.<subdomain>.workers.dev";
+        window.__API_BASE__ = " https://nbafantasy.workers.dev";
+    </script>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="brand">
+            <h1>NBA Fantasy H2H</h1>
+            <span id="event-info">Loading... 鈥?League #1653</span>
+        </div>
+        <div class="controls">
+            <div class="status">
+                <span class="pulse"></span>
+                <span id="update-time">鍔犺浇涓?..</span>
+            </div>
+            <button class="btn" onclick="manualRefresh()" id="refresh-btn">鍒锋柊鏁版嵁</button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Column 1: Games -->
+        <div class="column">
+            <div class="col-header">
+                <div class="col-title">浠婃棩璧涚▼</div>
+                <span class="col-badge" id="game-count">-</span>
+            </div>
+            <div class="game-list" id="game-list">
+                <div class="loading"><div class="spinner"></div>鍔犺浇涓?..</div>
+            </div>
+        </div>
+
+        <!-- Column 2: H2H -->
+        <div class="column">
+            <div class="col-header">
+                <div class="col-title">瀹炴椂瀵归樀</div>
+                <span class="col-badge" id="match-count">-</span>
+            </div>
+            <div class="h2h-list" id="h2h-list">
+                <div class="loading"><div class="spinner"></div>鍔犺浇涓?..</div>
+            </div>
+        </div>
+
+        <!-- Column 3: FDR -->
+        <div class="column">
+            <div class="col-header">
+                <div class="col-title">FDR 璧涚▼鎺掕</div>
+                <span class="col-badge" id="fdr-week-badge">Auto GW</span>
+            </div>
+            <table class="fdr-table">
+                <thead>
+                    <tr>
+                        <th class="t-name">TEAM</th>
+                        <th>22</th><th>23</th><th>24</th><th>25</th>
+                        <th class="avg-col">AVG</th>
+                    </tr>
+                </thead>
+                <tbody id="fdr-body">
+                    <!-- FDR data loaded by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Lineup Modal -->
+    <div class="modal-overlay" id="lineup-modal" onclick="closeModal(event, 'lineup-modal')">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="lineup-title">闃靛璇︽儏</div>
+                <button class="modal-close" onclick="closeModal(null, 'lineup-modal')">脳</button>
+            </div>
+            <div class="modal-body" id="lineup-body">
+                <div class="loading"><div class="spinner"></div>鍔犺浇涓?..</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Modal -->
+    <div class="modal-overlay" id="game-modal" onclick="closeModal(event, 'game-modal')">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width: 1000px;">
+            <div class="modal-header">
+                <div class="modal-title" id="game-title">姣旇禌璇︽儏</div>
+                <button class="modal-close" onclick="closeModal(null, 'game-modal')">脳</button>
+            </div>
+            <div class="modal-body" id="game-body">
+                <div class="loading"><div class="spinner"></div>鍔犺浇涓?..</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        // Load FDR HTML from backend
+        const apiBase = (window.__API_BASE__ || '').replace(/\/+$/, '');
+        fetch(`${apiBase}/api/fdr`).then(r => r.json()).then(data => {
+            document.getElementById('fdr-body').innerHTML = data.html;
+        }).catch(() => {
+            document.getElementById('fdr-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">鍔犺浇澶辫触</td></tr>';
+        });
+    </script>
+</body>
+</html>
+
