@@ -9,7 +9,7 @@
  */
 
 const POSITION_NAME = {1: 'BC', 2: 'FC'};
-let currentEventName = "GW22";
+let currentEventName = "";
 
 // ===== 错误提示组件 =====
 const ErrorBanner = {
@@ -166,12 +166,18 @@ const Render = {
                         <div class="team-name">${m.t1}</div>
                         <div class="score-main ${s1Class}">${m.total1}</div>
                         <div class="score-sub">今日 ${m.today1}</div>
+                        ${m.penalty1 > 0 ? `<div class="score-sub" style="color:#ff6b6b;">- ${m.penalty1} Penalty (${m.transfer_count1} transfers)</div>` : ''}
+                        ${m.penalty1 > 0 ? `<div class="score-sub" style="color:#fbbf24;">${m.raw_today1} - ${m.penalty1} = ${m.today1}</div>` : ''}
+                        ${m.wildcard1 ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>' : ''}
                     </div>
                     <div class="vs-divider">VS</div>
                     <div class="team-side ${rightClass}">
                         <div class="team-name">${m.t2}</div>
                         <div class="score-main ${s2Class}">${m.total2}</div>
                         <div class="score-sub">今日 ${m.today2}</div>
+                        ${m.penalty2 > 0 ? `<div class="score-sub" style="color:#ff6b6b;">- ${m.penalty2} Penalty (${m.transfer_count2} transfers)</div>` : ''}
+                        ${m.penalty2 > 0 ? `<div class="score-sub" style="color:#fbbf24;">${m.raw_today2} - ${m.penalty2} = ${m.today2}</div>` : ''}
+                        ${m.wildcard2 ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>' : ''}
                     </div>
                 </div>
             `;

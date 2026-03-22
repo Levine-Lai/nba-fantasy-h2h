@@ -357,3 +357,17 @@ async def update_fixtures(client: httpx.AsyncClient):
     
     CACHE.fixtures = games
     print(f"[Fixtures] Loaded {len(games)} games for Event {CACHE.current_event}")
+
+
+async def get_entry_transfers(client: httpx.AsyncClient, entry_id: int) -> List[Dict]:
+    """获取用户转会记录"""
+    url = f"{BASE_URL}/entry/{entry_id}/transfers/"
+    data = await fetch(client, url)
+    return data if isinstance(data, list) else []
+
+
+async def get_entry_history(client: httpx.AsyncClient, entry_id: int) -> Dict:
+    """获取用户历史记录（含卡片使用信息）"""
+    url = f"{BASE_URL}/entry/{entry_id}/history/"
+    data = await fetch(client, url)
+    return data if isinstance(data, dict) else {}

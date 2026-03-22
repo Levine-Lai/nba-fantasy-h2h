@@ -9,15 +9,88 @@
 3. 任一环节出错执行rollback，保持旧数据
 """
 
+import asyncio
 import sqlite3
 import logging
+import re
 from typing import Dict, List, Tuple, Optional
 
 from backend.cache import CACHE, cache, _get_connection, _db_lock
 from backend.config import POSITION_MAP, BASE_URL, CURRENT_PHASE, LEAGUE_ID, UID_MAP
-from backend.api_client import fetch
+from backend.api_client import fetch, get_entry_transfers, get_entry_history
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_history_records(history_data: Dict) -> List[Dict]:
+    """从 history 返回中提取记录列表"""
+    if not isinstance(history_data, dict):
+        return []
+    for key in ("history", "chips", "card_history", "cards", "events", "results"):
+        value = history_data.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+    return []
+
+
+def _extract_gw_number(value) -> Optional[int]:
+    """从 GW22 / 22.1 / 22 等格式提取 gameweek 整数"""
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    text = str(value)
+    match = re.search(r'(\d+)', text)
+    if match:
+        try:
+            return int(match.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def _is_wildcard_active_from_history(history_data: Dict, current_event: int) -> bool:
+    """wildcard 状态仅根据 history 接口判断"""
+    current_gw = _extract_gw_number(CACHE.current_event_name) or _extract_gw_number(current_event)
+    records = _extract_history_records(history_data)
+    for item in records:
+        name = str(item.get("name", "")).lower()
+        if name not in ("wildcard", "wild_card"):
+            continue
+        item_event = item.get("event")
+        item_gw = item.get("gw") or item.get("gameweek") or _extract_gw_number(item_event)
+        if item.get("active") or item.get("is_active"):
+            if item_gw in (None, current_gw) or item_event in (None, current_event):
+                return True
+        if item.get("used") or item.get("played"):
+            if item_gw == current_gw or item_event == current_event:
+                return True
+        if item_gw == current_gw or item_event == current_event:
+            return True
+    return False
+
+
+def _count_transfers_in_event(transfers: List[Dict], current_event: int) -> int:
+    """统计当前 GW 的转会次数"""
+    current_gw = _extract_gw_number(CACHE.current_event_name) or _extract_gw_number(current_event)
+    count = 0
+    for transfer in transfers:
+        if not isinstance(transfer, dict):
+            continue
+        transfer_event = transfer.get("event")
+        transfer_gw = transfer.get("gw") or transfer.get("gameweek") or _extract_gw_number(transfer_event)
+        if transfer_gw == current_gw or transfer_event == current_event:
+            count += 1
+    return count
+
+
+def _calculate_transfer_penalty(transfer_count: int, wildcard_active: bool) -> int:
+    """每 GW 免费 2 次，超出每次扣 100；wildcard 激活时不扣"""
+    if wildcard_active:
+        return 0
+    return max(0, transfer_count - 2) * 100
 
 
 def validate_api_response(data: any) -> bool:
@@ -456,7 +529,11 @@ async def update_user_picks(client, uid: int) -> Tuple[Optional[int], List[Dict]
     2. 添加 team_id 字段，用于检查今日是否有比赛
     """
     url = f"{BASE_URL}/entry/{uid}/event/{CACHE.current_event}/picks/"
-    data = await fetch(client, url)
+    data, transfers_data, history_data = await asyncio.gather(
+        fetch(client, url),
+        get_entry_transfers(client, uid),
+        get_entry_history(client, uid)
+    )
     
     if not data or 'picks' not in data:
         cached_picks = CACHE.user_picks.get(uid, [])
@@ -465,6 +542,15 @@ async def update_user_picks(client, uid: int) -> Tuple[Optional[int], List[Dict]
             return cached_score if cached_score is not None else 0, cached_picks
         return None, []
     
+    existing = CACHE.standings.get(uid, {})
+    transfer_count = _count_transfers_in_event(transfers_data, CACHE.current_event)
+    wildcard_active = _is_wildcard_active_from_history(history_data, CACHE.current_event)
+    if not transfers_data and 'transfer_count' in existing:
+        transfer_count = existing.get('transfer_count', 0)
+    if not history_data and 'wildcard_active' in existing:
+        wildcard_active = existing.get('wildcard_active', False)
+    penalty_score = _calculate_transfer_penalty(transfer_count, wildcard_active)
+
     picks = []
     for pick in data['picks']:
         element_id = pick.get('element')
@@ -503,8 +589,14 @@ async def update_user_picks(client, uid: int) -> Tuple[Optional[int], List[Dict]
     
     CACHE.user_picks[uid] = picks
     effective_score, _, _ = calculate_effective_score(picks)
+    final_score = effective_score - penalty_score
+    CACHE.standings.setdefault(uid, {})
+    CACHE.standings[uid]['raw_today_live'] = effective_score
+    CACHE.standings[uid]['penalty_score'] = penalty_score
+    CACHE.standings[uid]['transfer_count'] = transfer_count
+    CACHE.standings[uid]['wildcard_active'] = wildcard_active
     cache.save_to_disk()
-    return effective_score, picks
+    return final_score, picks
 
 
 async def update_standings(client):
@@ -526,6 +618,10 @@ async def update_standings(client):
             CACHE.standings[uid] = {
                 'total': total, 
                 'today_live': existing.get('today_live', 0),
+                'raw_today_live': existing.get('raw_today_live', existing.get('today_live', 0)),
+                'penalty_score': existing.get('penalty_score', 0),
+                'transfer_count': existing.get('transfer_count', 0),
+                'wildcard_active': existing.get('wildcard_active', False),
                 'effective_players': existing.get('effective_players', []),
                 'picks': existing.get('picks', [])
             }
