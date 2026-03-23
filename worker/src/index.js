@@ -125,7 +125,7 @@ function resolveUidByName(name) {
   return null;
 }
 
-function buildFdrHtmlFromFixtures() {
+function buildFdrHtmlFromFixtures(standingsByUid = {}) {
   const weeks = [22, 23, 24, 25];
   const byTeam = {};
   for (const [gw, team1, team2] of ALL_FIXTURES) {
@@ -138,14 +138,56 @@ function buildFdrHtmlFromFixtures() {
   }
 
   const teams = Object.values(UID_MAP).filter((name) => byTeam[name]);
+  const ranked = teams
+    .map((name) => ({
+      name,
+      total: Number(standingsByUid?.[resolveUidByName(name)]?.total || 0),
+    }))
+    .sort((a, b) => a.total - b.total);
+
+  const percentileByName = {};
+  const denom = Math.max(1, ranked.length - 1);
+  ranked.forEach((item, idx) => {
+    percentileByName[item.name] = idx / denom;
+  });
+
+  const difficultyClass = (opponent) => {
+    const pct = percentileByName[opponent];
+    if (pct === undefined) return 3;
+    if (pct < 0.2) return 1;
+    if (pct < 0.4) return 2;
+    if (pct < 0.6) return 3;
+    if (pct < 0.8) return 4;
+    return 5;
+  };
+
   return teams
     .map((team) => {
-      const cells = weeks
-        .map((gw) => `<td><div class='box fdr-3'>${byTeam[team][gw] || "-"}</div></td>`)
-        .join("");
-      return `<tr><td class='t-name'>${team}</td>${cells}<td class='avg-col'>3.0</td></tr>`;
+      let sum = 0;
+      let count = 0;
+      const cells = weeks.map((gw) => {
+        const opponent = byTeam[team][gw] || "-";
+        const cls = opponent === "-" ? 3 : difficultyClass(opponent);
+        sum += cls;
+        count += 1;
+        return `<td><div class='box fdr-${cls}'>${opponent}</div></td>`;
+      });
+      const avg = (sum / Math.max(1, count)).toFixed(2).replace(/\.00$/, "");
+      return `<tr><td class='t-name'>${team}</td>${cells.join("")}<td class='avg-col'>${avg}</td></tr>`;
     })
     .join("");
+}
+
+function formatKickoffBj(isoTime) {
+  if (!isoTime) return "--:--";
+  const dt = new Date(isoTime);
+  if (Number.isNaN(dt.getTime())) return "--:--";
+  return dt.toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Shanghai",
+  });
 }
 
 function jsonResponse(data, status = 200) {
@@ -312,12 +354,37 @@ function calculateTransferPenalty(transferCount, wildcardActive) {
   return Math.max(0, transferCount - 2) * 100;
 }
 
-function calculateGd1MissingPenalty(transferCount, gd1TransferCount, wildcardActive) {
-  if (wildcardActive) return 0;
-  const nonGd1Count = Math.max(0, transferCount - gd1TransferCount);
-  const correctPenalty = Math.max(0, transferCount - 2) * 100;
-  const websitePenalty = Math.max(0, nonGd1Count - 2) * 100;
-  return Math.max(0, correctPenalty - websitePenalty);
+function calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById) {
+  const rows = Array.isArray(historyData?.current) ? historyData.current : [];
+  let weeklyPoints = 0;
+  let apiPenalty = 0;
+  let todayPoints = null;
+  let hasWeekRows = false;
+
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const eventId = Number(row.event);
+    if (!eventId) continue;
+
+    const points = Number(row.points || 0) / 10;
+    if (eventId === currentEvent) {
+      todayPoints = Math.round(points);
+    }
+
+    const meta = eventMetaById?.[eventId];
+    if (!meta || meta.gw !== currentWeek) continue;
+
+    hasWeekRows = true;
+    weeklyPoints += points;
+    apiPenalty += Number(row.event_transfers_cost || 0) / 10;
+  }
+
+  return {
+    has_week_rows: hasWeekRows,
+    weekly_points: Math.round(weeklyPoints),
+    api_penalty: Math.round(apiPenalty),
+    today_points: todayPoints,
+  };
 }
 
 function getPlayerStats(elementId, liveElements, elements) {
@@ -448,7 +515,7 @@ async function buildState(previousState = null) {
     away_score: f.team_a_score || 0,
     started: !!f.started,
     finished: !!f.finished,
-    kickoff: f.kickoff_time ? String(f.kickoff_time).slice(11, 16) : "--:--",
+    kickoff: formatKickoffBj(f.kickoff_time),
   }));
 
   const fixtureDetails = {};
@@ -505,17 +572,34 @@ async function buildState(previousState = null) {
       fetchJson(`/entry/${uid}/transfers/`).catch(() => []),
       fetchJson(`/entry/${uid}/history/`).catch(() => ({})),
     ]);
-    if (!picksData?.picks) {
-      const previousMissing = Number(standingsByUid[uid].gd1_missing_penalty || 0);
-      standingsByUid[uid].total = standingsByUid[uid].total - previousMissing;
-      return;
-    }
 
     const transferCount = countTransfersInGw(transfersData, currentWeek, eventMetaById);
     const gd1TransferCount = countTransfersInGd1(transfersData, currentWeek, eventMetaById);
     const wildcardActive = isWildcardActiveFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
     const penaltyScore = calculateTransferPenalty(transferCount, wildcardActive);
-    const gd1MissingPenalty = calculateGd1MissingPenalty(transferCount, gd1TransferCount, wildcardActive);
+    const historyWeek = calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
+
+    // 网站一般已把扣分计入 points；只有漏扣时才补差额。
+    const missingPenalty = Math.max(0, penaltyScore - historyWeek.api_penalty);
+    const fallbackTotal = Number(standingsByUid[uid].total || 0);
+    const weeklyTotal = historyWeek.has_week_rows
+      ? historyWeek.weekly_points - missingPenalty
+      : fallbackTotal - missingPenalty;
+
+    standingsByUid[uid].penalty_score = penaltyScore;
+    standingsByUid[uid].transfer_count = transferCount;
+    standingsByUid[uid].gd1_transfer_count = gd1TransferCount;
+    standingsByUid[uid].gd1_missing_penalty = missingPenalty;
+    standingsByUid[uid].wildcard_active = wildcardActive;
+    standingsByUid[uid].total = weeklyTotal;
+
+    if (!picksData?.picks) {
+      const todayFallback =
+        historyWeek.today_points !== null ? historyWeek.today_points : Number(standingsByUid[uid].today_live || 0);
+      standingsByUid[uid].raw_today_live = todayFallback;
+      standingsByUid[uid].today_live = todayFallback;
+      return;
+    }
 
     const picks = (picksData.picks || []).map((pick) => {
       const elementId = pick.element;
@@ -543,16 +627,13 @@ async function buildState(previousState = null) {
     });
 
     const [effectiveScore] = calculateEffectiveScore(picks, games, teams);
-    const todayLive = effectiveScore - penaltyScore;
+    let todayLive = effectiveScore;
+    if (todayLive === 0 && historyWeek.today_points !== null) {
+      todayLive = historyWeek.today_points;
+    }
 
     standingsByUid[uid].raw_today_live = effectiveScore;
     standingsByUid[uid].today_live = todayLive;
-    standingsByUid[uid].penalty_score = penaltyScore;
-    standingsByUid[uid].transfer_count = transferCount;
-    standingsByUid[uid].gd1_transfer_count = gd1TransferCount;
-    standingsByUid[uid].gd1_missing_penalty = gd1MissingPenalty;
-    standingsByUid[uid].wildcard_active = wildcardActive;
-    standingsByUid[uid].total = standingsByUid[uid].total - gd1MissingPenalty;
     standingsByUid[uid].picks = picks;
   });
 
@@ -632,7 +713,7 @@ async function buildState(previousState = null) {
     fixture_details: fixtureDetails,
     h2h,
     picks_by_uid: picksByUid,
-    fdr_html: FDR_HTML || buildFdrHtmlFromFixtures(),
+    fdr_html: FDR_HTML || buildFdrHtmlFromFixtures(standingsByUid),
   };
 }
 

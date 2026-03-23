@@ -168,14 +168,12 @@ const Render = {
                         <div class="team-name">${m.t1}</div>
                         <div class="score-main ${s1Class}">${m.total1}</div>
                         <div class="score-sub">今日 ${m.today1}</div>
-                        ${m.wildcard1 ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>' : ''}
                     </div>
                     <div class="vs-divider">VS</div>
                     <div class="team-side ${rightClass}">
                         <div class="team-name">${m.t2}</div>
                         <div class="score-main ${s2Class}">${m.total2}</div>
                         <div class="score-sub">今日 ${m.today2}</div>
-                        ${m.wildcard2 ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>' : ''}
                     </div>
                 </div>
             `;
@@ -317,7 +315,6 @@ const Render = {
                         <div class="dual-lineup-header">
                             <div class="dual-team-name">${teamName}</div>
                             <div class="dual-team-score">${ldata.total_live}</div>
-                            <div class="dual-team-formation">${ldata.formation}</div>
                             <div class="score-sub">总分 ${ldata.event_total || 0}</div>
                             ${penaltyLine}
                             ${gd1FixLine}
@@ -394,7 +391,7 @@ const Render = {
                     ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>'
                     : '';
                 body.innerHTML = `
-                    <div class="formation-info">有效阵容: ${data.formation} | 今日得分: ${data.total_live} | 总分: ${data.event_total || 0}</div>
+                    <div class="formation-info">今日得分: ${data.total_live} | 总分: ${data.event_total || 0}</div>
                     ${penaltyLine}
                     ${gd1FixLine}
                     ${wildcardLine}
