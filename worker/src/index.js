@@ -317,6 +317,15 @@ async function fetchJson(path, retries = 3) {
   throw lastError || new Error(`fetch failed ${path}`);
 }
 
+async function fetchJsonSafe(path, retries = 3) {
+  try {
+    const data = await fetchJson(path, retries);
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, data: null, error: String(error?.message || error || "fetch failed") };
+  }
+}
+
 function extractGwNumber(value) {
   if (value === null || value === undefined) return null;
   const text = String(value);
@@ -682,13 +691,33 @@ async function buildState(previousState = null) {
 
   const uids = Object.keys(standingsByUid).map(Number);
   const transfersByUid = {};
-  await mapLimit(uids, 2, async (uid) => {
-    const [picksData, transfersData, historyData] = await Promise.all([
-      fetchJson(`/entry/${uid}/event/${currentEvent}/picks/`).catch(() => null),
-      fetchJson(`/entry/${uid}/transfers/`).catch(() => []),
-      fetchJson(`/entry/${uid}/history/`).catch(() => ({})),
+  await mapLimit(uids, 1, async (uid) => {
+    const previous = previousPicksByUid[String(uid)] || {};
+
+    let [picksRes, transfersRes, historyRes] = await Promise.all([
+      fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 4),
+      fetchJsonSafe(`/entry/${uid}/transfers/`, 4),
+      fetchJsonSafe(`/entry/${uid}/history/`, 4),
     ]);
-    transfersByUid[uid] = Array.isArray(transfersData) ? transfersData : [];
+
+    // Retry once for failed endpoints to reduce random empty states.
+    if (!picksRes.ok) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      picksRes = await fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 4);
+    }
+    if (!historyRes.ok) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      historyRes = await fetchJsonSafe(`/entry/${uid}/history/`, 4);
+    }
+    if (!transfersRes.ok) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      transfersRes = await fetchJsonSafe(`/entry/${uid}/transfers/`, 4);
+    }
+
+    const picksData = picksRes.ok ? picksRes.data : null;
+    const transfersData = transfersRes.ok && Array.isArray(transfersRes.data) ? transfersRes.data : [];
+    const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : {};
+    transfersByUid[uid] = transfersData;
 
     const transferCount = countTransfersInGw(transfersData, currentWeek, eventMetaById);
     const gd1TransferCount = countTransfersInGd1(transfersData, currentWeek, eventMetaById);
@@ -718,16 +747,24 @@ async function buildState(previousState = null) {
     standingsByUid[uid].total = finalWeekTotal;
 
     if (!picksData?.picks) {
+      if (Array.isArray(previous.players) && previous.players.length > 0) {
+        standingsByUid[uid].picks = previous.players;
+      }
       // 没有picks数据时的回退处理
       // 优先使用history中的今日得分，其次使用之前缓存的今日得分
       let todayFallback = 0;
       if (historyWeek.today_points !== null) {
         todayFallback = historyWeek.today_points;
       } else {
-        todayFallback = Number(standingsByUid[uid].today_live || 0);
+        todayFallback = Number(previous.total_live || standingsByUid[uid].today_live || 0);
       }
       standingsByUid[uid].raw_today_live = todayFallback;
       standingsByUid[uid].today_live = todayFallback;
+      standingsByUid[uid].fetch_status = {
+        picks_ok: !!picksRes.ok,
+        history_ok: !!historyRes.ok,
+        transfers_ok: !!transfersRes.ok,
+      };
       return;
     }
 
@@ -775,6 +812,11 @@ async function buildState(previousState = null) {
     standingsByUid[uid].raw_today_live = rawTodayLive;
     standingsByUid[uid].today_live = todayLive;
     standingsByUid[uid].picks = picks;
+    standingsByUid[uid].fetch_status = {
+      picks_ok: true,
+      history_ok: !!historyRes.ok,
+      transfers_ok: !!transfersRes.ok,
+    };
   });
 
   const availableWeeks = [...new Set(ALL_FIXTURES.map(([gw]) => gw))].sort((a, b) => a - b);
@@ -832,6 +874,7 @@ async function buildState(previousState = null) {
       gd1_transfer_count: s.gd1_transfer_count || 0,
       gd1_missing_penalty: s.gd1_missing_penalty || 0,
       wildcard_active: !!s.wildcard_active,
+      fetch_status: s.fetch_status || { picks_ok: true, history_ok: true, transfers_ok: true },
       event_total: s.total || 0,
       formation,
       current_event: currentEvent,
