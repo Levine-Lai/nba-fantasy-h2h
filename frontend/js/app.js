@@ -84,6 +84,11 @@ const API = {
     async refresh() {
         const res = await this.fetch('/api/refresh', {method: 'POST'});
         return res.json();
+    },
+
+    async getTransferTrends() {
+        const res = await this.fetch('/api/trends/transfers');
+        return res.json();
     }
 };
 
@@ -110,6 +115,30 @@ const Render = {
     matchCount(count) {
         const el = document.getElementById('match-count');
         if (el) el.textContent = count + '场';
+    },
+
+    transferTrends(data) {
+        const leagueEl = document.getElementById('trend-league');
+        const globalEl = document.getElementById('trend-global');
+        if (!leagueEl || !globalEl) return;
+
+        const toList = (items, emptyText) => {
+            if (!items || items.length === 0) {
+                return `<div class="trend-empty">${emptyText}</div>`;
+            }
+            return items.map((x, idx) => `
+                <div class="trend-item">
+                    <span class="trend-rank">#${idx + 1}</span>
+                    <span class="trend-name">${x.name}</span>
+                    <span class="trend-count">${x.count}</span>
+                </div>
+            `).join('');
+        };
+
+        const leaguePairs = data?.league?.top_pairs || [];
+        const globalIn = data?.global?.top_in || [];
+        leagueEl.innerHTML = toList(leaguePairs, '本周暂无换人数据');
+        globalEl.innerHTML = toList(globalIn, '全服暂无趋势数据');
     },
     
     gamesList(games) {
@@ -303,9 +332,6 @@ const Render = {
                 const penaltyLine = ldata.penalty_score > 0
                     ? `<div class="score-sub" style="color:#ff6b6b;">- ${ldata.penalty_score} Transfer Penalty (${ldata.transfer_count} transfers)</div>`
                     : '';
-                const gd1FixLine = ldata.gd1_missing_penalty > 0
-                    ? `<div class="score-sub" style="color:#f59e0b;">GW Day1 Fix: -${ldata.gd1_missing_penalty}</div>`
-                    : '';
                 const wildcardLine = ldata.wildcard_active
                     ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>'
                     : '';
@@ -317,7 +343,6 @@ const Render = {
                             <div class="dual-team-score">${ldata.total_live}</div>
                             <div class="score-sub">总分 ${ldata.event_total || 0}</div>
                             ${penaltyLine}
-                            ${gd1FixLine}
                             ${wildcardLine}
                         </div>
                         <div class="lineup-container">
@@ -384,16 +409,12 @@ const Render = {
                 const penaltyLine = data.penalty_score > 0
                     ? `<div class="score-sub" style="color:#ff6b6b;">- ${data.penalty_score} Transfer Penalty (${data.transfer_count} transfers)</div>`
                     : '';
-                const gd1FixLine = data.gd1_missing_penalty > 0
-                    ? `<div class="score-sub" style="color:#f59e0b;">GW Day1 Fix: -${data.gd1_missing_penalty}</div>`
-                    : '';
                 const wildcardLine = data.wildcard_active
                     ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>'
                     : '';
                 body.innerHTML = `
                     <div class="formation-info">今日得分: ${data.total_live} | 总分: ${data.event_total || 0}</div>
                     ${penaltyLine}
-                    ${gd1FixLine}
                     ${wildcardLine}
                     <div class="lineup-container">
                         <div class="lineup-section starters">
@@ -423,7 +444,7 @@ const Render = {
 const App = {
     async loadAll() {
         try {
-            await Promise.all([this.loadGames(), this.loadH2H()]);
+            await Promise.all([this.loadGames(), this.loadH2H(), this.loadTrends()]);
             Render.updateTime();
         } catch (e) {
             console.error('LoadAll error:', e);
@@ -457,6 +478,15 @@ const App = {
             Render.h2hList(data);
         } catch (e) {
             console.error('H2H error:', e);
+        }
+    },
+
+    async loadTrends() {
+        try {
+            const data = await API.getTransferTrends();
+            Render.transferTrends(data);
+        } catch (e) {
+            console.error('Trends error:', e);
         }
     },
     

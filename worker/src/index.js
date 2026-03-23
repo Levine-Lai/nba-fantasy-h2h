@@ -2,7 +2,34 @@ const BASE_URL = "https://nbafantasy.nba.com/api";
 const LEAGUE_ID = 1653;
 const CURRENT_PHASE = 23;
 const CACHE_KEY = "latest_state";
-const FDR_HTML = "";
+const FDR_HTML = `
+<tr><td class='t-name'>尼弟</td><td><div class='box fdr-2'>文史哲</div></td><td><div class='box fdr-3'>雕哥</div></td><td><div class='box fdr-1'>小火龙</div></td><td><div class='box fdr-2'>伍家辉</div></td><td class='avg-col'>2.0</td></tr>
+<tr><td class='t-name'>堡</td><td><div class='box fdr-3'>班班</div></td><td><div class='box fdr-2'>文史哲</div></td><td><div class='box fdr-3'>雕哥</div></td><td><div class='box fdr-1'>小火龙</div></td><td class='avg-col'>2.25</td></tr>
+<tr><td class='t-name'>雕哥</td><td><div class='box fdr-2'>船哥</div></td><td><div class='box fdr-2'>尼弟</div></td><td><div class='box fdr-4'>堡</div></td><td><div class='box fdr-1'>桑迪</div></td><td class='avg-col'>2.25</td></tr>
+<tr><td class='t-name'>Paul</td><td><div class='box fdr-1'>老姜</div></td><td><div class='box fdr-5'>笨笨</div></td><td><div class='box fdr-2'>橘队</div></td><td><div class='box fdr-2'>船哥</div></td><td class='avg-col'>2.5</td></tr>
+<tr><td class='t-name'>文史哲</td><td><div class='box fdr-2'>尼弟</div></td><td><div class='box fdr-4'>堡</div></td><td><div class='box fdr-1'>桑迪</div></td><td><div class='box fdr-3'>马哥</div></td><td class='avg-col'>2.5</td></tr>
+<tr><td class='t-name'>小火龙</td><td><div class='box fdr-2'>橘队</div></td><td><div class='box fdr-2'>船哥</div></td><td><div class='box fdr-2'>尼弟</div></td><td><div class='box fdr-4'>堡</div></td><td class='avg-col'>2.5</td></tr>
+<tr><td class='t-name'>弗老大</td><td><div class='box fdr-1'>柯南</div></td><td><div class='box fdr-4'>酸男</div></td><td><div class='box fdr-2'>阿甘</div></td><td><div class='box fdr-4'>紫葱酱</div></td><td class='avg-col'>2.75</td></tr>
+<tr><td class='t-name'>Kusuri</td><td><div class='box fdr-3'>鬼嗨</div></td><td><div class='box fdr-1'>老姜</div></td><td><div class='box fdr-5'>笨笨</div></td><td><div class='box fdr-2'>橘队</div></td><td class='avg-col'>2.75</td></tr>
+<tr><td class='t-name'>马哥</td><td><div class='box fdr-2'>阿甘</div></td><td><div class='box fdr-4'>紫葱酱</div></td><td><div class='box fdr-3'>班班</div></td><td><div class='box fdr-2'>文史哲</div></td><td class='avg-col'>2.75</td></tr>
+<tr><td class='t-name'>伍家辉</td><td><div class='box fdr-5'>笨笨</div></td><td><div class='box fdr-2'>橘队</div></td><td><div class='box fdr-2'>船哥</div></td><td><div class='box fdr-2'>尼弟</div></td><td class='avg-col'>2.75</td></tr>
+<tr><td class='t-name'>橘队</td><td><div class='box fdr-1'>小火龙</div></td><td><div class='box fdr-2'>伍家辉</div></td><td><div class='box fdr-5'>Pau</div></td><td><div class='box fdr-3'>Kus</div></td><td class='avg-col'>2.75</td></tr>
+<tr><td class='t-name'>船哥</td><td><div class='box fdr-3'>雕哥</div></td><td><div class='box fdr-1'>小火龙</div></td><td><div class='box fdr-2'>伍家辉</div></td><td><div class='box fdr-5'>Pau</div></td><td class='avg-col'>2.75</td></tr>
+<tr><td class='t-name'>大吉鲁</td><td><div class='box fdr-3'>凯文</div></td><td><div class='box fdr-2'>纪导</div></td><td><div class='box fdr-4'>AI</div></td><td><div class='box fdr-3'>鬼嗨</div></td><td class='avg-col'>3.0</td></tr>
+<tr><td class='t-name'>AI</td><td><div class='box fdr-2'>纪导</div></td><td><div class='box fdr-1'>柯南</div></td><td><div class='box fdr-5'>大吉鲁</div></td><td><div class='box fdr-4'>酸男</div></td><td class='avg-col'>3.0</td></tr>
+<tr><td class='t-name'>桑迪</td><td><div class='box fdr-4'>紫葱酱</div></td><td><div class='box fdr-3'>班班</div></td><td><div class='box fdr-2'>文史哲</div></td><td><div class='box fdr-3'>雕哥</div></td><td class='avg-col'>3.0</td></tr>
+<tr><td class='t-name'>笨笨</td><td><div class='box fdr-2'>伍家辉</div></td><td><div class='box fdr-5'>Pau</div></td><td><div class='box fdr-3'>Kus</div></td><td><div class='box fdr-3'>凯文</div></td><td class='avg-col'>3.25</td></tr>
+<tr><td class='t-name'>Kimi</td><td><div class='box fdr-4'>酸男</div></td><td><div class='box fdr-2'>阿甘</div></td><td><div class='box fdr-4'>紫葱酱</div></td><td><div class='box fdr-3'>班班</div></td><td class='avg-col'>3.25</td></tr>
+<tr><td class='t-name'>紫葱酱</td><td><div class='box fdr-1'>桑迪</div></td><td><div class='box fdr-3'>马哥</div></td><td><div class='box fdr-5'>Kim</div></td><td><div class='box fdr-4'>弗老大</div></td><td class='avg-col'>3.25</td></tr>
+<tr><td class='t-name'>班班</td><td><div class='box fdr-4'>堡</div></td><td><div class='box fdr-1'>桑迪</div></td><td><div class='box fdr-3'>马哥</div></td><td><div class='box fdr-5'>Kim</div></td><td class='avg-col'>3.25</td></tr>
+<tr><td class='t-name'>鬼嗨</td><td><div class='box fdr-3'>Kus</div></td><td><div class='box fdr-3'>凯文</div></td><td><div class='box fdr-2'>纪导</div></td><td><div class='box fdr-5'>大吉鲁</div></td><td class='avg-col'>3.25</td></tr>
+<tr><td class='t-name'>纪导</td><td><div class='box fdr-4'>AI</div></td><td><div class='box fdr-5'>大吉鲁</div></td><td><div class='box fdr-3'>鬼嗨</div></td><td><div class='box fdr-1'>老姜</div></td><td class='avg-col'>3.25</td></tr>
+<tr><td class='t-name'>阿甘</td><td><div class='box fdr-3'>马哥</div></td><td><div class='box fdr-5'>Kim</div></td><td><div class='box fdr-4'>弗老大</div></td><td><div class='box fdr-1'>柯南</div></td><td class='avg-col'>3.25</td></tr>
+<tr><td class='t-name'>老姜</td><td><div class='box fdr-5'>Pau</div></td><td><div class='box fdr-3'>Kus</div></td><td><div class='box fdr-3'>凯文</div></td><td><div class='box fdr-2'>纪导</div></td><td class='avg-col'>3.25</td></tr>
+<tr><td class='t-name'>酸男</td><td><div class='box fdr-5'>Kim</div></td><td><div class='box fdr-4'>弗老大</div></td><td><div class='box fdr-1'>柯南</div></td><td><div class='box fdr-4'>AI</div></td><td class='avg-col'>3.5</td></tr>
+<tr><td class='t-name'>凯文</td><td><div class='box fdr-5'>大吉鲁</div></td><td><div class='box fdr-3'>鬼嗨</div></td><td><div class='box fdr-1'>老姜</div></td><td><div class='box fdr-5'>笨笨</div></td><td class='avg-col'>3.5</td></tr>
+<tr><td class='t-name'>柯南</td><td><div class='box fdr-4'>弗老大</div></td><td><div class='box fdr-4'>AI</div></td><td><div class='box fdr-4'>酸男</div></td><td><div class='box fdr-2'>阿甘</div></td><td class='avg-col'>3.5</td></tr>
+`;
 
 const UID_MAP = {
   5410: "kusuri",
@@ -190,6 +217,73 @@ function formatKickoffBj(isoTime) {
   });
 }
 
+function topListFromMap(counter, limit = 10) {
+  return [...counter.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([name, count]) => ({ name, count }));
+}
+
+function buildTransferTrends({
+  transfersByUid,
+  leagueUids,
+  currentWeek,
+  eventMetaById,
+  elements,
+}) {
+  const pairCounter = new Map();
+  const inCounter = new Map();
+  const outCounter = new Map();
+  const managerCounter = new Map();
+
+  for (const uid of leagueUids || []) {
+    const transfers = transfersByUid?.[uid] || [];
+    let managerTransfers = 0;
+    for (const transfer of transfers) {
+      const { gw } = resolveTransferGwDay(transfer, eventMetaById);
+      if (gw !== currentWeek) continue;
+      managerTransfers += 1;
+
+      const inId = Number(transfer?.element_in || 0);
+      const outId = Number(transfer?.element_out || 0);
+      const inName = elements[inId]?.name || `#${inId}`;
+      const outName = elements[outId]?.name || `#${outId}`;
+      const pair = `${outName} -> ${inName}`;
+      pairCounter.set(pair, (pairCounter.get(pair) || 0) + 1);
+      inCounter.set(inName, (inCounter.get(inName) || 0) + 1);
+      outCounter.set(outName, (outCounter.get(outName) || 0) + 1);
+    }
+    if (managerTransfers > 0) {
+      managerCounter.set(UID_MAP[uid] || String(uid), managerTransfers);
+    }
+  }
+
+  const globalInCounter = new Map();
+  const globalOutCounter = new Map();
+  for (const elem of Object.values(elements)) {
+    if (!elem) continue;
+    const name = elem.name || "";
+    const inCount = Number(elem.transfers_in_event || 0);
+    const outCount = Number(elem.transfers_out_event || 0);
+    if (inCount > 0) globalInCounter.set(name, inCount);
+    if (outCount > 0) globalOutCounter.set(name, outCount);
+  }
+
+  return {
+    league: {
+      top_pairs: topListFromMap(pairCounter, 10),
+      top_in: topListFromMap(inCounter, 10),
+      top_out: topListFromMap(outCounter, 10),
+      top_managers: topListFromMap(managerCounter, 10),
+    },
+    global: {
+      // 全服目前无法获得逐笔“谁换谁”数据，这里展示当前 Event 的全服热门转入/转出。
+      top_in: topListFromMap(globalInCounter, 10),
+      top_out: topListFromMap(globalOutCounter, 10),
+    },
+  };
+}
+
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -202,7 +296,7 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-async function fetchJson(path, retries = 2) {
+async function fetchJson(path, retries = 3) {
   let lastError = null;
   for (let i = 0; i <= retries; i += 1) {
     try {
@@ -357,7 +451,6 @@ function calculateTransferPenalty(transferCount, wildcardActive) {
 function calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById) {
   const rows = Array.isArray(historyData?.current) ? historyData.current : [];
   let weeklyPoints = 0;
-  let apiPenalty = 0;
   let todayPoints = null;
   let hasWeekRows = false;
 
@@ -376,13 +469,11 @@ function calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, 
 
     hasWeekRows = true;
     weeklyPoints += points;
-    apiPenalty += Number(row.event_transfers_cost || 0) / 10;
   }
 
   return {
     has_week_rows: hasWeekRows,
     weekly_points: Math.round(weeklyPoints),
-    api_penalty: Math.round(apiPenalty),
     today_points: todayPoints,
   };
 }
@@ -488,6 +579,8 @@ async function buildState(previousState = null) {
       total_points: e.total_points || 0,
       status: e.status || "",
       news: e.news || "",
+      transfers_in_event: e.transfers_in_event || 0,
+      transfers_out_event: e.transfers_out_event || 0,
     };
   }
 
@@ -566,12 +659,14 @@ async function buildState(previousState = null) {
   }
 
   const uids = Object.keys(standingsByUid).map(Number);
-  await mapLimit(uids, 3, async (uid) => {
+  const transfersByUid = {};
+  await mapLimit(uids, 2, async (uid) => {
     const [picksData, transfersData, historyData] = await Promise.all([
       fetchJson(`/entry/${uid}/event/${currentEvent}/picks/`).catch(() => null),
       fetchJson(`/entry/${uid}/transfers/`).catch(() => []),
       fetchJson(`/entry/${uid}/history/`).catch(() => ({})),
     ]);
+    transfersByUid[uid] = Array.isArray(transfersData) ? transfersData : [];
 
     const transferCount = countTransfersInGw(transfersData, currentWeek, eventMetaById);
     const gd1TransferCount = countTransfersInGd1(transfersData, currentWeek, eventMetaById);
@@ -579,17 +674,13 @@ async function buildState(previousState = null) {
     const penaltyScore = calculateTransferPenalty(transferCount, wildcardActive);
     const historyWeek = calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
 
-    // 网站一般已把扣分计入 points；只有漏扣时才补差额。
-    const missingPenalty = Math.max(0, penaltyScore - historyWeek.api_penalty);
     const fallbackTotal = Number(standingsByUid[uid].total || 0);
-    const weeklyTotal = historyWeek.has_week_rows
-      ? historyWeek.weekly_points - missingPenalty
-      : fallbackTotal - missingPenalty;
+    const weeklyTotal = historyWeek.has_week_rows ? historyWeek.weekly_points - penaltyScore : fallbackTotal;
 
     standingsByUid[uid].penalty_score = penaltyScore;
     standingsByUid[uid].transfer_count = transferCount;
     standingsByUid[uid].gd1_transfer_count = gd1TransferCount;
-    standingsByUid[uid].gd1_missing_penalty = missingPenalty;
+    standingsByUid[uid].gd1_missing_penalty = 0;
     standingsByUid[uid].wildcard_active = wildcardActive;
     standingsByUid[uid].total = weeklyTotal;
 
@@ -700,6 +791,14 @@ async function buildState(previousState = null) {
     };
   }
 
+  const transferTrends = buildTransferTrends({
+    transfersByUid,
+    leagueUids: uids,
+    currentWeek,
+    eventMetaById,
+    elements,
+  });
+
   return {
     generated_at: new Date().toISOString(),
     current_event: currentEvent,
@@ -713,6 +812,7 @@ async function buildState(previousState = null) {
     fixture_details: fixtureDetails,
     h2h,
     picks_by_uid: picksByUid,
+    transfer_trends: transferTrends,
     fdr_html: FDR_HTML || buildFdrHtmlFromFixtures(standingsByUid),
   };
 }
@@ -765,8 +865,14 @@ export default {
     }
     if (path.startsWith("/api/picks/")) {
       const uid = String(Number(path.split("/").pop()));
-      return jsonResponse(state.picks_by_uid[uid] || {});
+      let payload = state.picks_by_uid[uid] || {};
+      if (!payload.players || payload.players.length === 0) {
+        state = await refreshState(env);
+        payload = state.picks_by_uid[uid] || {};
+      }
+      return jsonResponse(payload);
     }
+    if (path === "/api/trends/transfers") return jsonResponse(state.transfer_trends || { league: {}, global: {} });
     if (path === "/api/fdr") return jsonResponse({ html: state.fdr_html || "" });
     if (path === "/api/health") {
       return jsonResponse({

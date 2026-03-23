@@ -661,3 +661,60 @@ body {
     align-items: center;
     gap: 2px;
 }
+
+.trend-wrap {
+    margin-top: 16px;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 12px;
+}
+
+.trend-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: #444;
+    margin: 10px 0 6px;
+}
+
+.trend-list {
+    background: #fafafa;
+    border: 1px solid #efefef;
+    border-radius: 8px;
+    padding: 6px 8px;
+    min-height: 36px;
+}
+
+.trend-item {
+    display: grid;
+    grid-template-columns: 34px 1fr 42px;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    padding: 5px 2px;
+    border-bottom: 1px dashed #ececec;
+}
+
+.trend-item:last-child {
+    border-bottom: none;
+}
+
+.trend-rank {
+    color: #888;
+    font-weight: 700;
+}
+
+.trend-name {
+    color: #333;
+    font-weight: 600;
+}
+
+.trend-count {
+    text-align: right;
+    color: #00a94f;
+    font-weight: 800;
+}
+
+.trend-empty {
+    color: #999;
+    font-size: 11px;
+    padding: 6px 2px;
+}

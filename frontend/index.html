@@ -67,6 +67,12 @@
                     <!-- FDR data loaded by JS -->
                 </tbody>
             </table>
+            <div class="trend-wrap">
+                <div class="trend-title">League Transfer Trend (GW)</div>
+                <div id="trend-league" class="trend-list"></div>
+                <div class="trend-title">Global Transfer Trend (Current Day)</div>
+                <div id="trend-global" class="trend-list"></div>
+            </div>
         </div>
     </div>
 
@@ -75,7 +81,7 @@
         <div class="modal" onclick="event.stopPropagation()">
             <div class="modal-header">
                 <div class="modal-title" id="lineup-title">Lineup Details</div>
-                <button class="modal-close" onclick="closeModal(null, 'lineup-modal')">脳</button>
+                <button class="modal-close" onclick="closeModal(null, 'lineup-modal')">&times;</button>
             </div>
             <div class="modal-body" id="lineup-body">
                 <div class="loading"><div class="spinner"></div>Loading...</div>
@@ -88,7 +94,7 @@
         <div class="modal" onclick="event.stopPropagation()" style="max-width: 1000px;">
             <div class="modal-header">
                 <div class="modal-title" id="game-title">Game Details</div>
-                <button class="modal-close" onclick="closeModal(null, 'game-modal')">脳</button>
+                <button class="modal-close" onclick="closeModal(null, 'game-modal')">&times;</button>
             </div>
             <div class="modal-body" id="game-body">
                 <div class="loading"><div class="spinner"></div>Loading...</div>
