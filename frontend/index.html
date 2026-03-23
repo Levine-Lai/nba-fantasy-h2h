@@ -16,14 +16,14 @@
     <div class="header">
         <div class="brand">
             <h1>NBA Fantasy H2H</h1>
-            <span id="event-info">Loading... 鈥?League #1653</span>
+            <span id="event-info">Loading... - League #1653</span>
         </div>
         <div class="controls">
             <div class="status">
                 <span class="pulse"></span>
-                <span id="update-time">鍔犺浇涓?..</span>
+                <span id="update-time">Loading...</span>
             </div>
-            <button class="btn" onclick="manualRefresh()" id="refresh-btn">鍒锋柊鏁版嵁</button>
+            <button class="btn" onclick="manualRefresh()" id="refresh-btn">Refresh</button>
         </div>
     </div>
 
@@ -32,29 +32,29 @@
         <!-- Column 1: Games -->
         <div class="column">
             <div class="col-header">
-                <div class="col-title">浠婃棩璧涚▼</div>
+                <div class="col-title">Today's Fixtures</div>
                 <span class="col-badge" id="game-count">-</span>
             </div>
             <div class="game-list" id="game-list">
-                <div class="loading"><div class="spinner"></div>鍔犺浇涓?..</div>
+                <div class="loading"><div class="spinner"></div>Loading...</div>
             </div>
         </div>
 
         <!-- Column 2: H2H -->
         <div class="column">
             <div class="col-header">
-                <div class="col-title">瀹炴椂瀵归樀</div>
+                <div class="col-title">Live H2H</div>
                 <span class="col-badge" id="match-count">-</span>
             </div>
             <div class="h2h-list" id="h2h-list">
-                <div class="loading"><div class="spinner"></div>鍔犺浇涓?..</div>
+                <div class="loading"><div class="spinner"></div>Loading...</div>
             </div>
         </div>
 
         <!-- Column 3: FDR -->
         <div class="column">
             <div class="col-header">
-                <div class="col-title">FDR 璧涚▼鎺掕</div>
+                <div class="col-title">FDR Ranking</div>
                 <span class="col-badge" id="fdr-week-badge">Auto GW</span>
             </div>
             <table class="fdr-table">
@@ -76,11 +76,11 @@
     <div class="modal-overlay" id="lineup-modal" onclick="closeModal(event, 'lineup-modal')">
         <div class="modal" onclick="event.stopPropagation()">
             <div class="modal-header">
-                <div class="modal-title" id="lineup-title">闃靛璇︽儏</div>
+                <div class="modal-title" id="lineup-title">Lineup Details</div>
                 <button class="modal-close" onclick="closeModal(null, 'lineup-modal')">脳</button>
             </div>
             <div class="modal-body" id="lineup-body">
-                <div class="loading"><div class="spinner"></div>鍔犺浇涓?..</div>
+                <div class="loading"><div class="spinner"></div>Loading...</div>
             </div>
         </div>
     </div>
@@ -89,11 +89,11 @@
     <div class="modal-overlay" id="game-modal" onclick="closeModal(event, 'game-modal')">
         <div class="modal" onclick="event.stopPropagation()" style="max-width: 1000px;">
             <div class="modal-header">
-                <div class="modal-title" id="game-title">姣旇禌璇︽儏</div>
+                <div class="modal-title" id="game-title">Game Details</div>
                 <button class="modal-close" onclick="closeModal(null, 'game-modal')">脳</button>
             </div>
             <div class="modal-body" id="game-body">
-                <div class="loading"><div class="spinner"></div>鍔犺浇涓?..</div>
+                <div class="loading"><div class="spinner"></div>Loading...</div>
             </div>
         </div>
     </div>
@@ -105,7 +105,7 @@
         fetch(`${apiBase}/api/fdr`).then(r => r.json()).then(data => {
             document.getElementById('fdr-body').innerHTML = data.html;
         }).catch(() => {
-            document.getElementById('fdr-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">鍔犺浇澶辫触</td></tr>';
+            document.getElementById('fdr-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Load failed</td></tr>';
         });
     </script>
 </body>

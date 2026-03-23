@@ -10,7 +10,7 @@
 
 const POSITION_NAME = {1: 'BC', 2: 'FC'};
 let currentEventName = "";
-const API_BASE = (window.__API_BASE__ || '').replace(/\/+$/, '');
+const API_BASE = (window.__API_BASE__ || '').trim().replace(/\/+$/, '');
 
 // ===== 错误提示组件 =====
 const ErrorBanner = {
