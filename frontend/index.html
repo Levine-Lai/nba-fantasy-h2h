@@ -27,7 +27,7 @@
 
     <!-- Main Container -->
     <div class="container">
-        <!-- Column 1: Games -->
+        <!-- Column 1: Games + Trends -->
         <div class="column">
             <div class="col-header">
                 <div class="col-title">Today's Fixtures</div>
@@ -35,6 +35,12 @@
             </div>
             <div class="game-list" id="game-list">
                 <div class="loading"><div class="spinner"></div>Loading...</div>
+            </div>
+            <div class="trend-wrap">
+                <div class="trend-title">League Transfer Trend (GW)</div>
+                <div id="trend-league" class="trend-list"></div>
+                <div class="trend-title">Global Transfer Trend</div>
+                <div id="trend-global" class="trend-list"></div>
             </div>
         </div>
 
@@ -67,12 +73,6 @@
                     <!-- FDR data loaded by JS -->
                 </tbody>
             </table>
-            <div class="trend-wrap">
-                <div class="trend-title">League Transfer Trend (GW)</div>
-                <div id="trend-league" class="trend-list"></div>
-                <div class="trend-title">Global Transfer Trend (Current Day)</div>
-                <div id="trend-global" class="trend-list"></div>
-            </div>
         </div>
     </div>
 

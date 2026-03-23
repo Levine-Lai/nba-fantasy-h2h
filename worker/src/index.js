@@ -210,23 +210,13 @@ function formatKickoffBj(isoTime) {
   const dt = new Date(isoTime);
   if (Number.isNaN(dt.getTime())) return "--:--";
   
-  // 获取北京时间的小时和分钟
-  const timeStr = dt.toLocaleTimeString("zh-CN", {
+  // 只返回北京时间的小时和分钟
+  return dt.toLocaleTimeString("zh-CN", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
     timeZone: "Asia/Shanghai",
   });
-  
-  // 获取北京时间的日期（月/日）
-  const dateStr = dt.toLocaleDateString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: "Asia/Shanghai",
-  });
-  
-  // 返回带日期的格式
-  return `${dateStr} ${timeStr}`;
 }
 
 function topListFromMap(counter, limit = 10) {
@@ -371,7 +361,18 @@ function extractHistoryRecords(historyData) {
 
 function parseEventMetaFromName(eventName) {
   const text = String(eventName || "");
-  const match = text.match(/gameweek\s*(\d+)\s*-\s*day\s*(\d+)/i);
+  // 尝试匹配 "Gameweek 22 - Day 7" 格式
+  let match = text.match(/gameweek\s*(\d+)\s*-\s*day\s*(\d+)/i);
+  if (match) {
+    return { gw: Number(match[1]), day: Number(match[2]) };
+  }
+  // 尝试匹配 "GW22.7" 或 "22.7" 格式
+  match = text.match(/(?:GW)?(\d+)\.(\d+)/i);
+  if (match) {
+    return { gw: Number(match[1]), day: Number(match[2]) };
+  }
+  // 尝试匹配 "GW22 Day7" 格式（没有横线）
+  match = text.match(/(?:GW)?(\d+)[\s-]+day\s*(\d+)/i);
   if (match) {
     return { gw: Number(match[1]), day: Number(match[2]) };
   }
@@ -757,20 +758,19 @@ async function buildState(previousState = null) {
 
     const [effectiveScore] = calculateEffectiveScore(picks, games, teams);
     
-    // 计算今日得分：优先使用实时计算的effectiveScore
-    // 如果effectiveScore为0且history中有今日数据，使用history数据作为回退
+    // 计算今日得分：
+    // 1. 优先使用实时计算的 effectiveScore（基于球员实时数据）
+    // 2. 如果 effectiveScore 为0（可能球员今日无比赛），使用 history 数据作为回退
+    // 3. 如果 history 也没有数据，保持为0
     let todayLive = effectiveScore;
     let rawTodayLive = effectiveScore;
     
-    // 只有当effectiveScore为0且history中有今日数据时，才使用history作为回退
-    if (effectiveScore === 0 && historyWeek.today_points !== null && historyWeek.today_points > 0) {
+    // 如果 effectiveScore 为0，尝试使用 history 中的今日得分
+    // 这在第7天（最后一天）特别有用，因为有些球队可能已经没有比赛了
+    if (effectiveScore === 0 && historyWeek.today_points !== null) {
       todayLive = historyWeek.today_points;
+      rawTodayLive = historyWeek.today_points;
     }
-    
-    // 如果今日有扣分，今日得分也要扣除（因为网站API可能已经扣过了，需要保持一致）
-    // 但我们优先相信自己的计算
-    const todayPenalty = wildcardActive ? 0 : Math.max(0, transferCount - 2) * 100;
-    // 注意：今日得分不需要单独扣分，周总分已经扣了
 
     standingsByUid[uid].raw_today_live = rawTodayLive;
     standingsByUid[uid].today_live = todayLive;
