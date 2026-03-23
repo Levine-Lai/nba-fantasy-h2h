@@ -168,8 +168,6 @@ const Render = {
                         <div class="team-name">${m.t1}</div>
                         <div class="score-main ${s1Class}">${m.total1}</div>
                         <div class="score-sub">今日 ${m.today1}</div>
-                        ${m.penalty1 > 0 ? `<div class="score-sub" style="color:#ff6b6b;">- ${m.penalty1} Penalty (${m.transfer_count1} transfers)</div>` : ''}
-                        ${m.penalty1 > 0 ? `<div class="score-sub" style="color:#fbbf24;">${m.raw_today1} - ${m.penalty1} = ${m.today1}</div>` : ''}
                         ${m.wildcard1 ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>' : ''}
                     </div>
                     <div class="vs-divider">VS</div>
@@ -177,8 +175,6 @@ const Render = {
                         <div class="team-name">${m.t2}</div>
                         <div class="score-main ${s2Class}">${m.total2}</div>
                         <div class="score-sub">今日 ${m.today2}</div>
-                        ${m.penalty2 > 0 ? `<div class="score-sub" style="color:#ff6b6b;">- ${m.penalty2} Penalty (${m.transfer_count2} transfers)</div>` : ''}
-                        ${m.penalty2 > 0 ? `<div class="score-sub" style="color:#fbbf24;">${m.raw_today2} - ${m.penalty2} = ${m.today2}</div>` : ''}
                         ${m.wildcard2 ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>' : ''}
                     </div>
                 </div>
@@ -305,6 +301,16 @@ const Render = {
                         </div>
                     `;
                 };
+
+                const penaltyLine = ldata.penalty_score > 0
+                    ? `<div class="score-sub" style="color:#ff6b6b;">- ${ldata.penalty_score} Transfer Penalty (${ldata.transfer_count} transfers)</div>`
+                    : '';
+                const gd1FixLine = ldata.gd1_missing_penalty > 0
+                    ? `<div class="score-sub" style="color:#f59e0b;">GW Day1 Fix: -${ldata.gd1_missing_penalty}</div>`
+                    : '';
+                const wildcardLine = ldata.wildcard_active
+                    ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>'
+                    : '';
                 
                 return `
                     <div class="dual-lineup-side">
@@ -312,6 +318,10 @@ const Render = {
                             <div class="dual-team-name">${teamName}</div>
                             <div class="dual-team-score">${ldata.total_live}</div>
                             <div class="dual-team-formation">${ldata.formation}</div>
+                            <div class="score-sub">总分 ${ldata.event_total || 0}</div>
+                            ${penaltyLine}
+                            ${gd1FixLine}
+                            ${wildcardLine}
                         </div>
                         <div class="lineup-container">
                             <div class="lineup-section starters">
@@ -374,8 +384,20 @@ const Render = {
             };
             
             if (body) {
+                const penaltyLine = data.penalty_score > 0
+                    ? `<div class="score-sub" style="color:#ff6b6b;">- ${data.penalty_score} Transfer Penalty (${data.transfer_count} transfers)</div>`
+                    : '';
+                const gd1FixLine = data.gd1_missing_penalty > 0
+                    ? `<div class="score-sub" style="color:#f59e0b;">GW Day1 Fix: -${data.gd1_missing_penalty}</div>`
+                    : '';
+                const wildcardLine = data.wildcard_active
+                    ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>'
+                    : '';
                 body.innerHTML = `
-                    <div class="formation-info">有效阵容: ${data.formation} | 总得分: ${data.total_live}</div>
+                    <div class="formation-info">有效阵容: ${data.formation} | 今日得分: ${data.total_live} | 总分: ${data.event_total || 0}</div>
+                    ${penaltyLine}
+                    ${gd1FixLine}
+                    ${wildcardLine}
                     <div class="lineup-container">
                         <div class="lineup-section starters">
                             <h4>首发</h4>

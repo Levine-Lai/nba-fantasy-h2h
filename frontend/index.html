@@ -6,8 +6,6 @@
     <title>NBA Fantasy H2H Dashboard</title>
     <link rel="stylesheet" href="/css/style.css">
     <script>
-        // 閮ㄧ讲鍒?Cloudflare Pages 鏃讹紝濉叆浣犵殑 Worker 鍩熷悕锛屼緥濡?
-        // window.__API_BASE__ = "https://nba-fantasy-api.<subdomain>.workers.dev";
         window.__API_BASE__ = "https://nba-fantasy-api.nbafantasy.workers.dev";
     </script>
 </head>
@@ -101,7 +99,7 @@
     <script src="/js/app.js"></script>
     <script>
         // Load FDR HTML from backend
-        const apiBase = (window.__API_BASE__ || '').replace(/\/+$/, '');
+        const apiBase = (window.__API_BASE__ || '').trim().replace(/\/+$/, '');
         fetch(`${apiBase}/api/fdr`).then(r => r.json()).then(data => {
             document.getElementById('fdr-body').innerHTML = data.html;
         }).catch(() => {
