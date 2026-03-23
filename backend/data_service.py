@@ -154,6 +154,59 @@ def _calculate_gd1_missing_penalty(transfer_count: int, gd1_transfer_count: int,
     return max(0, correct_penalty - website_penalty)
 
 
+def _calculate_week_score_from_history(history_data: Dict, current_event: int) -> Tuple[int, int]:
+    """
+    从 history 数据计算本周总分和今日得分
+    
+    Args:
+        history_data: history API 返回的数据
+        current_event: 当前 event ID
+        
+    Returns:
+        (week_score, today_score) 元组
+    """
+    if not isinstance(history_data, dict):
+        return 0, 0
+    
+    # 从 history_data.current 获取每日得分
+    current_list = history_data.get('current', [])
+    if not isinstance(current_list, list):
+        return 0, 0
+    
+    # 提取当前 GW 号
+    current_gw = _extract_gw_number(CACHE.current_event_name) or _extract_gw_number(current_event)
+    if not current_gw:
+        current_gw = current_event
+    
+    week_score = 0
+    today_score = 0
+    
+    for row in current_list:
+        if not isinstance(row, dict):
+            continue
+        
+        event_id = row.get('event')
+        points = row.get('points', 0)
+        
+        # points 是放大10倍存储的，需要除以10
+        if isinstance(points, (int, float)):
+            points = int(points) / 10
+        else:
+            points = 0
+        
+        # 检查是否属于当前周（通过 GW 号匹配）
+        row_gw = _extract_gw_number(event_id)
+        
+        if row_gw == current_gw:
+            week_score += points
+        
+        # 记录今日得分
+        if event_id == current_event:
+            today_score = points
+    
+    return int(week_score), int(today_score)
+
+
 def validate_api_response(data: any) -> bool:
     """校验API响应数据
     
@@ -618,6 +671,12 @@ async def update_user_picks(client, uid: int) -> Tuple[Optional[int], List[Dict]
         gd1_transfer_count,
         wildcard_active
     )
+    
+    # 自己计算周总分和今日得分（从 history 数据累加）
+    # 这样可以避免网站API的bug（如GD1换人不扣分）
+    week_score_from_history, today_score_from_history = _calculate_week_score_from_history(
+        history_data, CACHE.current_event
+    )
 
     picks = []
     for pick in data['picks']:
@@ -658,13 +717,28 @@ async def update_user_picks(client, uid: int) -> Tuple[Optional[int], List[Dict]
     CACHE.user_picks[uid] = picks
     effective_score, _, _ = calculate_effective_score(picks)
     final_score = effective_score - penalty_score
+    
+    # 计算最终周总分
+    # 优先使用从 history 自己计算的周得分（避免网站API的bug）
+    # 如果 history 没有数据，则使用 API 返回的 total 作为回退
+    api_total = CACHE.standings.get(uid, {}).get('total', 0)
+    if week_score_from_history > 0:
+        # 使用自己计算的周总分，扣除罚分
+        calculated_total = max(0, week_score_from_history - penalty_score)
+    else:
+        # 没有 history 数据，使用 API 的 total 并减去 gd1_missing_penalty（修复GD1漏扣）
+        calculated_total = max(0, api_total - gd1_missing_penalty)
+    
     CACHE.standings.setdefault(uid, {})
     CACHE.standings[uid]['raw_today_live'] = effective_score
+    CACHE.standings[uid]['today_live'] = final_score
     CACHE.standings[uid]['penalty_score'] = penalty_score
     CACHE.standings[uid]['transfer_count'] = transfer_count
     CACHE.standings[uid]['gd1_transfer_count'] = gd1_transfer_count
     CACHE.standings[uid]['gd1_missing_penalty'] = gd1_missing_penalty
     CACHE.standings[uid]['wildcard_active'] = wildcard_active
+    CACHE.standings[uid]['total'] = calculated_total
+    CACHE.standings[uid]['week_score_from_history'] = week_score_from_history
     cache.save_to_disk()
     return final_score, picks
 
@@ -704,13 +778,7 @@ async def update_standings(client):
     for uid in uids_to_fetch:
         try:
             score, picks = await update_user_picks(client, uid)
-            if score is not None:
-                CACHE.standings[uid]['today_live'] = score
-                CACHE.standings[uid]['picks'] = picks
-                # 修复网站 GD1 漏扣：仅扣除“缺失差额”，不影响其他天已计入的扣分
-                api_total = CACHE.standings[uid].get('total', 0)
-                missing_penalty = CACHE.standings[uid].get('gd1_missing_penalty', 0)
-                CACHE.standings[uid]['total'] = api_total - missing_penalty
+            # update_user_picks now handles total calculation from history
             await asyncio.sleep(0.5)
         except Exception as e:
             print(f"[Error] Failed to fetch picks for {uid}: {e}")

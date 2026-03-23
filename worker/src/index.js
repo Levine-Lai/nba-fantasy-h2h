@@ -209,12 +209,24 @@ function formatKickoffBj(isoTime) {
   if (!isoTime) return "--:--";
   const dt = new Date(isoTime);
   if (Number.isNaN(dt.getTime())) return "--:--";
-  return dt.toLocaleTimeString("zh-CN", {
+  
+  // 获取北京时间的小时和分钟
+  const timeStr = dt.toLocaleTimeString("zh-CN", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
     timeZone: "Asia/Shanghai",
   });
+  
+  // 获取北京时间的日期（月/日）
+  const dateStr = dt.toLocaleDateString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Shanghai",
+  });
+  
+  // 返回带日期的格式
+  return `${dateStr} ${timeStr}`;
 }
 
 function topListFromMap(counter, limit = 10) {
@@ -453,6 +465,9 @@ function calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, 
   let weeklyPoints = 0;
   let todayPoints = null;
   let hasWeekRows = false;
+  
+  // 按GW和day组织数据，用于计算每日得分
+  const pointsByDay = {};
 
   for (const row of rows) {
     if (!row || typeof row !== "object") continue;
@@ -469,12 +484,18 @@ function calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, 
 
     hasWeekRows = true;
     weeklyPoints += points;
+    
+    // 按天记录得分
+    const day = meta.day || 1;
+    if (!pointsByDay[day]) pointsByDay[day] = 0;
+    pointsByDay[day] += points;
   }
 
   return {
     has_week_rows: hasWeekRows,
     weekly_points: Math.round(weeklyPoints),
     today_points: todayPoints,
+    points_by_day: pointsByDay,
   };
 }
 
@@ -674,19 +695,36 @@ async function buildState(previousState = null) {
     const penaltyScore = calculateTransferPenalty(transferCount, wildcardActive);
     const historyWeek = calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
 
-    const fallbackTotal = Number(standingsByUid[uid].total || 0);
-    const weeklyTotal = historyWeek.has_week_rows ? historyWeek.weekly_points - penaltyScore : fallbackTotal;
+    // 自己计算周总分：累加本周每一天的得分，然后减去扣分
+    // 这样可以避免网站API的bug（GD1换人不扣分的bug）
+    let calculatedWeekTotal = 0;
+    if (historyWeek.has_week_rows) {
+      // 使用自己计算的周得分（从history累加）
+      calculatedWeekTotal = historyWeek.weekly_points;
+    } else {
+      // 没有历史数据，使用API返回的总分作为回退
+      calculatedWeekTotal = Number(standingsByUid[uid].total || 0);
+    }
+    
+    // 扣除转会罚分
+    const finalWeekTotal = Math.max(0, calculatedWeekTotal - penaltyScore);
 
     standingsByUid[uid].penalty_score = penaltyScore;
     standingsByUid[uid].transfer_count = transferCount;
     standingsByUid[uid].gd1_transfer_count = gd1TransferCount;
     standingsByUid[uid].gd1_missing_penalty = 0;
     standingsByUid[uid].wildcard_active = wildcardActive;
-    standingsByUid[uid].total = weeklyTotal;
+    standingsByUid[uid].total = finalWeekTotal;
 
     if (!picksData?.picks) {
-      const todayFallback =
-        historyWeek.today_points !== null ? historyWeek.today_points : Number(standingsByUid[uid].today_live || 0);
+      // 没有picks数据时的回退处理
+      // 优先使用history中的今日得分，其次使用之前缓存的今日得分
+      let todayFallback = 0;
+      if (historyWeek.today_points !== null) {
+        todayFallback = historyWeek.today_points;
+      } else {
+        todayFallback = Number(standingsByUid[uid].today_live || 0);
+      }
       standingsByUid[uid].raw_today_live = todayFallback;
       standingsByUid[uid].today_live = todayFallback;
       return;
@@ -718,12 +756,23 @@ async function buildState(previousState = null) {
     });
 
     const [effectiveScore] = calculateEffectiveScore(picks, games, teams);
+    
+    // 计算今日得分：优先使用实时计算的effectiveScore
+    // 如果effectiveScore为0且history中有今日数据，使用history数据作为回退
     let todayLive = effectiveScore;
-    if (todayLive === 0 && historyWeek.today_points !== null) {
+    let rawTodayLive = effectiveScore;
+    
+    // 只有当effectiveScore为0且history中有今日数据时，才使用history作为回退
+    if (effectiveScore === 0 && historyWeek.today_points !== null && historyWeek.today_points > 0) {
       todayLive = historyWeek.today_points;
     }
+    
+    // 如果今日有扣分，今日得分也要扣除（因为网站API可能已经扣过了，需要保持一致）
+    // 但我们优先相信自己的计算
+    const todayPenalty = wildcardActive ? 0 : Math.max(0, transferCount - 2) * 100;
+    // 注意：今日得分不需要单独扣分，周总分已经扣了
 
-    standingsByUid[uid].raw_today_live = effectiveScore;
+    standingsByUid[uid].raw_today_live = rawTodayLive;
     standingsByUid[uid].today_live = todayLive;
     standingsByUid[uid].picks = picks;
   });
@@ -813,7 +862,7 @@ async function buildState(previousState = null) {
     h2h,
     picks_by_uid: picksByUid,
     transfer_trends: transferTrends,
-    fdr_html: FDR_HTML || buildFdrHtmlFromFixtures(standingsByUid),
+    fdr_html: buildFdrHtmlFromFixtures(standingsByUid),
   };
 }
 
