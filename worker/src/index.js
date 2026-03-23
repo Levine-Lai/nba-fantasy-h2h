@@ -132,6 +132,35 @@ const ALL_FIXTURES = [
   [25, "阿甘", "柯南"],
 ];
 
+const H2H_RANK_BY_UID = {
+  2: 1,
+  15: 2,
+  3455: 3,
+  4319: 4,
+  5095: 5,
+  17: 6,
+  10: 7,
+  14: 8,
+  6: 9,
+  5410: 10,
+  9: 11,
+  189: 12,
+  4224: 13,
+  5101: 14,
+  32: 15,
+  16447: 16,
+  6441: 17,
+  23: 18,
+  4: 19,
+  11: 20,
+  6412: 21,
+  22761: 22,
+  42: 23,
+  5467: 24,
+  6562: 25,
+  8580: 26,
+};
+
 function normalizeName(name) {
   if (name === null || name === undefined) return "";
   const text = String(name).trim();
@@ -152,7 +181,7 @@ function resolveUidByName(name) {
   return null;
 }
 
-function buildFdrHtmlFromFixtures(standingsByUid = {}) {
+function buildFdrHtmlFromFixtures(standingsByUid = {}, leagueRankByUid = {}) {
   const weeks = [22, 23, 24, 25];
   const byTeam = {};
   for (const [gw, team1, team2] of ALL_FIXTURES) {
@@ -165,12 +194,22 @@ function buildFdrHtmlFromFixtures(standingsByUid = {}) {
   }
 
   const teams = Object.values(UID_MAP).filter((name) => byTeam[name]);
+  const totalTeams = Math.max(1, teams.length);
   const ranked = teams
     .map((name) => ({
       name,
-      total: Number(standingsByUid?.[resolveUidByName(name)]?.total || 0),
+      uid: resolveUidByName(name),
     }))
-    .sort((a, b) => a.total - b.total);
+    .map((item) => ({
+      ...item,
+      leagueRank: Number(leagueRankByUid?.[item.uid] || totalTeams),
+      h2hRank: Number(H2H_RANK_BY_UID?.[item.uid] || totalTeams),
+    }))
+    .map((item) => ({
+      ...item,
+      combinedRank: item.leagueRank * 0.7 + item.h2hRank * 0.3,
+    }))
+    .sort((a, b) => a.combinedRank - b.combinedRank);
 
   const percentileByName = {};
   const denom = Math.max(1, ranked.length - 1);
@@ -181,11 +220,11 @@ function buildFdrHtmlFromFixtures(standingsByUid = {}) {
   const difficultyClass = (opponent) => {
     const pct = percentileByName[opponent];
     if (pct === undefined) return 3;
-    if (pct < 0.2) return 1;
-    if (pct < 0.4) return 2;
+    if (pct < 0.2) return 5;
+    if (pct < 0.4) return 4;
     if (pct < 0.6) return 3;
-    if (pct < 0.8) return 4;
-    return 5;
+    if (pct < 0.8) return 2;
+    return 1;
   };
 
   return teams
@@ -200,8 +239,14 @@ function buildFdrHtmlFromFixtures(standingsByUid = {}) {
         return `<td><div class='box fdr-${cls}'>${opponent}</div></td>`;
       });
       const avg = (sum / Math.max(1, count)).toFixed(2).replace(/\.00$/, "");
-      return `<tr><td class='t-name'>${team}</td>${cells.join("")}<td class='avg-col'>${avg}</td></tr>`;
+      return {
+        team,
+        avg: Number(sum / Math.max(1, count)),
+        html: `<tr><td class='t-name'>${team}</td>${cells.join("")}<td class='avg-col'>${avg}</td></tr>`,
+      };
     })
+    .sort((a, b) => a.avg - b.avg || a.team.localeCompare(b.team))
+    .map((row) => row.html)
     .join("");
 }
 
@@ -672,9 +717,11 @@ async function buildState(previousState = null) {
   }
 
   const standingsByUid = {};
-  for (const row of standingsRaw?.standings?.results || []) {
+  const leagueRankByUid = {};
+  for (const [index, row] of (standingsRaw?.standings?.results || []).entries()) {
     const uid = Number(row.entry);
     if (!UID_MAP[uid]) continue;
+    leagueRankByUid[uid] = index + 1;
     const previous = previousPicksByUid[String(uid)] || {};
     standingsByUid[uid] = {
       total: Math.floor(Number(row.total || 0) / 10),
@@ -905,7 +952,7 @@ async function buildState(previousState = null) {
     h2h,
     picks_by_uid: picksByUid,
     transfer_trends: transferTrends,
-    fdr_html: buildFdrHtmlFromFixtures(standingsByUid),
+    fdr_html: buildFdrHtmlFromFixtures(standingsByUid, leagueRankByUid),
   };
 }
 
