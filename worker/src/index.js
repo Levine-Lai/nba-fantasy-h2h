@@ -719,25 +719,31 @@ async function buildState(previousState = null) {
     const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : {};
     transfersByUid[uid] = transfersData;
 
-    const transferCount = countTransfersInGw(transfersData, currentWeek, eventMetaById);
-    const gd1TransferCount = countTransfersInGd1(transfersData, currentWeek, eventMetaById);
-    const wildcardActive = isWildcardActiveFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
-    const penaltyScore = calculateTransferPenalty(transferCount, wildcardActive);
+    const canRecomputePenalty = !!transfersRes.ok && !!historyRes.ok;
+    const transferCount = canRecomputePenalty
+      ? countTransfersInGw(transfersData, currentWeek, eventMetaById)
+      : Number(previous.transfer_count || 0);
+    const gd1TransferCount = canRecomputePenalty
+      ? countTransfersInGd1(transfersData, currentWeek, eventMetaById)
+      : Number(previous.gd1_transfer_count || 0);
+    const wildcardActive = canRecomputePenalty
+      ? isWildcardActiveFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
+      : !!previous.wildcard_active;
+    const penaltyScore = canRecomputePenalty
+      ? calculateTransferPenalty(transferCount, wildcardActive)
+      : Number(previous.penalty_score || 0);
     const historyWeek = calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
 
-    // 自己计算周总分：累加本周每一天的得分，然后减去扣分
-    // 这样可以避免网站API的bug（GD1换人不扣分的bug）
     let calculatedWeekTotal = 0;
     if (historyWeek.has_week_rows) {
-      // 使用自己计算的周得分（从history累加）
       calculatedWeekTotal = historyWeek.weekly_points;
+    } else if (Number.isFinite(Number(previous.event_total))) {
+      calculatedWeekTotal = Number(previous.event_total) + penaltyScore;
     } else {
-      // 没有历史数据，使用API返回的总分作为回退
-      calculatedWeekTotal = Number(standingsByUid[uid].total || 0);
+      calculatedWeekTotal = Number(standingsByUid[uid].total || 0) + penaltyScore;
     }
-    
-    // 扣除转会罚分
-    const finalWeekTotal = Math.max(0, calculatedWeekTotal - penaltyScore);
+
+    const finalWeekTotal = Math.max(0, Number(calculatedWeekTotal || 0) - penaltyScore);
 
     standingsByUid[uid].penalty_score = penaltyScore;
     standingsByUid[uid].transfer_count = transferCount;
@@ -754,9 +760,11 @@ async function buildState(previousState = null) {
       // 优先使用history中的今日得分，其次使用之前缓存的今日得分
       let todayFallback = 0;
       if (historyWeek.today_points !== null) {
-        todayFallback = historyWeek.today_points;
+        todayFallback = Number(historyWeek.today_points);
+      } else if (Number.isFinite(Number(previous.total_live))) {
+        todayFallback = Number(previous.total_live);
       } else {
-        todayFallback = Number(previous.total_live || standingsByUid[uid].today_live || 0);
+        todayFallback = Number(standingsByUid[uid].today_live || 0);
       }
       standingsByUid[uid].raw_today_live = todayFallback;
       standingsByUid[uid].today_live = todayFallback;
@@ -794,20 +802,22 @@ async function buildState(previousState = null) {
     });
 
     const [effectiveScore] = calculateEffectiveScore(picks, games, teams);
-    
-    // 计算今日得分：
-    // 1. 优先使用实时计算的 effectiveScore（基于球员实时数据）
-    // 2. 如果 effectiveScore 为0（可能球员今日无比赛），使用 history 数据作为回退
-    // 3. 如果 history 也没有数据，保持为0
-    let todayLive = effectiveScore;
-    let rawTodayLive = effectiveScore;
-    
-    // 如果 effectiveScore 为0，尝试使用 history 中的今日得分
-    // 这在第7天（最后一天）特别有用，因为有些球队可能已经没有比赛了
-    if (effectiveScore === 0 && historyWeek.today_points !== null) {
-      todayLive = historyWeek.today_points;
-      rawTodayLive = historyWeek.today_points;
+    const officialToday = Number.isFinite(Number(picksData?.entry_history?.points))
+      ? Math.round(Number(picksData.entry_history.points) / 10)
+      : null;
+    const historyToday = historyWeek.today_points !== null ? Number(historyWeek.today_points) : null;
+
+    let todayLive = 0;
+    if (historyToday !== null) {
+      todayLive = historyToday;
+    } else if (officialToday !== null) {
+      todayLive = officialToday;
+    } else if (Number.isFinite(Number(previous.total_live))) {
+      todayLive = Number(previous.total_live);
+    } else {
+      todayLive = Number(effectiveScore || 0);
     }
+    const rawTodayLive = todayLive;
 
     standingsByUid[uid].raw_today_live = rawTodayLive;
     standingsByUid[uid].today_live = todayLive;
