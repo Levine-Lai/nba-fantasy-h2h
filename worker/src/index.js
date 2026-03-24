@@ -632,6 +632,44 @@ async function mapLimit(list, limit, fn) {
   return results;
 }
 
+async function fetchAllStandingsRows() {
+  const allRows = [];
+  const seen = new Set();
+  const maxPages = 20;
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const pageRes = await fetchJsonSafe(
+      `/leagues-classic/${LEAGUE_ID}/standings/?phase=${CURRENT_PHASE}&page_standings=${page}`,
+      4
+    );
+    if (!pageRes.ok) break;
+
+    const standings = pageRes.data?.standings || {};
+    const rows = Array.isArray(standings?.results) ? standings.results : [];
+    if (rows.length === 0) break;
+
+    let added = 0;
+    for (const row of rows) {
+      const uid = Number(row?.entry || 0);
+      if (!uid || seen.has(uid)) continue;
+      seen.add(uid);
+      allRows.push(row);
+      added += 1;
+    }
+
+    if (standings?.has_next === true) continue;
+    if (standings?.has_next === false) break;
+    if (added === 0 || rows.length < 50) break;
+  }
+
+  if (allRows.length > 0) return allRows;
+
+  const fallback = await fetchJsonSafe(`/leagues-classic/${LEAGUE_ID}/standings/?phase=${CURRENT_PHASE}`, 4);
+  if (!fallback.ok) return [];
+  const rows = fallback.data?.standings?.results;
+  return Array.isArray(rows) ? rows : [];
+}
+
 async function buildState(previousState = null) {
   const bootstrap = await fetchJson("/bootstrap-static/");
   const events = bootstrap.events || [];
@@ -660,10 +698,10 @@ async function buildState(previousState = null) {
     };
   }
 
-  const [liveRaw, fixturesRaw, standingsRaw] = await Promise.all([
+  const [liveRaw, fixturesRaw, standingsRows] = await Promise.all([
     fetchJson(`/event/${currentEvent}/live/`),
     fetchJson(`/fixtures/?event=${currentEvent}`),
-    fetchJson(`/leagues-classic/${LEAGUE_ID}/standings/?phase=${CURRENT_PHASE}`),
+    fetchAllStandingsRows(),
   ]);
 
   const liveElements = {};
@@ -718,10 +756,10 @@ async function buildState(previousState = null) {
 
   const standingsByUid = {};
   const leagueRankByUid = {};
-  for (const [index, row] of (standingsRaw?.standings?.results || []).entries()) {
+  for (const [index, row] of (standingsRows || []).entries()) {
     const uid = Number(row.entry);
     if (!UID_MAP[uid]) continue;
-    leagueRankByUid[uid] = index + 1;
+    leagueRankByUid[uid] = Number(row?.rank_sort || row?.rank || index + 1);
     const previous = previousPicksByUid[String(uid)] || {};
     standingsByUid[uid] = {
       total: Math.floor(Number(row.total || 0) / 10),
@@ -736,7 +774,22 @@ async function buildState(previousState = null) {
     };
   }
 
-  const uids = Object.keys(standingsByUid).map(Number);
+  const uids = Object.keys(UID_MAP).map(Number);
+  for (const uid of uids) {
+    if (standingsByUid[uid]) continue;
+    const previous = previousPicksByUid[String(uid)] || {};
+    standingsByUid[uid] = {
+      total: Number(previous.event_total || 0),
+      today_live: Number(previous.total_live || 0),
+      raw_today_live: Number(previous.raw_total_live || previous.total_live || 0),
+      penalty_score: Number(previous.penalty_score || 0),
+      transfer_count: Number(previous.transfer_count || 0),
+      gd1_transfer_count: Number(previous.gd1_transfer_count || 0),
+      gd1_missing_penalty: Number(previous.gd1_missing_penalty || 0),
+      wildcard_active: !!previous.wildcard_active,
+      picks: Array.isArray(previous.players) ? previous.players : [],
+    };
+  }
   const transfersByUid = {};
   await mapLimit(uids, 1, async (uid) => {
     const previous = previousPicksByUid[String(uid)] || {};
@@ -766,47 +819,53 @@ async function buildState(previousState = null) {
     const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : {};
     transfersByUid[uid] = transfersData;
 
-    const transferCount = countTransfersInGw(transfersData, currentWeek, eventMetaById);
-    const gd1TransferCount = countTransfersInGd1(transfersData, currentWeek, eventMetaById);
-    const wildcardActive = isWildcardActiveFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
-    const penaltyScore = calculateTransferPenalty(transferCount, wildcardActive);
+    const canRecomputePenalty = !!transfersRes.ok && !!historyRes.ok;
+    const transferCount = canRecomputePenalty
+      ? countTransfersInGw(transfersData, currentWeek, eventMetaById)
+      : Number(previous.transfer_count || 0);
+    const gd1TransferCount = canRecomputePenalty
+      ? countTransfersInGd1(transfersData, currentWeek, eventMetaById)
+      : Number(previous.gd1_transfer_count || 0);
+    const wildcardActive = canRecomputePenalty
+      ? isWildcardActiveFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
+      : !!previous.wildcard_active;
+    const penaltyScore = canRecomputePenalty
+      ? calculateTransferPenalty(transferCount, wildcardActive)
+      : Number(previous.penalty_score || 0);
     const historyWeek = calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
-
-    // 自己计算周总分：累加本周每一天的得分，然后减去扣分
-    // 这样可以避免网站API的bug（GD1换人不扣分的bug）
-    let calculatedWeekTotal = 0;
-    if (historyWeek.has_week_rows) {
-      // 使用自己计算的周得分（从history累加）
-      calculatedWeekTotal = historyWeek.weekly_points;
-    } else {
-      // 没有历史数据，使用API返回的总分作为回退
-      calculatedWeekTotal = Number(standingsByUid[uid].total || 0);
-    }
-    
-    // 扣除转会罚分
-    const finalWeekTotal = Math.max(0, calculatedWeekTotal - penaltyScore);
 
     standingsByUid[uid].penalty_score = penaltyScore;
     standingsByUid[uid].transfer_count = transferCount;
     standingsByUid[uid].gd1_transfer_count = gd1TransferCount;
     standingsByUid[uid].gd1_missing_penalty = 0;
     standingsByUid[uid].wildcard_active = wildcardActive;
-    standingsByUid[uid].total = finalWeekTotal;
 
     if (!picksData?.picks) {
       if (Array.isArray(previous.players) && previous.players.length > 0) {
         standingsByUid[uid].picks = previous.players;
       }
-      // 没有picks数据时的回退处理
-      // 优先使用history中的今日得分，其次使用之前缓存的今日得分
-      let todayFallback = 0;
+      // 没有 picks 时回退到 history/缓存，并保持周总分与今日分同源。
+      let todayFallback = Number(previous.raw_total_live || previous.total_live || 0);
       if (historyWeek.today_points !== null) {
         todayFallback = historyWeek.today_points;
-      } else {
-        todayFallback = Number(previous.total_live || standingsByUid[uid].today_live || 0);
       }
-      standingsByUid[uid].raw_today_live = todayFallback;
-      standingsByUid[uid].today_live = todayFallback;
+
+      let weekRawTotal = 0;
+      if (historyWeek.has_week_rows) {
+        const historyToday = Number(historyWeek.today_points || 0);
+        weekRawTotal = Math.max(0, Number(historyWeek.weekly_points || 0) - historyToday + Number(todayFallback || 0));
+      } else {
+        weekRawTotal = Math.max(
+          0,
+          Number(previous.event_total || standingsByUid[uid].total || 0) + penaltyScore
+        );
+      }
+      const weekNetTotal = Math.max(0, weekRawTotal - penaltyScore);
+      const todayNet = Math.max(0, Number(todayFallback || 0) - penaltyScore);
+
+      standingsByUid[uid].raw_today_live = Number(todayFallback || 0);
+      standingsByUid[uid].today_live = todayNet;
+      standingsByUid[uid].total = weekNetTotal;
       standingsByUid[uid].fetch_status = {
         picks_ok: !!picksRes.ok,
         history_ok: !!historyRes.ok,
@@ -841,23 +900,24 @@ async function buildState(previousState = null) {
     });
 
     const [effectiveScore] = calculateEffectiveScore(picks, games, teams);
-    
-    // 计算今日得分：
-    // 1. 优先使用实时计算的 effectiveScore（基于球员实时数据）
-    // 2. 如果 effectiveScore 为0（可能球员今日无比赛），使用 history 数据作为回退
-    // 3. 如果 history 也没有数据，保持为0
-    let todayLive = effectiveScore;
-    let rawTodayLive = effectiveScore;
-    
-    // 如果 effectiveScore 为0，尝试使用 history 中的今日得分
-    // 这在第7天（最后一天）特别有用，因为有些球队可能已经没有比赛了
-    if (effectiveScore === 0 && historyWeek.today_points !== null) {
-      todayLive = historyWeek.today_points;
-      rawTodayLive = historyWeek.today_points;
+    const rawTodayLive = Number(effectiveScore || 0);
+    const todayLive = Math.max(0, rawTodayLive - penaltyScore);
+
+    let weekRawTotal = 0;
+    if (historyWeek.has_week_rows) {
+      const historyToday = Number(historyWeek.today_points || 0);
+      weekRawTotal = Math.max(0, Number(historyWeek.weekly_points || 0) - historyToday + rawTodayLive);
+    } else {
+      weekRawTotal = Math.max(
+        0,
+        Number(previous.event_total || standingsByUid[uid].total || 0) + penaltyScore - Number(previous.raw_total_live || previous.total_live || 0) + rawTodayLive
+      );
     }
+    const weekNetTotal = Math.max(0, weekRawTotal - penaltyScore);
 
     standingsByUid[uid].raw_today_live = rawTodayLive;
     standingsByUid[uid].today_live = todayLive;
+    standingsByUid[uid].total = weekNetTotal;
     standingsByUid[uid].picks = picks;
     standingsByUid[uid].fetch_status = {
       picks_ok: true,

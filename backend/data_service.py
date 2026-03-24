@@ -51,6 +51,37 @@ def _extract_gw_number(value) -> Optional[int]:
     return None
 
 
+def _resolve_event_gw(event_value) -> Optional[int]:
+    """通过 CACHE.events_data 将 event id 解析为 gameweek。"""
+    if event_value is None:
+        return None
+
+    event_id = None
+    if isinstance(event_value, int):
+        event_id = event_value
+    elif isinstance(event_value, float):
+        event_id = int(event_value)
+    else:
+        match = re.search(r"(\d+)", str(event_value))
+        if match:
+            try:
+                event_id = int(match.group(1))
+            except ValueError:
+                event_id = None
+
+    if event_id is None:
+        return _extract_gw_number(event_value)
+
+    for event in CACHE.events_data:
+        if not isinstance(event, dict):
+            continue
+        if event.get("id") != event_id:
+            continue
+        return _extract_gw_number(event.get("name")) or _extract_gw_number(event_id)
+
+    return _extract_gw_number(event_id)
+
+
 def _is_wildcard_active_from_history(history_data: Dict, current_event: int) -> bool:
     """wildcard 状态仅根据 history 接口判断"""
     current_gw = _extract_gw_number(CACHE.current_event_name) or _extract_gw_number(current_event)
@@ -154,7 +185,7 @@ def _calculate_gd1_missing_penalty(transfer_count: int, gd1_transfer_count: int,
     return max(0, correct_penalty - website_penalty)
 
 
-def _calculate_week_score_from_history(history_data: Dict, current_event: int) -> Tuple[int, int]:
+def _calculate_week_score_from_history(history_data: Dict, current_event: int) -> Tuple[int, int, bool]:
     """
     从 history 数据计算本周总分和今日得分
     
@@ -163,15 +194,15 @@ def _calculate_week_score_from_history(history_data: Dict, current_event: int) -
         current_event: 当前 event ID
         
     Returns:
-        (week_score, today_score) 元组
+        (week_score, today_score, has_week_rows) 元组
     """
     if not isinstance(history_data, dict):
-        return 0, 0
+        return 0, 0, False
     
     # 从 history_data.current 获取每日得分
     current_list = history_data.get('current', [])
     if not isinstance(current_list, list):
-        return 0, 0
+        return 0, 0, False
     
     # 提取当前 GW 号
     current_gw = _extract_gw_number(CACHE.current_event_name) or _extract_gw_number(current_event)
@@ -180,12 +211,17 @@ def _calculate_week_score_from_history(history_data: Dict, current_event: int) -
     
     week_score = 0
     today_score = 0
+    has_week_rows = False
     
     for row in current_list:
         if not isinstance(row, dict):
             continue
         
-        event_id = row.get('event')
+        event_id_raw = row.get('event')
+        try:
+            event_id = int(float(event_id_raw))
+        except (TypeError, ValueError):
+            event_id = None
         points = row.get('points', 0)
         
         # points 是放大10倍存储的，需要除以10
@@ -195,16 +231,17 @@ def _calculate_week_score_from_history(history_data: Dict, current_event: int) -
             points = 0
         
         # 检查是否属于当前周（通过 GW 号匹配）
-        row_gw = _extract_gw_number(event_id)
+        row_gw = _resolve_event_gw(event_id if event_id is not None else event_id_raw)
         
         if row_gw == current_gw:
             week_score += points
+            has_week_rows = True
         
         # 记录今日得分
         if event_id == current_event:
             today_score = points
     
-    return int(week_score), int(today_score)
+    return int(week_score), int(today_score), has_week_rows
 
 
 def validate_api_response(data: any) -> bool:
@@ -674,7 +711,7 @@ async def update_user_picks(client, uid: int) -> Tuple[Optional[int], List[Dict]
     
     # 自己计算周总分和今日得分（从 history 数据累加）
     # 这样可以避免网站API的bug（如GD1换人不扣分）
-    week_score_from_history, today_score_from_history = _calculate_week_score_from_history(
+    week_score_from_history, today_score_from_history, has_history_week_rows = _calculate_week_score_from_history(
         history_data, CACHE.current_event
     )
 
@@ -716,18 +753,16 @@ async def update_user_picks(client, uid: int) -> Tuple[Optional[int], List[Dict]
     
     CACHE.user_picks[uid] = picks
     effective_score, _, _ = calculate_effective_score(picks)
-    final_score = effective_score - penalty_score
+    final_score = max(0, effective_score - penalty_score)
     
-    # 计算最终周总分
-    # 优先使用从 history 自己计算的周得分（避免网站API的bug）
-    # 如果 history 没有数据，则使用 API 返回的 total 作为回退
-    api_total = CACHE.standings.get(uid, {}).get('total', 0)
-    if week_score_from_history > 0:
-        # 使用自己计算的周总分，扣除罚分
-        calculated_total = max(0, week_score_from_history - penalty_score)
+    # 周总分与今日分同源：用 history 的“本周已完成天数”+“当前实时有效分”合成
+    if has_history_week_rows:
+        week_raw_score = max(0, week_score_from_history - today_score_from_history + effective_score)
     else:
-        # 没有 history 数据，使用 API 的 total 并减去 gd1_missing_penalty（修复GD1漏扣）
-        calculated_total = max(0, api_total - gd1_missing_penalty)
+        previous_total = existing.get('total', 0)
+        previous_raw_today = existing.get('raw_today_live', existing.get('today_live', 0))
+        week_raw_score = max(0, previous_total + penalty_score - previous_raw_today + effective_score)
+    calculated_total = max(0, week_raw_score - penalty_score)
     
     CACHE.standings.setdefault(uid, {})
     CACHE.standings[uid]['raw_today_live'] = effective_score
@@ -739,40 +774,87 @@ async def update_user_picks(client, uid: int) -> Tuple[Optional[int], List[Dict]
     CACHE.standings[uid]['wildcard_active'] = wildcard_active
     CACHE.standings[uid]['total'] = calculated_total
     CACHE.standings[uid]['week_score_from_history'] = week_score_from_history
+    CACHE.standings[uid]['week_score_raw'] = week_raw_score
     cache.save_to_disk()
     return final_score, picks
 
 
+async def _fetch_all_standings_results(client) -> List[Dict]:
+    """分页拉取联赛 standings，避免只读第一页导致部分 UID 不更新。"""
+    all_results: List[Dict] = []
+    seen_entries = set()
+    max_pages = 20
+
+    for page in range(1, max_pages + 1):
+        url = f"{BASE_URL}/leagues-classic/{LEAGUE_ID}/standings/?phase={CURRENT_PHASE}&page_standings={page}"
+        data = await fetch(client, url)
+        standings = data.get('standings', {}) if isinstance(data, dict) else {}
+        results = standings.get('results', [])
+        if not isinstance(results, list) or not results:
+            break
+
+        new_count = 0
+        for row in results:
+            if not isinstance(row, dict):
+                continue
+            entry_id = row.get('entry')
+            if entry_id in seen_entries:
+                continue
+            seen_entries.add(entry_id)
+            all_results.append(row)
+            new_count += 1
+
+        has_next = standings.get('has_next')
+        if has_next is True:
+            continue
+        if has_next is False:
+            break
+
+        if new_count == 0 or len(results) < 50:
+            break
+
+    if all_results:
+        return all_results
+
+    # 回退：兼容不支持 page_standings 的场景
+    fallback_url = f"{BASE_URL}/leagues-classic/{LEAGUE_ID}/standings/?phase={CURRENT_PHASE}"
+    fallback_data = await fetch(client, fallback_url)
+    fallback_standings = fallback_data.get('standings', {}) if isinstance(fallback_data, dict) else {}
+    fallback_results = fallback_standings.get('results', [])
+    return fallback_results if isinstance(fallback_results, list) else []
+
+
 async def update_standings(client):
     """获取联赛排名"""
-    url = f"{BASE_URL}/leagues-classic/{LEAGUE_ID}/standings/?phase={CURRENT_PHASE}"
-    data = await fetch(client, url)
-    
-    if not data or 'standings' not in data or 'results' not in data['standings']:
-        return
-    
+    standings_rows = await _fetch_all_standings_results(client)
     import asyncio
-    
-    uids_to_fetch = []
-    for entry in data['standings']['results']:
-        uid = entry.get('entry')
+
+    rows_by_uid: Dict[int, Dict] = {}
+    for row in standings_rows:
+        if not isinstance(row, dict):
+            continue
+        uid = row.get('entry')
         if uid in UID_MAP:
-            total = int(float(entry.get('total', 0)) / 10)
-            existing = CACHE.standings.get(uid, {})
-            CACHE.standings[uid] = {
-                'total': total, 
-                'today_live': existing.get('today_live', 0),
-                'raw_today_live': existing.get('raw_today_live', existing.get('today_live', 0)),
-                'penalty_score': existing.get('penalty_score', 0),
-                'transfer_count': existing.get('transfer_count', 0),
-                'gd1_transfer_count': existing.get('gd1_transfer_count', 0),
-                'gd1_missing_penalty': existing.get('gd1_missing_penalty', 0),
-                'wildcard_active': existing.get('wildcard_active', False),
-                'effective_players': existing.get('effective_players', []),
-                'picks': existing.get('picks', [])
-            }
-            uids_to_fetch.append(uid)
-    
+            rows_by_uid[uid] = row
+
+    uids_to_fetch = list(UID_MAP.keys())
+    for uid in uids_to_fetch:
+        entry = rows_by_uid.get(uid, {})
+        existing = CACHE.standings.get(uid, {})
+        total = int(float(entry.get('total', 0)) / 10) if entry else existing.get('total', 0)
+        CACHE.standings[uid] = {
+            'total': total,
+            'today_live': existing.get('today_live', 0),
+            'raw_today_live': existing.get('raw_today_live', existing.get('today_live', 0)),
+            'penalty_score': existing.get('penalty_score', 0),
+            'transfer_count': existing.get('transfer_count', 0),
+            'gd1_transfer_count': existing.get('gd1_transfer_count', 0),
+            'gd1_missing_penalty': existing.get('gd1_missing_penalty', 0),
+            'wildcard_active': existing.get('wildcard_active', False),
+            'effective_players': existing.get('effective_players', []),
+            'picks': existing.get('picks', [])
+        }
+
     print(f"[Standings] Loaded {len(CACHE.standings)} users")
     
     for uid in uids_to_fetch:

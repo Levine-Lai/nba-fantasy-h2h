@@ -44,7 +44,7 @@ cache/
 
 ### 3.2 周总分（Event Total）
 
-- 周总分优先使用 `entry/{uid}/history/` 的 `current` 明细自行汇总：
+- 周总分：
   - 找到当前 Gameweek 的 Day1~Day7 对应 events
   - 累加 `points / 10` 得到周总分基线
 - 转会扣分规则：
@@ -108,48 +108,4 @@ PowerShell 命令：
 Invoke-WebRequest -Method POST "https://<your-worker-domain>/api/refresh?token=<REFRESH_TOKEN>"
 ```
 
----
-
-## 8. 常见问题排查
-
-### Q1: 某些人显示今日 0
-
-可能原因：
-
-- 该用户当天有效上场球员确实没有比赛
-- 实时 picks 接口短时失败（会回退历史分）
-- 当前 Event 切换中，数据还在刷新
-
-建议：
-
-- 先执行一次 `/api/refresh`
-- 再看 `/api/picks/{uid}` 中 `total_live`、`event_total` 是否正常
-
-### Q2: 对阵不匹配
-
-- 检查 `worker/src/index.js` 中 `ALL_FIXTURES` 与 `NAME_MAP` 是否一致
-- 检查别名是否都能映射到 `UID_MAP`
-
-### Q3: FDR 不显示或无颜色
-
-- 检查 `/api/fdr` 返回是否为空
-- 检查前端 `fdr-body` 是否成功 `innerHTML` 注入
-- 检查 `.box` 与 `.fdr-1~5` 样式是否被覆盖
-
----
-
-## 9. 后续可扩展模块（已验证可做）
-
-“每周转会趋势榜”可以实现：
-
-- 数据来源：`entry/{uid}/transfers/`
-- 统计维度示例：
-  - 本周最多被买入球员
-  - 本周最多被卖出球员
-  - 某用户本周转会次数排名
-
-实现方式建议：
-
-- Worker 在 refresh 时聚合一次，缓存到 KV
-- 前端新增一个 `Transfer Trend` 模块读取 `GET /api/trends/transfers`
 
