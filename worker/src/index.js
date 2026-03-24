@@ -379,11 +379,29 @@ function extractGwNumber(value) {
 }
 
 function getCurrentEvent(events) {
-  const current = events.find((e) => e.is_current);
+  const current = events.find((e) => e?.is_current);
   if (current) return [current.id, current.name || `GW${current.id}`];
-  const firstUnfinished = events.find((e) => !e.finished);
-  if (firstUnfinished) return [firstUnfinished.id, firstUnfinished.name || `GW${firstUnfinished.id}`];
-  const last = events[events.length - 1];
+
+  const now = Date.now();
+  let bestActive = null;
+  for (const event of events || []) {
+    if (!event || event.finished) continue;
+    const deadline = Date.parse(event.deadline_time || "");
+    if (Number.isNaN(deadline)) continue;
+    if (now >= deadline) {
+      if (!bestActive || Number(event.id || 0) > Number(bestActive.id || 0)) {
+        bestActive = event;
+      }
+    }
+  }
+  if (bestActive) return [bestActive.id, bestActive.name || `GW${bestActive.id}`];
+
+  const upcoming = (events || [])
+    .filter((e) => e && !e.finished)
+    .sort((a, b) => Number(a.id || 0) - Number(b.id || 0))[0];
+  if (upcoming) return [upcoming.id, upcoming.name || `GW${upcoming.id}`];
+
+  const last = (events || [])[events.length - 1];
   return [last?.id || 1, last?.name || "GW1"];
 }
 
