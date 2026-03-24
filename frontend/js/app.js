@@ -118,9 +118,9 @@ const Render = {
     },
 
     transferTrends(data) {
-        const leagueEl = document.getElementById('trend-league');
-        const globalEl = document.getElementById('trend-global');
-        if (!leagueEl || !globalEl) return;
+        const inEl = document.getElementById('trend-overall-in');
+        const outEl = document.getElementById('trend-overall-out');
+        if (!inEl || !outEl) return;
 
         const toList = (items, emptyText) => {
             if (!items || items.length === 0) {
@@ -129,16 +129,19 @@ const Render = {
             return items.map((x, idx) => `
                 <div class="trend-item">
                     <span class="trend-rank">#${idx + 1}</span>
+                    <span class="trend-avatar-wrap">
+                        ${x.avatar ? `<img class="trend-avatar" src="${x.avatar}" alt="${x.name}">` : '<span class="trend-avatar trend-avatar-fallback"></span>'}
+                    </span>
                     <span class="trend-name">${x.name}</span>
                     <span class="trend-count">${x.count}</span>
                 </div>
             `).join('');
         };
 
-        const leaguePairs = data?.league?.top_pairs || [];
-        const globalIn = data?.global?.top_in || [];
-        leagueEl.innerHTML = toList(leaguePairs, '本周暂无换人数据');
-        globalEl.innerHTML = toList(globalIn, '全服暂无趋势数据');
+        const overallIn = data?.overall?.top_in || [];
+        const overallOut = data?.overall?.top_out || [];
+        inEl.innerHTML = toList(overallIn, 'No transfer-in trend data');
+        outEl.innerHTML = toList(overallOut, 'No transfer-out trend data');
     },
     
     gamesList(games) {
