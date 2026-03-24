@@ -132,35 +132,6 @@ const ALL_FIXTURES = [
   [25, "阿甘", "柯南"],
 ];
 
-const H2H_RANK_BY_UID = {
-  2: 1,
-  15: 2,
-  3455: 3,
-  4319: 4,
-  5095: 5,
-  17: 6,
-  10: 7,
-  14: 8,
-  6: 9,
-  5410: 10,
-  9: 11,
-  189: 12,
-  4224: 13,
-  5101: 14,
-  32: 15,
-  16447: 16,
-  6441: 17,
-  23: 18,
-  4: 19,
-  11: 20,
-  6412: 21,
-  22761: 22,
-  42: 23,
-  5467: 24,
-  6562: 25,
-  8580: 26,
-};
-
 function normalizeName(name) {
   if (name === null || name === undefined) return "";
   const text = String(name).trim();
@@ -181,7 +152,7 @@ function resolveUidByName(name) {
   return null;
 }
 
-function buildFdrHtmlFromFixtures(standingsByUid = {}, leagueRankByUid = {}) {
+function buildFdrHtmlFromFixtures(standingsByUid = {}) {
   const weeks = [22, 23, 24, 25];
   const byTeam = {};
   for (const [gw, team1, team2] of ALL_FIXTURES) {
@@ -194,22 +165,12 @@ function buildFdrHtmlFromFixtures(standingsByUid = {}, leagueRankByUid = {}) {
   }
 
   const teams = Object.values(UID_MAP).filter((name) => byTeam[name]);
-  const totalTeams = Math.max(1, teams.length);
   const ranked = teams
     .map((name) => ({
       name,
-      uid: resolveUidByName(name),
+      total: Number(standingsByUid?.[resolveUidByName(name)]?.total || 0),
     }))
-    .map((item) => ({
-      ...item,
-      leagueRank: Number(leagueRankByUid?.[item.uid] || totalTeams),
-      h2hRank: Number(H2H_RANK_BY_UID?.[item.uid] || totalTeams),
-    }))
-    .map((item) => ({
-      ...item,
-      combinedRank: item.leagueRank * 0.7 + item.h2hRank * 0.3,
-    }))
-    .sort((a, b) => a.combinedRank - b.combinedRank);
+    .sort((a, b) => a.total - b.total);
 
   const percentileByName = {};
   const denom = Math.max(1, ranked.length - 1);
@@ -220,11 +181,11 @@ function buildFdrHtmlFromFixtures(standingsByUid = {}, leagueRankByUid = {}) {
   const difficultyClass = (opponent) => {
     const pct = percentileByName[opponent];
     if (pct === undefined) return 3;
-    if (pct < 0.2) return 5;
-    if (pct < 0.4) return 4;
+    if (pct < 0.2) return 1;
+    if (pct < 0.4) return 2;
     if (pct < 0.6) return 3;
-    if (pct < 0.8) return 2;
-    return 1;
+    if (pct < 0.8) return 4;
+    return 5;
   };
 
   return teams
@@ -239,14 +200,8 @@ function buildFdrHtmlFromFixtures(standingsByUid = {}, leagueRankByUid = {}) {
         return `<td><div class='box fdr-${cls}'>${opponent}</div></td>`;
       });
       const avg = (sum / Math.max(1, count)).toFixed(2).replace(/\.00$/, "");
-      return {
-        team,
-        avg: Number(sum / Math.max(1, count)),
-        html: `<tr><td class='t-name'>${team}</td>${cells.join("")}<td class='avg-col'>${avg}</td></tr>`,
-      };
+      return `<tr><td class='t-name'>${team}</td>${cells.join("")}<td class='avg-col'>${avg}</td></tr>`;
     })
-    .sort((a, b) => a.avg - b.avg || a.team.localeCompare(b.team))
-    .map((row) => row.html)
     .join("");
 }
 
@@ -271,27 +226,6 @@ function topListFromMap(counter, limit = 10) {
     .map(([name, count]) => ({ name, count }));
 }
 
-function playerAvatarUrl(playerCode) {
-  const code = Number(playerCode || 0);
-  if (!code) return "";
-  return `https://cdn.nba.com/headshots/nba/latest/260x190/${code}.png`;
-}
-
-function topPlayerListFromIdCounter(counter, elements, limit = 10) {
-  return [...counter.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([id, count]) => {
-      const elem = elements?.[Number(id)] || {};
-      return {
-        id: Number(id),
-        name: elem.name || `#${id}`,
-        count,
-        avatar: elem.avatar || "",
-      };
-    });
-}
-
 function buildTransferTrends({
   transfersByUid,
   leagueUids,
@@ -299,22 +233,55 @@ function buildTransferTrends({
   eventMetaById,
   elements,
 }) {
+  const pairCounter = new Map();
+  const inCounter = new Map();
+  const outCounter = new Map();
+  const managerCounter = new Map();
+
+  for (const uid of leagueUids || []) {
+    const transfers = transfersByUid?.[uid] || [];
+    let managerTransfers = 0;
+    for (const transfer of transfers) {
+      const { gw } = resolveTransferGwDay(transfer, eventMetaById);
+      if (gw !== currentWeek) continue;
+      managerTransfers += 1;
+
+      const inId = Number(transfer?.element_in || 0);
+      const outId = Number(transfer?.element_out || 0);
+      const inName = elements[inId]?.name || `#${inId}`;
+      const outName = elements[outId]?.name || `#${outId}`;
+      const pair = `${outName} -> ${inName}`;
+      pairCounter.set(pair, (pairCounter.get(pair) || 0) + 1);
+      inCounter.set(inName, (inCounter.get(inName) || 0) + 1);
+      outCounter.set(outName, (outCounter.get(outName) || 0) + 1);
+    }
+    if (managerTransfers > 0) {
+      managerCounter.set(UID_MAP[uid] || String(uid), managerTransfers);
+    }
+  }
+
   const globalInCounter = new Map();
   const globalOutCounter = new Map();
   for (const elem of Object.values(elements)) {
     if (!elem) continue;
-    const id = Number(elem.id || 0);
-    if (!id) continue;
+    const name = elem.name || "";
     const inCount = Number(elem.transfers_in_event || 0);
     const outCount = Number(elem.transfers_out_event || 0);
-    if (inCount > 0) globalInCounter.set(id, inCount);
-    if (outCount > 0) globalOutCounter.set(id, outCount);
+    if (inCount > 0) globalInCounter.set(name, inCount);
+    if (outCount > 0) globalOutCounter.set(name, outCount);
   }
 
   return {
-    overall: {
-      top_in: topPlayerListFromIdCounter(globalInCounter, elements, 10),
-      top_out: topPlayerListFromIdCounter(globalOutCounter, elements, 10),
+    league: {
+      top_pairs: topListFromMap(pairCounter, 10),
+      top_in: topListFromMap(inCounter, 10),
+      top_out: topListFromMap(outCounter, 10),
+      top_managers: topListFromMap(managerCounter, 10),
+    },
+    global: {
+      // 全服目前无法获得逐笔“谁换谁”数据，这里展示当前 Event 的全服热门转入/转出。
+      top_in: topListFromMap(globalInCounter, 10),
+      top_out: topListFromMap(globalOutCounter, 10),
     },
   };
 }
@@ -367,29 +334,11 @@ function extractGwNumber(value) {
 }
 
 function getCurrentEvent(events) {
-  const current = events.find((e) => e?.is_current);
+  const current = events.find((e) => e.is_current);
   if (current) return [current.id, current.name || `GW${current.id}`];
-
-  const now = Date.now();
-  let bestActive = null;
-  for (const event of events || []) {
-    if (!event || event.finished) continue;
-    const deadline = Date.parse(event.deadline_time || "");
-    if (Number.isNaN(deadline)) continue;
-    if (now >= deadline) {
-      if (!bestActive || Number(event.id || 0) > Number(bestActive.id || 0)) {
-        bestActive = event;
-      }
-    }
-  }
-  if (bestActive) return [bestActive.id, bestActive.name || `GW${bestActive.id}`];
-
-  const upcoming = (events || [])
-    .filter((e) => e && !e.finished)
-    .sort((a, b) => Number(a.id || 0) - Number(b.id || 0))[0];
-  if (upcoming) return [upcoming.id, upcoming.name || `GW${upcoming.id}`];
-
-  const last = (events || [])[events.length - 1];
+  const firstUnfinished = events.find((e) => !e.finished);
+  if (firstUnfinished) return [firstUnfinished.id, firstUnfinished.name || `GW${firstUnfinished.id}`];
+  const last = events[events.length - 1];
   return [last?.id || 1, last?.name || "GW1"];
 }
 
@@ -562,7 +511,8 @@ function calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, 
 
 function getPlayerStats(elementId, liveElements, elements) {
   const live = liveElements[elementId];
-  const fallback = 0;
+  const elem = elements[elementId] || {};
+  const fallback = Number(elem.points_scored || elem.total_points || 0);
   const stats = live?.stats || null;
   if (!stats) {
     return { points: fallback, rebounds: 0, assists: 0, steals: 0, blocks: 0, minutes: 0, fantasy: fallback };
@@ -578,78 +528,49 @@ function getPlayerStats(elementId, liveElements, elements) {
   };
 }
 
-function hasGameToday(elementId, liveElements) {
-  const liveInfo = liveElements?.[elementId];
-  if (!liveInfo || typeof liveInfo !== "object") return false;
-  const stats = liveInfo?.stats || {};
-  return typeof stats === "object" && Object.keys(stats).length > 0;
+function hasGameToday(teamId, fixtures, teams) {
+  if (!teamId) return false;
+  for (const f of fixtures) {
+    if (f.team_h === teamId || f.team_a === teamId) return true;
+    const homeId = Object.entries(teams).find(([, name]) => name === f.home_team)?.[0];
+    const awayId = Object.entries(teams).find(([, name]) => name === f.away_team)?.[0];
+    if (Number(homeId) === teamId || Number(awayId) === teamId) return true;
+  }
+  return false;
 }
 
-function calculateEffectiveScore(picks, liveElements) {
+function isPlayerAvailable(pick, fixtures, teams) {
+  if (pick.injury) return false;
+  if (pick.team_id && !hasGameToday(pick.team_id, fixtures, teams)) return false;
+  return true;
+}
+
+function calculateEffectiveScore(picks, fixtures, teams) {
   for (const p of picks) p.is_effective = false;
-  for (const p of picks) p.has_game_today = hasGameToday(p.element_id, liveElements);
+  const starters = picks.filter((p) => p.lineup_position <= 5);
+  const bench = picks.filter((p) => p.lineup_position > 5);
 
-  const starters = picks
-    .filter((p) => p.lineup_position <= 5)
-    .sort((a, b) => Number(a.lineup_position || 0) - Number(b.lineup_position || 0));
-  const bench = picks
-    .filter((p) => p.lineup_position > 5)
-    .sort((a, b) => Number(a.lineup_position || 0) - Number(b.lineup_position || 0));
+  const availableStarters = starters.filter((p) => isPlayerAvailable(p, fixtures, teams));
+  const availableBench = bench.filter((p) => isPlayerAvailable(p, fixtures, teams));
 
-  const buildEffectiveLineup = (requiredBc, requiredFc) => {
-    const effectivePlayers = [];
-    const remainingBench = [...bench];
+  const sortByScore = (arr, pos) =>
+    arr.filter((p) => p.position_type === pos).sort((a, b) => b.final_points - a.final_points);
 
-    for (let i = 0; i < 5; i += 1) {
-      if (i >= starters.length) break;
-      const starter = starters[i];
-      if (starter.has_game_today) {
-        effectivePlayers.push(starter);
-      } else {
-        let replacementIndex = -1;
-        for (let idx = 0; idx < remainingBench.length; idx += 1) {
-          if (remainingBench[idx].position_type === starter.position_type) {
-            replacementIndex = idx;
-            break;
-          }
-        }
-        if (replacementIndex >= 0) {
-          effectivePlayers.push(remainingBench[replacementIndex]);
-          remainingBench.splice(replacementIndex, 1);
-        }
-      }
-    }
+  const bcStarters = sortByScore(availableStarters, 1);
+  const fcStarters = sortByScore(availableStarters, 2);
+  const bcBench = sortByScore(availableBench, 1);
+  const fcBench = sortByScore(availableBench, 2);
 
-    const bcPlayers = effectivePlayers.filter((p) => p.position_type === 1);
-    const fcPlayers = effectivePlayers.filter((p) => p.position_type === 2);
+  const combo = (bcCount, fcCount) => [...bcStarters, ...bcBench].slice(0, bcCount).concat([...fcStarters, ...fcBench].slice(0, fcCount));
 
-    while (bcPlayers.length < requiredBc && remainingBench.length) {
-      const idx = remainingBench.findIndex((p) => p.position_type === 1);
-      if (idx < 0) break;
-      bcPlayers.push(remainingBench[idx]);
-      remainingBench.splice(idx, 1);
-    }
+  const c1 = combo(3, 2);
+  const s1 = c1.reduce((sum, p) => sum + p.final_points, 0);
+  const c2 = combo(2, 3);
+  const s2 = c2.reduce((sum, p) => sum + p.final_points, 0);
 
-    while (fcPlayers.length < requiredFc && remainingBench.length) {
-      const idx = remainingBench.findIndex((p) => p.position_type === 2);
-      if (idx < 0) break;
-      fcPlayers.push(remainingBench[idx]);
-      remainingBench.splice(idx, 1);
-    }
-
-    const finalLineup = bcPlayers.slice(0, requiredBc).concat(fcPlayers.slice(0, requiredFc));
-    const totalScore = finalLineup.reduce(
-      (sum, p) => sum + (p.has_game_today ? Number(p.final_points || 0) : 0),
-      0
-    );
-    return [Math.floor(totalScore), finalLineup];
-  };
-
-  const [score1, lineup1] = buildEffectiveLineup(3, 2);
-  const [score2, lineup2] = buildEffectiveLineup(2, 3);
-  const chosen = score1 >= score2 ? lineup1 : lineup2;
+  const chosen = s1 >= s2 ? c1 : c2;
   for (const p of chosen) p.is_effective = true;
-  return [Math.max(score1, score2), chosen, score1 >= score2 ? "3BC+2FC" : "2BC+3FC"];
+  return [Math.floor(Math.max(s1, s2)), chosen, s1 >= s2 ? "3BC+2FC" : "2BC+3FC"];
 }
 
 async function mapLimit(list, limit, fn) {
@@ -664,44 +585,6 @@ async function mapLimit(list, limit, fn) {
   });
   await Promise.all(workers);
   return results;
-}
-
-async function fetchAllStandingsRows() {
-  const allRows = [];
-  const seen = new Set();
-  const maxPages = 20;
-
-  for (let page = 1; page <= maxPages; page += 1) {
-    const pageRes = await fetchJsonSafe(
-      `/leagues-classic/${LEAGUE_ID}/standings/?phase=${CURRENT_PHASE}&page_standings=${page}`,
-      4
-    );
-    if (!pageRes.ok) break;
-
-    const standings = pageRes.data?.standings || {};
-    const rows = Array.isArray(standings?.results) ? standings.results : [];
-    if (rows.length === 0) break;
-
-    let added = 0;
-    for (const row of rows) {
-      const uid = Number(row?.entry || 0);
-      if (!uid || seen.has(uid)) continue;
-      seen.add(uid);
-      allRows.push(row);
-      added += 1;
-    }
-
-    if (standings?.has_next === true) continue;
-    if (standings?.has_next === false) break;
-    if (added === 0 || rows.length < 50) break;
-  }
-
-  if (allRows.length > 0) return allRows;
-
-  const fallback = await fetchJsonSafe(`/leagues-classic/${LEAGUE_ID}/standings/?phase=${CURRENT_PHASE}`, 4);
-  if (!fallback.ok) return [];
-  const rows = fallback.data?.standings?.results;
-  return Array.isArray(rows) ? rows : [];
 }
 
 async function buildState(previousState = null) {
@@ -719,14 +602,10 @@ async function buildState(previousState = null) {
   const elements = {};
   for (const e of bootstrap.elements || []) {
     elements[e.id] = {
-      id: e.id,
       name: e.web_name || `#${e.id}`,
       team: e.team,
       position: e.element_type,
       position_name: e.element_type === 1 ? "BC" : e.element_type === 2 ? "FC" : "UNK",
-      code: e.code || 0,
-      photo: e.photo || "",
-      avatar: playerAvatarUrl(e.code || 0),
       points_scored: e.points_scored || 0,
       total_points: e.total_points || 0,
       status: e.status || "",
@@ -736,10 +615,10 @@ async function buildState(previousState = null) {
     };
   }
 
-  const [liveRaw, fixturesRaw, standingsRows] = await Promise.all([
+  const [liveRaw, fixturesRaw, standingsRaw] = await Promise.all([
     fetchJson(`/event/${currentEvent}/live/`),
     fetchJson(`/fixtures/?event=${currentEvent}`),
-    fetchAllStandingsRows(),
+    fetchJson(`/leagues-classic/${LEAGUE_ID}/standings/?phase=${CURRENT_PHASE}`),
   ]);
 
   const liveElements = {};
@@ -793,11 +672,9 @@ async function buildState(previousState = null) {
   }
 
   const standingsByUid = {};
-  const leagueRankByUid = {};
-  for (const [index, row] of (standingsRows || []).entries()) {
+  for (const row of standingsRaw?.standings?.results || []) {
     const uid = Number(row.entry);
     if (!UID_MAP[uid]) continue;
-    leagueRankByUid[uid] = Number(row?.rank_sort || row?.rank || index + 1);
     const previous = previousPicksByUid[String(uid)] || {};
     standingsByUid[uid] = {
       total: Math.floor(Number(row.total || 0) / 10),
@@ -812,22 +689,7 @@ async function buildState(previousState = null) {
     };
   }
 
-  const uids = Object.keys(UID_MAP).map(Number);
-  for (const uid of uids) {
-    if (standingsByUid[uid]) continue;
-    const previous = previousPicksByUid[String(uid)] || {};
-    standingsByUid[uid] = {
-      total: Number(previous.event_total || 0),
-      today_live: Number(previous.total_live || 0),
-      raw_today_live: Number(previous.raw_total_live || previous.total_live || 0),
-      penalty_score: Number(previous.penalty_score || 0),
-      transfer_count: Number(previous.transfer_count || 0),
-      gd1_transfer_count: Number(previous.gd1_transfer_count || 0),
-      gd1_missing_penalty: Number(previous.gd1_missing_penalty || 0),
-      wildcard_active: !!previous.wildcard_active,
-      picks: Array.isArray(previous.players) ? previous.players : [],
-    };
-  }
+  const uids = Object.keys(standingsByUid).map(Number);
   const transfersByUid = {};
   await mapLimit(uids, 1, async (uid) => {
     const previous = previousPicksByUid[String(uid)] || {};
@@ -857,100 +719,47 @@ async function buildState(previousState = null) {
     const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : {};
     transfersByUid[uid] = transfersData;
 
-    const canRecomputePenalty = !!transfersRes.ok && !!historyRes.ok;
-    const transferCount = canRecomputePenalty
-      ? countTransfersInGw(transfersData, currentWeek, eventMetaById)
-      : Number(previous.transfer_count || 0);
-    const gd1TransferCount = canRecomputePenalty
-      ? countTransfersInGd1(transfersData, currentWeek, eventMetaById)
-      : Number(previous.gd1_transfer_count || 0);
-    const wildcardActive = canRecomputePenalty
-      ? isWildcardActiveFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
-      : !!previous.wildcard_active;
-    const penaltyScore = canRecomputePenalty
-      ? calculateTransferPenalty(transferCount, wildcardActive)
-      : Number(previous.penalty_score || 0);
+    const transferCount = countTransfersInGw(transfersData, currentWeek, eventMetaById);
+    const gd1TransferCount = countTransfersInGd1(transfersData, currentWeek, eventMetaById);
+    const wildcardActive = isWildcardActiveFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
+    const penaltyScore = calculateTransferPenalty(transferCount, wildcardActive);
     const historyWeek = calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
+
+    // 自己计算周总分：累加本周每一天的得分，然后减去扣分
+    // 这样可以避免网站API的bug（GD1换人不扣分的bug）
+    let calculatedWeekTotal = 0;
+    if (historyWeek.has_week_rows) {
+      // 使用自己计算的周得分（从history累加）
+      calculatedWeekTotal = historyWeek.weekly_points;
+    } else {
+      // 没有历史数据，使用API返回的总分作为回退
+      calculatedWeekTotal = Number(standingsByUid[uid].total || 0);
+    }
+    
+    // 扣除转会罚分
+    const finalWeekTotal = Math.max(0, calculatedWeekTotal - penaltyScore);
 
     standingsByUid[uid].penalty_score = penaltyScore;
     standingsByUid[uid].transfer_count = transferCount;
     standingsByUid[uid].gd1_transfer_count = gd1TransferCount;
     standingsByUid[uid].gd1_missing_penalty = 0;
     standingsByUid[uid].wildcard_active = wildcardActive;
+    standingsByUid[uid].total = finalWeekTotal;
 
     if (!picksData?.picks) {
-      let rebuiltPicks = [];
       if (Array.isArray(previous.players) && previous.players.length > 0) {
-        rebuiltPicks = previous.players
-          .map((oldPick) => {
-            const elementId = Number(oldPick?.element_id || oldPick?.element || 0);
-            if (!elementId) return null;
-            const elem = elements[elementId] || {};
-            const stats = getPlayerStats(elementId, liveElements, elements);
-            const multiplier = Number(oldPick?.multiplier || 1);
-            const isCaptain = !!oldPick?.is_captain;
-            const base = Number(stats?.fantasy || 0);
-            return {
-              element_id: elementId,
-              name: elem.name || oldPick?.name || `#${elementId}`,
-              position_type: Number(elem.position || oldPick?.position_type || 0),
-              position_name: elem.position_name || oldPick?.position_name || "UNK",
-              lineup_position: Number(oldPick?.lineup_position || oldPick?.position || 0),
-              is_captain: isCaptain,
-              is_vice: !!oldPick?.is_vice,
-              multiplier,
-              base_points: base,
-              final_points: isCaptain ? base * multiplier : base,
-              stats,
-              injury: parseInjuryStatus(elem),
-              team_id: elem.team || oldPick?.team_id || 0,
-              is_effective: false,
-            };
-          })
-          .filter(Boolean);
+        standingsByUid[uid].picks = previous.players;
       }
-
-      // 确定今日得分（回退逻辑）
-      // 1. 尝试用重建的阵容计算实时得分
-      // 2. 如果实时得分为0（球员无比赛数据），使用 history 数据
-      // 3. 如果 history 也没有，使用之前缓存的数据
-      let todayFallback = Number(previous.raw_total_live || previous.total_live || 0);
-      let effectiveScore = 0;
-      
-      if (rebuiltPicks.length > 0) {
-        const [rebuiltScore] = calculateEffectiveScore(rebuiltPicks, liveElements);
-        effectiveScore = Number(rebuiltScore || 0);
-        // 只有当实时计算得分 > 0 时才使用，否则优先用 history
-        if (effectiveScore > 0) {
-          todayFallback = effectiveScore;
-        } else if (historyWeek.today_points !== null && historyWeek.today_points > 0) {
-          todayFallback = Number(historyWeek.today_points || 0);
-        }
-      } else if (historyWeek.today_points !== null) {
-        todayFallback = Number(historyWeek.today_points || 0);
-      }
-
-      // 计算周总分
-      let weekRawTotal = 0;
-      if (historyWeek.has_week_rows) {
-        const historyToday = Number(historyWeek.today_points || 0);
-        // 如果实时计算为0但 history 有今日分，说明比赛已结束，直接用 history 周总分
-        if (effectiveScore === 0 && historyToday > 0) {
-          weekRawTotal = Number(historyWeek.weekly_points || 0);
-        } else {
-          weekRawTotal = Math.max(0, Number(historyWeek.weekly_points || 0) - historyToday + Number(todayFallback || 0));
-        }
+      // 没有picks数据时的回退处理
+      // 优先使用history中的今日得分，其次使用之前缓存的今日得分
+      let todayFallback = 0;
+      if (historyWeek.today_points !== null) {
+        todayFallback = historyWeek.today_points;
       } else {
-        weekRawTotal = Math.max(
-          0,
-          Number(previous.event_total || standingsByUid[uid].total || 0) - Number(previous.raw_total_live || previous.total_live || 0) + Number(todayFallback || 0)
-        );
+        todayFallback = Number(previous.total_live || standingsByUid[uid].today_live || 0);
       }
-
-      standingsByUid[uid].picks = rebuiltPicks;
-      standingsByUid[uid].raw_today_live = Number(todayFallback || 0);
-      standingsByUid[uid].today_live = Number(todayFallback || 0);
-      standingsByUid[uid].total = Number(weekRawTotal || 0);
+      standingsByUid[uid].raw_today_live = todayFallback;
+      standingsByUid[uid].today_live = todayFallback;
       standingsByUid[uid].fetch_status = {
         picks_ok: !!picksRes.ok,
         history_ok: !!historyRes.ok,
@@ -984,40 +793,24 @@ async function buildState(previousState = null) {
       };
     });
 
-    const [effectiveScore] = calculateEffectiveScore(picks, liveElements);
+    const [effectiveScore] = calculateEffectiveScore(picks, games, teams);
     
-    // 确定今日得分：
-    // 1. 优先使用实时计算的 effectiveScore
-    // 2. 如果 effectiveScore 为0（球员今日无比赛或数据缺失），使用 history 回退
-    let rawTodayLive = Number(effectiveScore || 0);
-    if (rawTodayLive === 0 && historyWeek.today_points !== null && historyWeek.today_points > 0) {
+    // 计算今日得分：
+    // 1. 优先使用实时计算的 effectiveScore（基于球员实时数据）
+    // 2. 如果 effectiveScore 为0（可能球员今日无比赛），使用 history 数据作为回退
+    // 3. 如果 history 也没有数据，保持为0
+    let todayLive = effectiveScore;
+    let rawTodayLive = effectiveScore;
+    
+    // 如果 effectiveScore 为0，尝试使用 history 中的今日得分
+    // 这在第7天（最后一天）特别有用，因为有些球队可能已经没有比赛了
+    if (effectiveScore === 0 && historyWeek.today_points !== null) {
+      todayLive = historyWeek.today_points;
       rawTodayLive = historyWeek.today_points;
-    }
-    const todayLive = rawTodayLive;
-
-    // 计算周总分：
-    // 1. 如果有 history 数据，用本周累加分 - history今日分 + 实时今日分
-    // 2. 如果没有 history，用之前的总分 - 之前的今日分 + 实时今日分
-    let weekRawTotal = 0;
-    if (historyWeek.has_week_rows) {
-      const historyToday = Number(historyWeek.today_points || 0);
-      // 如果 effectiveScore 为0但 history 有今日分，说明球员今日比赛已结束
-      // 此时应该直接用 history 的 weekly_points（不替换今日分）
-      if (Number(effectiveScore || 0) === 0 && historyToday > 0) {
-        weekRawTotal = Number(historyWeek.weekly_points || 0);
-      } else {
-        weekRawTotal = Math.max(0, Number(historyWeek.weekly_points || 0) - historyToday + rawTodayLive);
-      }
-    } else {
-      weekRawTotal = Math.max(
-        0,
-        Number(previous.event_total || standingsByUid[uid].total || 0) - Number(previous.raw_total_live || previous.total_live || 0) + rawTodayLive
-      );
     }
 
     standingsByUid[uid].raw_today_live = rawTodayLive;
     standingsByUid[uid].today_live = todayLive;
-    standingsByUid[uid].total = Number(weekRawTotal || 0);
     standingsByUid[uid].picks = picks;
     standingsByUid[uid].fetch_status = {
       picks_ok: true,
@@ -1068,7 +861,7 @@ async function buildState(previousState = null) {
     const picks = s.picks || [];
     let formation = "N/A";
     if (picks.length) {
-      const [, , fmt] = calculateEffectiveScore(picks, liveElements);
+      const [, , fmt] = calculateEffectiveScore(picks, games, teams);
       formation = fmt;
     }
     picksByUid[uid] = {
@@ -1112,7 +905,7 @@ async function buildState(previousState = null) {
     h2h,
     picks_by_uid: picksByUid,
     transfer_trends: transferTrends,
-    fdr_html: buildFdrHtmlFromFixtures(standingsByUid, leagueRankByUid),
+    fdr_html: buildFdrHtmlFromFixtures(standingsByUid),
   };
 }
 
