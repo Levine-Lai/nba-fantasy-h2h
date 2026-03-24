@@ -2,34 +2,6 @@ const BASE_URL = "https://nbafantasy.nba.com/api";
 const LEAGUE_ID = 1653;
 const CURRENT_PHASE = 23;
 const CACHE_KEY = "latest_state";
-const FDR_HTML = `
-<tr><td class='t-name'>尼弟</td><td><div class='box fdr-2'>文史哲</div></td><td><div class='box fdr-3'>雕哥</div></td><td><div class='box fdr-1'>小火龙</div></td><td><div class='box fdr-2'>伍家辉</div></td><td class='avg-col'>2.0</td></tr>
-<tr><td class='t-name'>堡</td><td><div class='box fdr-3'>班班</div></td><td><div class='box fdr-2'>文史哲</div></td><td><div class='box fdr-3'>雕哥</div></td><td><div class='box fdr-1'>小火龙</div></td><td class='avg-col'>2.25</td></tr>
-<tr><td class='t-name'>雕哥</td><td><div class='box fdr-2'>船哥</div></td><td><div class='box fdr-2'>尼弟</div></td><td><div class='box fdr-4'>堡</div></td><td><div class='box fdr-1'>桑迪</div></td><td class='avg-col'>2.25</td></tr>
-<tr><td class='t-name'>Paul</td><td><div class='box fdr-1'>老姜</div></td><td><div class='box fdr-5'>笨笨</div></td><td><div class='box fdr-2'>橘队</div></td><td><div class='box fdr-2'>船哥</div></td><td class='avg-col'>2.5</td></tr>
-<tr><td class='t-name'>文史哲</td><td><div class='box fdr-2'>尼弟</div></td><td><div class='box fdr-4'>堡</div></td><td><div class='box fdr-1'>桑迪</div></td><td><div class='box fdr-3'>马哥</div></td><td class='avg-col'>2.5</td></tr>
-<tr><td class='t-name'>小火龙</td><td><div class='box fdr-2'>橘队</div></td><td><div class='box fdr-2'>船哥</div></td><td><div class='box fdr-2'>尼弟</div></td><td><div class='box fdr-4'>堡</div></td><td class='avg-col'>2.5</td></tr>
-<tr><td class='t-name'>弗老大</td><td><div class='box fdr-1'>柯南</div></td><td><div class='box fdr-4'>酸男</div></td><td><div class='box fdr-2'>阿甘</div></td><td><div class='box fdr-4'>紫葱酱</div></td><td class='avg-col'>2.75</td></tr>
-<tr><td class='t-name'>Kusuri</td><td><div class='box fdr-3'>鬼嗨</div></td><td><div class='box fdr-1'>老姜</div></td><td><div class='box fdr-5'>笨笨</div></td><td><div class='box fdr-2'>橘队</div></td><td class='avg-col'>2.75</td></tr>
-<tr><td class='t-name'>马哥</td><td><div class='box fdr-2'>阿甘</div></td><td><div class='box fdr-4'>紫葱酱</div></td><td><div class='box fdr-3'>班班</div></td><td><div class='box fdr-2'>文史哲</div></td><td class='avg-col'>2.75</td></tr>
-<tr><td class='t-name'>伍家辉</td><td><div class='box fdr-5'>笨笨</div></td><td><div class='box fdr-2'>橘队</div></td><td><div class='box fdr-2'>船哥</div></td><td><div class='box fdr-2'>尼弟</div></td><td class='avg-col'>2.75</td></tr>
-<tr><td class='t-name'>橘队</td><td><div class='box fdr-1'>小火龙</div></td><td><div class='box fdr-2'>伍家辉</div></td><td><div class='box fdr-5'>Pau</div></td><td><div class='box fdr-3'>Kus</div></td><td class='avg-col'>2.75</td></tr>
-<tr><td class='t-name'>船哥</td><td><div class='box fdr-3'>雕哥</div></td><td><div class='box fdr-1'>小火龙</div></td><td><div class='box fdr-2'>伍家辉</div></td><td><div class='box fdr-5'>Pau</div></td><td class='avg-col'>2.75</td></tr>
-<tr><td class='t-name'>大吉鲁</td><td><div class='box fdr-3'>凯文</div></td><td><div class='box fdr-2'>纪导</div></td><td><div class='box fdr-4'>AI</div></td><td><div class='box fdr-3'>鬼嗨</div></td><td class='avg-col'>3.0</td></tr>
-<tr><td class='t-name'>AI</td><td><div class='box fdr-2'>纪导</div></td><td><div class='box fdr-1'>柯南</div></td><td><div class='box fdr-5'>大吉鲁</div></td><td><div class='box fdr-4'>酸男</div></td><td class='avg-col'>3.0</td></tr>
-<tr><td class='t-name'>桑迪</td><td><div class='box fdr-4'>紫葱酱</div></td><td><div class='box fdr-3'>班班</div></td><td><div class='box fdr-2'>文史哲</div></td><td><div class='box fdr-3'>雕哥</div></td><td class='avg-col'>3.0</td></tr>
-<tr><td class='t-name'>笨笨</td><td><div class='box fdr-2'>伍家辉</div></td><td><div class='box fdr-5'>Pau</div></td><td><div class='box fdr-3'>Kus</div></td><td><div class='box fdr-3'>凯文</div></td><td class='avg-col'>3.25</td></tr>
-<tr><td class='t-name'>Kimi</td><td><div class='box fdr-4'>酸男</div></td><td><div class='box fdr-2'>阿甘</div></td><td><div class='box fdr-4'>紫葱酱</div></td><td><div class='box fdr-3'>班班</div></td><td class='avg-col'>3.25</td></tr>
-<tr><td class='t-name'>紫葱酱</td><td><div class='box fdr-1'>桑迪</div></td><td><div class='box fdr-3'>马哥</div></td><td><div class='box fdr-5'>Kim</div></td><td><div class='box fdr-4'>弗老大</div></td><td class='avg-col'>3.25</td></tr>
-<tr><td class='t-name'>班班</td><td><div class='box fdr-4'>堡</div></td><td><div class='box fdr-1'>桑迪</div></td><td><div class='box fdr-3'>马哥</div></td><td><div class='box fdr-5'>Kim</div></td><td class='avg-col'>3.25</td></tr>
-<tr><td class='t-name'>鬼嗨</td><td><div class='box fdr-3'>Kus</div></td><td><div class='box fdr-3'>凯文</div></td><td><div class='box fdr-2'>纪导</div></td><td><div class='box fdr-5'>大吉鲁</div></td><td class='avg-col'>3.25</td></tr>
-<tr><td class='t-name'>纪导</td><td><div class='box fdr-4'>AI</div></td><td><div class='box fdr-5'>大吉鲁</div></td><td><div class='box fdr-3'>鬼嗨</div></td><td><div class='box fdr-1'>老姜</div></td><td class='avg-col'>3.25</td></tr>
-<tr><td class='t-name'>阿甘</td><td><div class='box fdr-3'>马哥</div></td><td><div class='box fdr-5'>Kim</div></td><td><div class='box fdr-4'>弗老大</div></td><td><div class='box fdr-1'>柯南</div></td><td class='avg-col'>3.25</td></tr>
-<tr><td class='t-name'>老姜</td><td><div class='box fdr-5'>Pau</div></td><td><div class='box fdr-3'>Kus</div></td><td><div class='box fdr-3'>凯文</div></td><td><div class='box fdr-2'>纪导</div></td><td class='avg-col'>3.25</td></tr>
-<tr><td class='t-name'>酸男</td><td><div class='box fdr-5'>Kim</div></td><td><div class='box fdr-4'>弗老大</div></td><td><div class='box fdr-1'>柯南</div></td><td><div class='box fdr-4'>AI</div></td><td class='avg-col'>3.5</td></tr>
-<tr><td class='t-name'>凯文</td><td><div class='box fdr-5'>大吉鲁</div></td><td><div class='box fdr-3'>鬼嗨</div></td><td><div class='box fdr-1'>老姜</div></td><td><div class='box fdr-5'>笨笨</div></td><td class='avg-col'>3.5</td></tr>
-<tr><td class='t-name'>柯南</td><td><div class='box fdr-4'>弗老大</div></td><td><div class='box fdr-4'>AI</div></td><td><div class='box fdr-4'>酸男</div></td><td><div class='box fdr-2'>阿甘</div></td><td class='avg-col'>3.5</td></tr>
-`;
 
 const UID_MAP = {
   5410: "kusuri",
@@ -271,6 +243,12 @@ function buildTransferTrends({
     if (outCount > 0) globalOutCounter.set(name, outCount);
   }
 
+  const global = {
+    // 全服目前无法获得逐笔“谁换谁”数据，这里展示当前 Event 的全服热门转入/转出。
+    top_in: topListFromMap(globalInCounter, 10),
+    top_out: topListFromMap(globalOutCounter, 10),
+  };
+
   return {
     league: {
       top_pairs: topListFromMap(pairCounter, 10),
@@ -278,11 +256,8 @@ function buildTransferTrends({
       top_out: topListFromMap(outCounter, 10),
       top_managers: topListFromMap(managerCounter, 10),
     },
-    global: {
-      // 全服目前无法获得逐笔“谁换谁”数据，这里展示当前 Event 的全服热门转入/转出。
-      top_in: topListFromMap(globalInCounter, 10),
-      top_out: topListFromMap(globalOutCounter, 10),
-    },
+    global,
+    overall: global,
   };
 }
 
@@ -326,6 +301,41 @@ async function fetchJsonSafe(path, retries = 3) {
   }
 }
 
+async function fetchAllStandings() {
+  const rows = [];
+  const seenEntries = new Set();
+
+  for (let page = 1; page <= 20; page += 1) {
+    const data = await fetchJsonSafe(
+      `/leagues-classic/${LEAGUE_ID}/standings/?phase=${CURRENT_PHASE}&page_standings=${page}`,
+      4
+    );
+    if (!data.ok) break;
+
+    const standings = data.data?.standings || {};
+    const results = Array.isArray(standings.results) ? standings.results : [];
+    if (results.length === 0) break;
+
+    let newRows = 0;
+    for (const row of results) {
+      const entry = Number(row?.entry);
+      if (!entry || seenEntries.has(entry)) continue;
+      seenEntries.add(entry);
+      rows.push(row);
+      newRows += 1;
+    }
+
+    if (standings.has_next === false || newRows === 0 || results.length < 50) {
+      break;
+    }
+  }
+
+  if (rows.length > 0) return rows;
+
+  const fallback = await fetchJsonSafe(`/leagues-classic/${LEAGUE_ID}/standings/?phase=${CURRENT_PHASE}`, 4);
+  return Array.isArray(fallback.data?.standings?.results) ? fallback.data.standings.results : [];
+}
+
 function extractGwNumber(value) {
   if (value === null || value === undefined) return null;
   const text = String(value);
@@ -353,10 +363,21 @@ function fantasyScore(stats) {
 }
 
 function parseInjuryStatus(elem) {
-  if (!elem || elem.status !== "i") return null;
-  const news = elem.news || "";
-  const lower = news.toLowerCase();
-  if (lower.includes("expected")) return lower.split("expected")[0].trim() || "OUT";
+  if (!elem) return null;
+  const status = String(elem.status || "").toLowerCase();
+  if (!status || status === "a") return null;
+
+  const news = String(elem.news || "").trim();
+  if (news) {
+    const lower = news.toLowerCase();
+    if (lower.includes("expected")) {
+      return news.slice(0, lower.indexOf("expected")).trim() || "OUT";
+    }
+    return news;
+  }
+
+  if (status === "u") return "Unavailable";
+  if (status === "s") return "Suspended";
   return "OUT";
 }
 
@@ -512,10 +533,18 @@ function calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, 
 function getPlayerStats(elementId, liveElements, elements) {
   const live = liveElements[elementId];
   const elem = elements[elementId] || {};
-  const fallback = Number(elem.points_scored || elem.total_points || 0);
   const stats = live?.stats || null;
   if (!stats) {
-    return { points: fallback, rebounds: 0, assists: 0, steals: 0, blocks: 0, minutes: 0, fantasy: fallback };
+    const fallbackFantasy = Math.round(Number(elem.event_points || 0) / 10);
+    return {
+      points: 0,
+      rebounds: 0,
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      minutes: 0,
+      fantasy: fallbackFantasy,
+    };
   }
   return {
     points: Number(stats.points_scored || 0),
@@ -528,49 +557,64 @@ function getPlayerStats(elementId, liveElements, elements) {
   };
 }
 
-function hasGameToday(teamId, fixtures, teams) {
-  if (!teamId) return false;
-  for (const f of fixtures) {
-    if (f.team_h === teamId || f.team_a === teamId) return true;
-    const homeId = Object.entries(teams).find(([, name]) => name === f.home_team)?.[0];
-    const awayId = Object.entries(teams).find(([, name]) => name === f.away_team)?.[0];
-    if (Number(homeId) === teamId || Number(awayId) === teamId) return true;
+function buildTeamsPlayingToday(fixtures) {
+  const teamIds = new Set();
+  for (const fixture of fixtures || []) {
+    if (fixture?.team_h) teamIds.add(Number(fixture.team_h));
+    if (fixture?.team_a) teamIds.add(Number(fixture.team_a));
   }
-  return false;
+  return teamIds;
 }
 
-function isPlayerAvailable(pick, fixtures, teams) {
+function isPlayerAvailable(pick, teamsPlayingToday) {
   if (pick.injury) return false;
-  if (pick.team_id && !hasGameToday(pick.team_id, fixtures, teams)) return false;
+  if (pick.team_id && !teamsPlayingToday.has(Number(pick.team_id))) return false;
   return true;
 }
 
-function calculateEffectiveScore(picks, fixtures, teams) {
+function calculateEffectiveScore(picks, teamsPlayingToday) {
   for (const p of picks) p.is_effective = false;
-  const starters = picks.filter((p) => p.lineup_position <= 5);
-  const bench = picks.filter((p) => p.lineup_position > 5);
+  const starters = picks
+    .filter((p) => p.lineup_position <= 5)
+    .sort((a, b) => a.lineup_position - b.lineup_position);
+  const bench = picks
+    .filter((p) => p.lineup_position > 5)
+    .sort((a, b) => a.lineup_position - b.lineup_position);
 
-  const availableStarters = starters.filter((p) => isPlayerAvailable(p, fixtures, teams));
-  const availableBench = bench.filter((p) => isPlayerAvailable(p, fixtures, teams));
+  const selected = [];
+  let bcCount = 0;
+  let fcCount = 0;
 
-  const sortByScore = (arr, pos) =>
-    arr.filter((p) => p.position_type === pos).sort((a, b) => b.final_points - a.final_points);
+  const addSelected = (pick) => {
+    selected.push(pick);
+    if (pick.position_type === 1) bcCount += 1;
+    if (pick.position_type === 2) fcCount += 1;
+  };
 
-  const bcStarters = sortByScore(availableStarters, 1);
-  const fcStarters = sortByScore(availableStarters, 2);
-  const bcBench = sortByScore(availableBench, 1);
-  const fcBench = sortByScore(availableBench, 2);
+  const allStartersAvailable =
+    starters.length === 5 && starters.every((pick) => isPlayerAvailable(pick, teamsPlayingToday));
 
-  const combo = (bcCount, fcCount) => [...bcStarters, ...bcBench].slice(0, bcCount).concat([...fcStarters, ...fcBench].slice(0, fcCount));
+  if (allStartersAvailable) {
+    for (const starter of starters) addSelected(starter);
+  } else {
+    for (const starter of starters) {
+      if (!isPlayerAvailable(starter, teamsPlayingToday)) continue;
+      addSelected(starter);
+    }
 
-  const c1 = combo(3, 2);
-  const s1 = c1.reduce((sum, p) => sum + p.final_points, 0);
-  const c2 = combo(2, 3);
-  const s2 = c2.reduce((sum, p) => sum + p.final_points, 0);
+    for (const reserve of bench) {
+      if (selected.length >= 5) break;
+      if (!isPlayerAvailable(reserve, teamsPlayingToday)) continue;
+      if (reserve.position_type === 1 && bcCount >= 3) continue;
+      if (reserve.position_type === 2 && fcCount >= 3) continue;
+      addSelected(reserve);
+    }
+  }
 
-  const chosen = s1 >= s2 ? c1 : c2;
-  for (const p of chosen) p.is_effective = true;
-  return [Math.floor(Math.max(s1, s2)), chosen, s1 >= s2 ? "3BC+2FC" : "2BC+3FC"];
+  for (const pick of selected) pick.is_effective = true;
+  const score = selected.reduce((sum, pick) => sum + Number(pick.final_points || 0), 0);
+  const formation = `${bcCount}BC+${fcCount}FC`;
+  return [Math.floor(score), selected, formation];
 }
 
 async function mapLimit(list, limit, fn) {
@@ -606,6 +650,7 @@ async function buildState(previousState = null) {
       team: e.team,
       position: e.element_type,
       position_name: e.element_type === 1 ? "BC" : e.element_type === 2 ? "FC" : "UNK",
+      event_points: e.event_points || 0,
       points_scored: e.points_scored || 0,
       total_points: e.total_points || 0,
       status: e.status || "",
@@ -615,10 +660,10 @@ async function buildState(previousState = null) {
     };
   }
 
-  const [liveRaw, fixturesRaw, standingsRaw] = await Promise.all([
+  const [liveRaw, fixturesRaw, standingsRows] = await Promise.all([
     fetchJson(`/event/${currentEvent}/live/`),
     fetchJson(`/fixtures/?event=${currentEvent}`),
-    fetchJson(`/leagues-classic/${LEAGUE_ID}/standings/?phase=${CURRENT_PHASE}`),
+    fetchAllStandings(),
   ]);
 
   const liveElements = {};
@@ -641,6 +686,7 @@ async function buildState(previousState = null) {
     finished: !!f.finished,
     kickoff: formatKickoffBj(f.kickoff_time),
   }));
+  const teamsPlayingToday = buildTeamsPlayingToday(games);
 
   const fixtureDetails = {};
   for (const fixture of fixturesRaw || []) {
@@ -671,13 +717,20 @@ async function buildState(previousState = null) {
     };
   }
 
-  const standingsByUid = {};
-  for (const row of standingsRaw?.standings?.results || []) {
+  const standingsRowsByUid = {};
+  for (const row of standingsRows || []) {
     const uid = Number(row.entry);
     if (!UID_MAP[uid]) continue;
+    standingsRowsByUid[uid] = row;
+  }
+
+  const standingsByUid = {};
+  for (const uidText of Object.keys(UID_MAP)) {
+    const uid = Number(uidText);
+    const row = standingsRowsByUid[uid] || {};
     const previous = previousPicksByUid[String(uid)] || {};
     standingsByUid[uid] = {
-      total: Math.floor(Number(row.total || 0) / 10),
+      total: row.entry ? Math.floor(Number(row.total || 0) / 10) : Number(previous.event_total || 0),
       today_live: Number(previous.total_live || 0),
       raw_today_live: Number(previous.raw_total_live || previous.total_live || 0),
       penalty_score: Number(previous.penalty_score || 0),
@@ -689,7 +742,7 @@ async function buildState(previousState = null) {
     };
   }
 
-  const uids = Object.keys(standingsByUid).map(Number);
+  const uids = Object.keys(UID_MAP).map(Number);
   const transfersByUid = {};
   await mapLimit(uids, 1, async (uid) => {
     const previous = previousPicksByUid[String(uid)] || {};
@@ -734,23 +787,14 @@ async function buildState(previousState = null) {
       : Number(previous.penalty_score || 0);
     const historyWeek = calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
 
-    let calculatedWeekTotal = 0;
-    if (historyWeek.has_week_rows) {
-      calculatedWeekTotal = historyWeek.weekly_points;
-    } else if (Number.isFinite(Number(previous.event_total))) {
-      calculatedWeekTotal = Number(previous.event_total) + penaltyScore;
-    } else {
-      calculatedWeekTotal = Number(standingsByUid[uid].total || 0) + penaltyScore;
-    }
-
-    const finalWeekTotal = Math.max(0, Number(calculatedWeekTotal || 0) - penaltyScore);
-
     standingsByUid[uid].penalty_score = penaltyScore;
     standingsByUid[uid].transfer_count = transferCount;
     standingsByUid[uid].gd1_transfer_count = gd1TransferCount;
     standingsByUid[uid].gd1_missing_penalty = 0;
     standingsByUid[uid].wildcard_active = wildcardActive;
-    standingsByUid[uid].total = finalWeekTotal;
+    if (historyWeek.has_week_rows) {
+      standingsByUid[uid].total = Math.max(0, Number(historyWeek.weekly_points || 0) - penaltyScore);
+    }
 
     if (!picksData?.picks) {
       if (Array.isArray(previous.players) && previous.players.length > 0) {
@@ -801,26 +845,32 @@ async function buildState(previousState = null) {
       };
     });
 
-    const [effectiveScore] = calculateEffectiveScore(picks, games, teams);
-    const officialToday = Number.isFinite(Number(picksData?.entry_history?.points))
-      ? Math.round(Number(picksData.entry_history.points) / 10)
-      : null;
-    const historyToday = historyWeek.today_points !== null ? Number(historyWeek.today_points) : null;
+    const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
+    const previousEventTotal = Number(previous.event_total);
+    const previousRawToday = Number(previous.raw_total_live ?? previous.total_live);
 
-    let todayLive = 0;
-    if (historyToday !== null) {
-      todayLive = historyToday;
-    } else if (officialToday !== null) {
-      todayLive = officialToday;
-    } else if (Number.isFinite(Number(previous.total_live))) {
-      todayLive = Number(previous.total_live);
+    let weekRawScore = null;
+    if (historyWeek.has_week_rows) {
+      const settledWeekPoints =
+        Number(historyWeek.weekly_points || 0) -
+        (historyWeek.today_points !== null ? Number(historyWeek.today_points) : 0);
+      weekRawScore = Math.max(0, settledWeekPoints + effectiveScore);
+    } else if (Number.isFinite(previousEventTotal)) {
+      weekRawScore = Math.max(
+        0,
+        previousEventTotal + penaltyScore - (Number.isFinite(previousRawToday) ? previousRawToday : 0) + effectiveScore
+      );
     } else {
-      todayLive = Number(effectiveScore || 0);
+      weekRawScore = Math.max(0, Number(standingsByUid[uid].total || 0) + penaltyScore);
     }
+
+    const todayLive = Number(effectiveScore || 0);
     const rawTodayLive = todayLive;
+    const finalWeekTotal = Math.max(0, Number(weekRawScore || 0) - penaltyScore);
 
     standingsByUid[uid].raw_today_live = rawTodayLive;
     standingsByUid[uid].today_live = todayLive;
+    standingsByUid[uid].total = finalWeekTotal;
     standingsByUid[uid].picks = picks;
     standingsByUid[uid].fetch_status = {
       picks_ok: true,
@@ -871,7 +921,7 @@ async function buildState(previousState = null) {
     const picks = s.picks || [];
     let formation = "N/A";
     if (picks.length) {
-      const [, , fmt] = calculateEffectiveScore(picks, games, teams);
+      const [, , fmt] = calculateEffectiveScore(picks, teamsPlayingToday);
       formation = fmt;
     }
     picksByUid[uid] = {

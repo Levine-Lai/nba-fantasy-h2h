@@ -138,8 +138,8 @@ const Render = {
             `).join('');
         };
 
-        const overallIn = data?.overall?.top_in || [];
-        const overallOut = data?.overall?.top_out || [];
+        const overallIn = data?.overall?.top_in || data?.global?.top_in || [];
+        const overallOut = data?.overall?.top_out || data?.global?.top_out || [];
         inEl.innerHTML = toList(overallIn, 'No transfer-in trend data');
         outEl.innerHTML = toList(overallOut, 'No transfer-out trend data');
     },
