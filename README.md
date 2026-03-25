@@ -74,3 +74,7 @@
    - 今日平均有效人数：当天有比赛且未伤停、理论上可算分的人数平均值
 7. 前端默认改为同域 API 调用：`window.__API_BASE__ = ""`，优先走 `pages.dev` 域名下的 `/api/*`，不再依赖直接访问 `workers.dev`。
 8. 新增头部 Logo，资源文件为 `frontend/LOGO.jpg`。
+9. 为兼容 Cloudflare 免费版 Worker 的外部子请求限制，后端刷新改为分块模式：
+   - 默认 `POST /api/refresh` 只刷新一部分 UID
+   - Worker 定时任务应高频执行，逐步完成整轮刷新
+   - 如需全量刷新，可显式调用 `POST /api/refresh?mode=full`，但在免费版下可能触发子请求上限

@@ -1,6 +1,8 @@
 ﻿const BASE_URL = "https://nbafantasy.nba.com/api";
 const LEAGUE_ID = 1653;
 const CACHE_KEY = "latest_state";
+const CACHE_CURSOR_KEY = "refresh_cursor";
+const UID_CHUNK_SIZE = 6;
 const UID_LIST = [
   "5410",
   "3455",
@@ -837,7 +839,7 @@ async function mapLimit(list, limit, fn) {
   return results;
 }
 
-async function buildState(previousState = null) {
+async function buildState(previousState = null, targetUids = UID_LIST) {
   const bootstrap = await fetchJson("/bootstrap-static/");
   const events = bootstrap.events || [];
   const [currentEvent, currentEventName] = getCurrentEvent(events);
@@ -963,7 +965,7 @@ async function buildState(previousState = null) {
     });
   }
 
-  const uids = [...UID_LIST];
+  const uids = [...new Set((targetUids || UID_LIST).map((uid) => normalizeUid(uid)).filter(Boolean))];
   const transfersByUid = {};
   await mapLimit(uids, 1, async (uid) => {
     const uidNumber = uidToNumber(uid);
@@ -1218,13 +1220,16 @@ async function buildState(previousState = null) {
 
   const league_daily_averages = buildLeagueDailyAverages(picksByUid, teamsPlayingToday);
 
-  const transferTrends = buildTransferTrends({
-    transfersByUid,
-    leagueUids: uids,
-    currentWeek,
-    eventMetaById,
-    elements,
-  });
+  const isFullRefresh = uids.length === UID_LIST.length;
+  const transferTrends = isFullRefresh
+    ? buildTransferTrends({
+        transfersByUid,
+        leagueUids: uids,
+        currentWeek,
+        eventMetaById,
+        elements,
+      })
+    : previousState?.transfer_trends || { league: {}, global: {}, overall: {} };
   const fdr = buildFdrPayload({
     standingsByUid,
     currentWeek,
@@ -1248,13 +1253,30 @@ async function buildState(previousState = null) {
     fdr,
     fdr_html: fdr.html,
     league_daily_averages,
+    refresh_meta: previousState?.refresh_meta || null,
   };
 }
 
-async function refreshState(env) {
+async function refreshState(env, options = {}) {
   const previous = await getState(env);
-  const state = await buildState(previous);
+  const full = !!options.full;
+  const rawCursor = full ? "0" : await env.NBA_CACHE.get(CACHE_CURSOR_KEY);
+  const startIndex = Math.max(0, Number(rawCursor || 0) || 0);
+  const safeStart = startIndex >= UID_LIST.length ? 0 : startIndex;
+  const targetUids = full ? [...UID_LIST] : UID_LIST.slice(safeStart, safeStart + UID_CHUNK_SIZE);
+  const state = await buildState(previous, targetUids);
+  const nextIndex = full || safeStart + UID_CHUNK_SIZE >= UID_LIST.length ? 0 : safeStart + UID_CHUNK_SIZE;
+  state.refresh_meta = {
+    mode: full ? "full" : "chunk",
+    chunk_size: full ? UID_LIST.length : UID_CHUNK_SIZE,
+    start_index: safeStart,
+    next_index: nextIndex,
+    processed_uids: targetUids,
+    complete_cycle: nextIndex === 0,
+    updated_at: new Date().toISOString(),
+  };
   await env.NBA_CACHE.put(CACHE_KEY, JSON.stringify(state));
+  await env.NBA_CACHE.put(CACHE_CURSOR_KEY, String(nextIndex));
   return state;
 }
 
@@ -1281,13 +1303,19 @@ export default {
         const token = url.searchParams.get("token");
         if (token !== auth) return jsonResponse({ success: false, error: "unauthorized" }, 401);
       }
-      const state = await refreshState(env);
-      return jsonResponse({ success: true, current_event_name: state.current_event_name });
+      const mode = String(url.searchParams.get("mode") || "chunk").toLowerCase();
+      const state = await refreshState(env, { full: mode === "full" });
+      return jsonResponse({
+        success: true,
+        mode: mode === "full" ? "full" : "chunk",
+        current_event_name: state.current_event_name,
+        refresh_meta: state.refresh_meta,
+      });
     }
 
     let state = await getState(env);
     if (!state) {
-      state = await refreshState(env);
+      state = await refreshState(env, { full: false });
     }
 
     if (path === "/api/state") return jsonResponse(state);
@@ -1334,6 +1362,7 @@ export default {
         last_update: state.generated_at,
         current_event: state.current_event,
         current_event_name: state.current_event_name,
+        refresh_meta: state.refresh_meta || null,
       });
     }
 
