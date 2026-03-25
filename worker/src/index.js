@@ -1,6 +1,5 @@
-const BASE_URL = "https://nbafantasy.nba.com/api";
+﻿const BASE_URL = "https://nbafantasy.nba.com/api";
 const LEAGUE_ID = 1653;
-const CURRENT_PHASE = 23;
 const CACHE_KEY = "latest_state";
 const UID_LIST = [
   "5410",
@@ -30,7 +29,7 @@ const UID_LIST = [
   "8580",
   "42",
 ];
-const DEBUG_UIDS = new Set(["5095", "6412", "8580", "16447", "5467", "5410", "6441", "6562", "22761", "5101", "4319"]);
+const DEBUG_UIDS = new Set(["5095", "6412", "8580", "16447", "5467", "5410", "6441", "6562", "22761", "5101", "4319", "11", "23", "42"]);
 const FDR_TOTAL_WEIGHT = 0.7;
 const FDR_H2H_WEIGHT = 0.3;
 const FDR_H2H_RANK_BY_UID = {
@@ -91,23 +90,60 @@ const UID_MAP = {
   42: "桑迪",
 };
 
-const NAME_TO_UID = Object.fromEntries(Object.entries(UID_MAP).map(([k, v]) => [v, Number(k)]));
-
-const NAME_MAP = {
-  BigAsGiroud: "大吉鲁",
-  Acidboy: "酸男",
-  ConanJoe: "柯南",
-  KevinXi: "凯文",
-  Fitz: "文史哲",
-  Francis: "弗老大",
-  Santiago: "桑迪",
-  Kusuri: "kusuri",
-  "M&M": "马哥",
-  "快船总冠军": "船哥",
-  "崇明座山雕": "雕哥",
-  "笨笨是大骗子": "笨笨",
-};
-
+const ALL_FIXTURES = [
+  [22, "5095", "22761"],
+  [22, "10", "6562"],
+  [22, "189", "2"],
+  [22, "4319", "14"],
+  [22, "5410", "5101"],
+  [22, "6441", "6412"],
+  [22, "3455", "5467"],
+  [22, "42", "6"],
+  [22, "32", "15"],
+  [22, "17", "4224"],
+  [22, "8580", "23"],
+  [22, "4", "16447"],
+  [22, "9", "11"],
+  [23, "4", "9"],
+  [23, "17", "16447"],
+  [23, "3455", "15"],
+  [23, "8580", "11"],
+  [23, "10", "14"],
+  [23, "5410", "5467"],
+  [23, "6441", "6"],
+  [23, "32", "23"],
+  [23, "2", "22761"],
+  [23, "5095", "6562"],
+  [23, "42", "4224"],
+  [23, "4319", "6412"],
+  [23, "5101", "189"],
+  [24, "4", "8580"],
+  [24, "17", "9"],
+  [24, "3455", "23"],
+  [24, "16447", "42"],
+  [24, "10", "6412"],
+  [24, "5410", "15"],
+  [24, "6441", "4224"],
+  [24, "32", "11"],
+  [24, "2", "5095"],
+  [24, "4319", "6"],
+  [24, "5101", "22761"],
+  [24, "5467", "189"],
+  [24, "14", "6562"],
+  [25, "4", "32"],
+  [25, "17", "8580"],
+  [25, "9", "42"],
+  [25, "3455", "11"],
+  [25, "16447", "6441"],
+  [25, "10", "6"],
+  [25, "5410", "23"],
+  [25, "2", "5101"],
+  [25, "5095", "14"],
+  [25, "15", "189"],
+  [25, "4319", "4224"],
+  [25, "22761", "5467"],
+  [25, "6412", "6562"],
+];
 function normalizeUid(uid) {
   if (uid === null || uid === undefined) return "";
   return String(uid).trim();
@@ -193,78 +229,15 @@ function buildPreviousPicksByUid(previousState) {
   return migrated;
 }
 
-const ALL_FIXTURES = [
-  [22, "AI", "纪导"],
-  [22, "弗老大", "柯南"],
-  [22, "凯文", "大吉鲁"],
-  [22, "Kimi", "酸男"],
-  [22, "kusuri", "鬼嗨"],
-  [22, "马哥", "阿甘"],
-  [22, "Paul", "老姜"],
-  [22, "桑迪", "紫葱酱"],
-  [22, "伍家辉", "笨笨"],
-  [22, "堡", "班班"],
-  [22, "小火龙", "橘队"],
-  [22, "尼弟", "文史哲"],
-  [22, "雕哥", "船哥"],
-  [23, "尼弟", "雕哥"],
-  [23, "堡", "文史哲"],
-  [23, "Paul", "笨笨"],
-  [23, "小火龙", "船哥"],
-  [23, "弗老大", "酸男"],
-  [23, "kusuri", "老姜"],
-  [23, "马哥", "紫葱酱"],
-  [23, "伍家辉", "橘队"],
-  [23, "大吉鲁", "纪导"],
-  [23, "AI", "柯南"],
-  [23, "桑迪", "班班"],
-  [23, "Kimi", "阿甘"],
-  [23, "鬼嗨", "凯文"],
-  [24, "尼弟", "小火龙"],
-  [24, "堡", "雕哥"],
-  [24, "Paul", "橘队"],
-  [24, "文史哲", "桑迪"],
-  [24, "弗老大", "阿甘"],
-  [24, "kusuri", "笨笨"],
-  [24, "马哥", "班班"],
-  [24, "伍家辉", "船哥"],
-  [24, "大吉鲁", "AI"],
-  [24, "Kimi", "紫葱酱"],
-  [24, "鬼嗨", "纪导"],
-  [24, "老姜", "凯文"],
-  [24, "酸男", "柯南"],
-  [25, "尼弟", "伍家辉"],
-  [25, "堡", "小火龙"],
-  [25, "雕哥", "桑迪"],
-  [25, "Paul", "船哥"],
-  [25, "文史哲", "马哥"],
-  [25, "弗老大", "紫葱酱"],
-  [25, "kusuri", "橘队"],
-  [25, "大吉鲁", "鬼嗨"],
-  [25, "AI", "酸男"],
-  [25, "笨笨", "凯文"],
-  [25, "Kimi", "班班"],
-  [25, "纪导", "老姜"],
-  [25, "阿甘", "柯南"],
-];
+function extractLeagueClassicRank(entryData, leagueId) {
+  const classicLeagues = Array.isArray(entryData?.leagues?.classic) ? entryData.leagues.classic : [];
+  const matched = classicLeagues.find((league) => Number(league?.id) === Number(leagueId));
+  const directRank = Number(matched?.entry_rank);
+  if (Number.isFinite(directRank) && directRank > 0) return directRank;
 
-function normalizeName(name) {
-  if (name === null || name === undefined) return "";
-  const text = String(name).trim();
-  return NAME_MAP[text] || text;
-}
+  const fallbackRank = Number(entryData?.entry_rank);
+  if (Number.isFinite(fallbackRank) && fallbackRank > 0) return fallbackRank;
 
-function resolveUidByName(name) {
-  const normalized = normalizeName(name);
-  if (!normalized) return null;
-  if (NAME_TO_UID[normalized] !== undefined) return Number(NAME_TO_UID[normalized]);
-
-  const lower = normalized.toLowerCase();
-  for (const [uid, displayName] of Object.entries(UID_MAP)) {
-    if (String(displayName).toLowerCase() === lower) {
-      return Number(uid);
-    }
-  }
   return null;
 }
 
@@ -277,30 +250,38 @@ function getFutureFixtureWeeks(currentWeek) {
 
 function buildFdrPayload({ standingsByUid = {}, currentWeek }) {
   const weeks = getFutureFixtureWeeks(currentWeek);
-  const byTeam = {};
-  for (const [gw, team1, team2] of ALL_FIXTURES) {
-    const t1 = normalizeName(team1);
-    const t2 = normalizeName(team2);
-    if (!byTeam[t1]) byTeam[t1] = {};
-    if (!byTeam[t2]) byTeam[t2] = {};
-    byTeam[t1][gw] = t2;
-    byTeam[t2][gw] = t1;
+  const byUid = {};
+  for (const [gw, uid1Raw, uid2Raw] of ALL_FIXTURES) {
+    const uid1 = normalizeUid(uid1Raw);
+    const uid2 = normalizeUid(uid2Raw);
+    if (!byUid[uid1]) byUid[uid1] = {};
+    if (!byUid[uid2]) byUid[uid2] = {};
+    byUid[uid1][gw] = uid2;
+    byUid[uid2][gw] = uid1;
   }
 
-  const teams = UID_LIST.map((uid) => UID_MAP[uidToNumber(uid)]).filter((name) => byTeam[name]);
-  const rankedByTotal = UID_LIST
-    .filter((uid) => byTeam[UID_MAP[uidToNumber(uid)]])
+  const teams = UID_LIST.filter((uid) => byUid[uid]);
+  const rankedByClassic = UID_LIST
+    .filter((uid) => byUid[uid])
     .map((uid) => ({
       uid,
-      name: UID_MAP[uidToNumber(uid)],
+      name: UID_MAP[uidToNumber(uid)] || uid,
+      classic_rank: Number(getMapValueByUid(standingsByUid, uid)?.classic_rank || 0),
       overall_total: Number(getMapValueByUid(standingsByUid, uid)?.overall_total || 0),
     }))
-    .sort((a, b) => b.overall_total - a.overall_total);
+    .sort((a, b) => {
+      const aHasRank = a.classic_rank > 0;
+      const bHasRank = b.classic_rank > 0;
+      if (aHasRank && bHasRank) return a.classic_rank - b.classic_rank;
+      if (aHasRank) return -1;
+      if (bHasRank) return 1;
+      return b.overall_total - a.overall_total;
+    });
 
-  const totalStrengthByUid = {};
-  const totalDenom = Math.max(1, rankedByTotal.length - 1);
-  rankedByTotal.forEach((item, idx) => {
-    totalStrengthByUid[item.uid] = 1 - idx / totalDenom;
+  const classicStrengthByUid = {};
+  const classicDenom = Math.max(1, rankedByClassic.length - 1);
+  rankedByClassic.forEach((item, idx) => {
+    classicStrengthByUid[item.uid] = 1 - idx / classicDenom;
   });
 
   const rankedByH2h = Object.entries(FDR_H2H_RANK_BY_UID)
@@ -314,13 +295,12 @@ function buildFdrPayload({ standingsByUid = {}, currentWeek }) {
     h2hStrengthByUid[item.uid] = 1 - idx / h2hDenom;
   });
 
-  const difficultyClass = (opponent) => {
-    const opponentUid = normalizeUid(resolveUidByName(opponent));
+  const difficultyClass = (opponentUid) => {
     if (!opponentUid) return 3;
 
-    const totalStrength = totalStrengthByUid[opponentUid] ?? 0.5;
-    const h2hStrength = h2hStrengthByUid[opponentUid] ?? totalStrength;
-    const weightedStrength = totalStrength * FDR_TOTAL_WEIGHT + h2hStrength * FDR_H2H_WEIGHT;
+    const classicStrength = classicStrengthByUid[opponentUid] ?? 0.5;
+    const h2hStrength = h2hStrengthByUid[opponentUid] ?? classicStrength;
+    const weightedStrength = classicStrength * FDR_TOTAL_WEIGHT + h2hStrength * FDR_H2H_WEIGHT;
 
     if (weightedStrength < 0.2) return 1;
     if (weightedStrength < 0.4) return 2;
@@ -330,12 +310,14 @@ function buildFdrPayload({ standingsByUid = {}, currentWeek }) {
   };
 
   const html = teams
-    .map((team) => {
+    .map((uid) => {
+      const team = UID_MAP[uidToNumber(uid)] || uid;
       let sum = 0;
       let count = 0;
       const cells = weeks.map((gw) => {
-        const opponent = byTeam[team][gw] || "-";
-        const cls = opponent === "-" ? 3 : difficultyClass(opponent);
+        const opponentUid = byUid[uid]?.[gw] || "";
+        const opponent = opponentUid ? UID_MAP[uidToNumber(opponentUid)] || opponentUid : "-";
+        const cls = opponentUid ? difficultyClass(opponentUid) : 3;
         sum += cls;
         count += 1;
         return `<td><div class='box fdr-${cls}'>${opponent}</div></td>`;
@@ -349,6 +331,7 @@ function buildFdrPayload({ standingsByUid = {}, currentWeek }) {
     weeks,
     html,
     uses_h2h: rankedByH2h.length > 0,
+    ranking_source: "entry_league_rank",
     weights: {
       total: FDR_TOTAL_WEIGHT,
       h2h: FDR_H2H_WEIGHT,
@@ -368,6 +351,29 @@ function formatKickoffBj(isoTime) {
     hour12: false,
     timeZone: "Asia/Shanghai",
   });
+}
+
+function resolveFixtureStatus(fixture) {
+  const kickoffMs = fixture?.kickoff_time ? new Date(fixture.kickoff_time).getTime() : null;
+  const nowMs = Date.now();
+  const finished = !!(fixture?.finished || fixture?.finished_provisional);
+
+  if (finished) {
+    return { code: "finished", label: "已结束" };
+  }
+
+  if (fixture?.started) {
+    if (Number.isFinite(kickoffMs) && nowMs - kickoffMs >= 5 * 60 * 60 * 1000) {
+      return { code: "finished", label: "已结束" };
+    }
+    const minutes = Number(fixture?.minutes || 0);
+    if (minutes > 0) {
+      return { code: "live", label: `进行中 ${minutes}'` };
+    }
+    return { code: "live", label: "进行中" };
+  }
+
+  return { code: "upcoming", label: "未开始" };
 }
 
 function topListFromMap(counter, limit = 10) {
@@ -480,13 +486,14 @@ async function fetchJsonSafe(path, retries = 3) {
   }
 }
 
-async function fetchAllStandings() {
+async function fetchAllStandings(phase) {
   const rows = [];
   const seenEntries = new Set();
+  const targetPhase = Number(phase || 0) || 1;
 
   for (let page = 1; page <= 20; page += 1) {
     const data = await fetchJsonSafe(
-      `/leagues-classic/${LEAGUE_ID}/standings/?phase=${CURRENT_PHASE}&page_standings=${page}`,
+      `/leagues-classic/${LEAGUE_ID}/standings/?phase=${targetPhase}&page_standings=${page}`,
       4
     );
     if (!data.ok) break;
@@ -511,7 +518,7 @@ async function fetchAllStandings() {
 
   if (rows.length > 0) return rows;
 
-  const fallback = await fetchJsonSafe(`/leagues-classic/${LEAGUE_ID}/standings/?phase=${CURRENT_PHASE}`, 4);
+  const fallback = await fetchJsonSafe(`/leagues-classic/${LEAGUE_ID}/standings/?phase=${targetPhase}`, 4);
   return Array.isArray(fallback.data?.standings?.results) ? fallback.data.standings.results : [];
 }
 
@@ -796,6 +803,26 @@ function calculateEffectiveScore(picks, teamsPlayingToday) {
   return [Math.floor(score), selected, formation];
 }
 
+function buildLeagueDailyAverages(picksByUid, teamsPlayingToday) {
+  let totalTodayPlayers = 0;
+  let totalAvailablePlayers = 0;
+
+  for (const uid of UID_LIST) {
+    const payload = picksByUid?.[uid];
+    const players = Array.isArray(payload?.players) ? payload.players : [];
+    totalTodayPlayers += players.filter((player) => Number(player?.team_id) && teamsPlayingToday.has(Number(player.team_id))).length;
+    totalAvailablePlayers += players.filter((player) => isPlayerAvailable(player, teamsPlayingToday)).length;
+  }
+
+  const managerCount = UID_LIST.length;
+  const divisor = Math.max(1, managerCount);
+  return {
+    manager_count: managerCount,
+    today_average_count: Number((totalTodayPlayers / divisor).toFixed(2)),
+    effective_average_count: Number((totalAvailablePlayers / divisor).toFixed(2)),
+  };
+}
+
 async function mapLimit(list, limit, fn) {
   const results = new Array(list.length);
   let index = 0;
@@ -817,6 +844,7 @@ async function buildState(previousState = null) {
   const eventMetaById = buildEventMetaById(events);
   const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(currentEventName);
   const currentWeek = currentMeta.gw || extractGwNumber(currentEventName) || extractGwNumber(currentEvent) || 22;
+  const currentPhase = Number(currentWeek || 1);
   const previousPicksByUid = buildPreviousPicksByUid(previousState);
 
   const teams = {};
@@ -842,7 +870,7 @@ async function buildState(previousState = null) {
   const [liveRaw, fixturesRaw, standingsRows] = await Promise.all([
     fetchJson(`/event/${currentEvent}/live/`),
     fetchJson(`/fixtures/?event=${currentEvent}`),
-    fetchAllStandings(),
+    fetchAllStandings(currentPhase),
   ]);
 
   const liveElements = {};
@@ -853,18 +881,24 @@ async function buildState(previousState = null) {
     for (const [k, v] of Object.entries(rawElements)) liveElements[Number(k)] = v;
   }
 
-  const games = (fixturesRaw || []).map((f) => ({
-    id: f.id,
-    team_h: f.team_h,
-    team_a: f.team_a,
-    home_team: teams[f.team_h] || `Team #${f.team_h}`,
-    away_team: teams[f.team_a] || `Team #${f.team_a}`,
-    home_score: f.team_h_score || 0,
-    away_score: f.team_a_score || 0,
-    started: !!f.started,
-    finished: !!f.finished,
-    kickoff: formatKickoffBj(f.kickoff_time),
-  }));
+  const games = (fixturesRaw || []).map((f) => {
+    const status = resolveFixtureStatus(f);
+    return {
+      id: f.id,
+      team_h: f.team_h,
+      team_a: f.team_a,
+      home_team: teams[f.team_h] || `Team #${f.team_h}`,
+      away_team: teams[f.team_a] || `Team #${f.team_a}`,
+      home_score: f.team_h_score || 0,
+      away_score: f.team_a_score || 0,
+      started: !!f.started,
+      finished: status.code === "finished",
+      status_code: status.code,
+      status_label: status.label,
+      kickoff: formatKickoffBj(f.kickoff_time),
+      kickoff_time: f.kickoff_time || null,
+    };
+  });
   const teamsPlayingToday = buildTeamsPlayingToday(games);
 
   const fixtureDetails = {};
@@ -908,8 +942,9 @@ async function buildState(previousState = null) {
     const row = standingsRowsByUid[uid] || {};
     const previous = previousPicksByUid[uid] || {};
     standingsByUid[uid] = {
-      total: row.entry ? Math.floor(Number(row.total || 0) / 10) : Number(previous.event_total || 0),
+      week_total: Number(previous.event_total || 0),
       overall_total: row.entry ? Math.floor(Number(row.total || 0) / 10) : Number(previous.overall_total || previous.event_total || 0),
+      classic_rank: Number(previous.classic_rank || 0),
       today_live: Number(previous.total_live || 0),
       raw_today_live: Number(previous.raw_total_live || previous.total_live || 0),
       penalty_score: Number(previous.penalty_score || 0),
@@ -921,6 +956,7 @@ async function buildState(previousState = null) {
     };
     debugUid("base_data", uid, {
       row_total: row.entry ? Math.floor(Number(row.total || 0) / 10) : null,
+      row_rank: Number(row.rank || 0),
       previous_event_total: Number(previous.event_total || 0),
       previous_total_live: Number(previous.total_live || 0),
       previous_players: Array.isArray(previous.players) ? previous.players.length : 0,
@@ -934,12 +970,17 @@ async function buildState(previousState = null) {
     const previous = previousPicksByUid[uid] || {};
     debugUid("input_uid", uid, { uid, uid_number: uidNumber });
 
-    let [picksRes, transfersRes, historyRes] = await Promise.all([
+    let [profileRes, picksRes, transfersRes, historyRes] = await Promise.all([
+      fetchJsonSafe(`/entry/${uidNumber}/`, 4),
       fetchJsonSafe(`/entry/${uidNumber}/event/${currentEvent}/picks/`, 4),
       fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 4),
       fetchJsonSafe(`/entry/${uidNumber}/history/`, 4),
     ]);
 
+    if (!profileRes.ok) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      profileRes = await fetchJsonSafe(`/entry/${uidNumber}/`, 4);
+    }
     // Retry once for failed endpoints to reduce random empty states.
     if (!picksRes.ok) {
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -954,14 +995,23 @@ async function buildState(previousState = null) {
       transfersRes = await fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 4);
     }
 
+    const profileData = profileRes.ok && typeof profileRes.data === "object" && profileRes.data ? profileRes.data : {};
     const picksData = picksRes.ok ? picksRes.data : null;
     const transfersData = transfersRes.ok && Array.isArray(transfersRes.data) ? transfersRes.data : [];
     const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : {};
     transfersByUid[uid] = transfersData;
+    const classicRank =
+      extractLeagueClassicRank(profileData, LEAGUE_ID) ||
+      Number(standingsByUid[uid].classic_rank || 0) ||
+      Number(standingsRowsByUid[uid]?.rank || 0) ||
+      0;
+    standingsByUid[uid].classic_rank = classicRank;
     debugUid("fetch_status", uid, {
+      profile_ok: !!profileRes.ok,
       picks_ok: !!picksRes.ok,
       transfers_ok: !!transfersRes.ok,
       history_ok: !!historyRes.ok,
+      classic_rank: classicRank,
       picks_count: Array.isArray(picksData?.picks) ? picksData.picks.length : 0,
       transfer_count_raw: transfersData.length,
       history_rows: Array.isArray(historyData?.current) ? historyData.current.length : 0,
@@ -990,11 +1040,16 @@ async function buildState(previousState = null) {
     standingsByUid[uid].gd1_missing_penalty = 0;
     standingsByUid[uid].wildcard_active = wildcardActive;
     if (historyWeek.has_week_rows) {
-      standingsByUid[uid].total = Math.max(0, Number(historyWeek.weekly_points || 0) - penaltyScore);
+      standingsByUid[uid].week_total = Math.max(0, Number(historyWeek.weekly_points || 0) - penaltyScore);
     }
 
     if (!picksData?.picks) {
-      if (Array.isArray(previous.players) && previous.players.length > 0) {
+      if (
+        Array.isArray(previous.players) &&
+        previous.players.length > 0 &&
+        Number(previous.current_event || currentEvent) === Number(currentEvent) &&
+        previous.fetch_status?.picks_ok === true
+      ) {
         standingsByUid[uid].picks = previous.players;
       }
       // 没有picks数据时的回退处理
@@ -1010,6 +1065,7 @@ async function buildState(previousState = null) {
       standingsByUid[uid].raw_today_live = todayFallback;
       standingsByUid[uid].today_live = todayFallback;
       standingsByUid[uid].fetch_status = {
+        profile_ok: !!profileRes.ok,
         picks_ok: !!picksRes.ok,
         history_ok: !!historyRes.ok,
         transfers_ok: !!transfersRes.ok,
@@ -1017,7 +1073,7 @@ async function buildState(previousState = null) {
       debugUid("final_payload", uid, {
         fallback: true,
         total_live: standingsByUid[uid].today_live,
-        event_total: standingsByUid[uid].total,
+        event_total: standingsByUid[uid].week_total,
         players: summarizePlayersForDebug(standingsByUid[uid].picks),
       });
       return;
@@ -1068,7 +1124,7 @@ async function buildState(previousState = null) {
         previousEventTotal + penaltyScore - (Number.isFinite(previousRawToday) ? previousRawToday : 0) + effectiveScore
       );
     } else {
-      weekRawScore = Math.max(0, Number(standingsByUid[uid].total || 0) + penaltyScore);
+      weekRawScore = Math.max(0, Number(standingsByUid[uid].week_total || 0) + penaltyScore);
     }
 
     const todayLive = Number(effectiveScore || 0);
@@ -1077,9 +1133,10 @@ async function buildState(previousState = null) {
 
     standingsByUid[uid].raw_today_live = rawTodayLive;
     standingsByUid[uid].today_live = todayLive;
-    standingsByUid[uid].total = finalWeekTotal;
+    standingsByUid[uid].week_total = finalWeekTotal;
     standingsByUid[uid].picks = picks;
     standingsByUid[uid].fetch_status = {
+      profile_ok: !!profileRes.ok,
       picks_ok: true,
       history_ok: !!historyRes.ok,
       transfers_ok: !!transfersRes.ok,
@@ -1087,7 +1144,7 @@ async function buildState(previousState = null) {
     debugUid("final_payload", uid, {
       total_live: standingsByUid[uid].today_live,
       raw_total_live: standingsByUid[uid].raw_today_live,
-      event_total: standingsByUid[uid].total,
+      event_total: standingsByUid[uid].week_total,
       penalty_score: standingsByUid[uid].penalty_score,
       players: summarizePlayersForDebug(picks),
     });
@@ -1100,21 +1157,21 @@ async function buildState(previousState = null) {
   }
   const weeklyFixtures = ALL_FIXTURES.filter(([gw]) => gw === fixtureWeek);
 
-  const h2h = weeklyFixtures.map(([gw, raw1, raw2]) => {
-    const t1 = normalizeName(raw1);
-    const t2 = normalizeName(raw2);
-    const uid1 = normalizeUid(resolveUidByName(t1));
-    const uid2 = normalizeUid(resolveUidByName(t2));
-    const s1 = standingsByUid[uid1] || { total: 0, today_live: 0 };
-    const s2 = standingsByUid[uid2] || { total: 0, today_live: 0 };
+  const h2h = weeklyFixtures.map(([gw, rawUid1, rawUid2]) => {
+    const uid1 = normalizeUid(rawUid1);
+    const uid2 = normalizeUid(rawUid2);
+    const t1 = UID_MAP[uidToNumber(uid1)] || uid1;
+    const t2 = UID_MAP[uidToNumber(uid2)] || uid2;
+    const s1 = standingsByUid[uid1] || { week_total: 0, today_live: 0 };
+    const s2 = standingsByUid[uid2] || { week_total: 0, today_live: 0 };
     return {
       gameweek: fixtureWeek,
       t1,
       t2,
       uid1: uidToNumber(uid1),
       uid2: uidToNumber(uid2),
-      total1: s1.total || 0,
-      total2: s2.total || 0,
+      total1: s1.week_total || 0,
+      total2: s2.week_total || 0,
       today1: s1.today_live || 0,
       today2: s2.today_live || 0,
       raw_today1: s1.raw_today_live || s1.today_live || 0,
@@ -1149,14 +1206,17 @@ async function buildState(previousState = null) {
       gd1_missing_penalty: s.gd1_missing_penalty || 0,
       wildcard_active: !!s.wildcard_active,
       fetch_status: s.fetch_status || { picks_ok: true, history_ok: true, transfers_ok: true },
-      event_total: s.total || 0,
-      overall_total: s.overall_total || s.total || 0,
+      event_total: s.week_total || 0,
+      overall_total: s.overall_total || s.week_total || 0,
+      classic_rank: s.classic_rank || 0,
       formation,
       current_event: currentEvent,
       current_event_name: currentEventName,
       players: picks,
     };
   }
+
+  const league_daily_averages = buildLeagueDailyAverages(picksByUid, teamsPlayingToday);
 
   const transferTrends = buildTransferTrends({
     transfersByUid,
@@ -1169,6 +1229,7 @@ async function buildState(previousState = null) {
     standingsByUid,
     currentWeek,
   });
+  fdr.daily_averages = league_daily_averages;
 
   return {
     generated_at: new Date().toISOString(),
@@ -1186,6 +1247,7 @@ async function buildState(previousState = null) {
     transfer_trends: transferTrends,
     fdr,
     fdr_html: fdr.html,
+    league_daily_averages,
   };
 }
 
@@ -1256,7 +1318,13 @@ export default {
           weeks: [],
           html: state.fdr_html || "",
           uses_h2h: false,
+          ranking_source: "entry_league_rank",
           weights: { total: FDR_TOTAL_WEIGHT, h2h: FDR_H2H_WEIGHT },
+          daily_averages: state.league_daily_averages || {
+            manager_count: 0,
+            today_average_count: 0,
+            effective_average_count: 0,
+          },
         }
       );
     }
@@ -1276,4 +1344,5 @@ export default {
     ctx.waitUntil(refreshState(env));
   },
 };
+
 

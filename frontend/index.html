@@ -6,15 +6,18 @@
     <title>NBA Fantasy H2H Dashboard</title>
     <link rel="stylesheet" href="/css/style.css">
     <script>
-        window.__API_BASE__ = "https://nba-fantasy-api.nbafantasy.workers.dev";
+        window.__API_BASE__ = "";
     </script>
 </head>
 <body>
     <!-- Header -->
     <div class="header">
         <div class="brand">
-            <h1>NBA Fantasy H2H</h1>
-            <span id="event-info">Loading... - League #1653</span>
+            <img src="/LOGO.jpg" alt="NBA Fantasy H2H logo" class="brand-logo">
+            <div class="brand-copy">
+                <h1>NBA Fantasy H2H</h1>
+                <span id="event-info">Loading... - League #1653</span>
+            </div>
         </div>
         <div class="controls">
             <div class="status">
@@ -72,6 +75,16 @@
                     <!-- FDR data loaded by JS -->
                 </tbody>
             </table>
+            <div class="league-metrics" id="league-metrics">
+                <div class="metric-card">
+                    <div class="metric-label">今日平均人数</div>
+                    <div class="metric-value" id="avg-today-count">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">今日平均有效人数</div>
+                    <div class="metric-value" id="avg-effective-count">-</div>
+                </div>
+            </div>
         </div>
     </div>
 

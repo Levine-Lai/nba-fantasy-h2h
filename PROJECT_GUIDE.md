@@ -108,4 +108,14 @@ PowerShell 命令：
 Invoke-WebRequest -Method POST "https://<your-worker-domain>/api/refresh?token=<REFRESH_TOKEN>"
 ```
 
+## 2026-03-25 架构说明补充
 
+- 线上唯一后端为 `worker/src/index.js`。
+- `backend/` 为迁移前的本地 FastAPI 历史版本，不作为线上主逻辑维护。
+- 前端推荐通过同域 `/api/*` 调用 Worker API，不再依赖直接访问 `workers.dev` 域名。
+- `/api/fdr` 当前返回 JSON，核心字段包括：
+  - `weeks`
+  - `html`
+  - `weights`
+  - `ranking_source`
+  - `daily_averages`

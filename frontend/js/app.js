@@ -157,6 +157,16 @@ const Render = {
         headerRow.innerHTML = `<th class="t-name">TEAM</th>${weekHeaders}<th class="avg-col">AVG</th>`;
         badge.textContent = weeks.length ? `GW ${weeks.join('-')}` : 'Auto GW';
         body.innerHTML = data?.html || '<tr><td colspan="5" style="text-align:center;padding:20px;">No FDR data</td></tr>';
+        this.leagueAverages(data?.daily_averages);
+    },
+
+    leagueAverages(data) {
+        const avgToday = document.getElementById('avg-today-count');
+        const avgEffective = document.getElementById('avg-effective-count');
+        if (!avgToday || !avgEffective) return;
+
+        avgToday.textContent = Number.isFinite(Number(data?.today_average_count)) ? Number(data.today_average_count).toFixed(2) : '-';
+        avgEffective.textContent = Number.isFinite(Number(data?.effective_average_count)) ? Number(data.effective_average_count).toFixed(2) : '-';
     },
     
     gamesList(games) {
@@ -169,8 +179,7 @@ const Render = {
         }
         
         const html = games.map(g => {
-            const isLive = g.started && !g.finished;
-            const status = isLive ? '进行中' : (g.finished ? '已结束' : '未开始');
+            const status = g.status_label || (g.finished ? '已结束' : (g.started ? '进行中' : '未开始'));
             const homeClass = g.home_score > g.away_score ? 'winning' : (g.home_score < g.away_score ? 'losing' : '');
             const awayClass = g.away_score > g.home_score ? 'winning' : (g.away_score < g.home_score ? 'losing' : '');
             
@@ -514,7 +523,11 @@ const App = {
             Render.fdr(data);
         } catch (e) {
             console.error('FDR error:', e);
-            Render.fdr({ weeks: [], html: '<tr><td colspan="5" style="text-align:center;padding:20px;">Load failed</td></tr>' });
+            Render.fdr({
+                weeks: [],
+                html: '<tr><td colspan="5" style="text-align:center;padding:20px;">Load failed</td></tr>',
+                daily_averages: { today_average_count: 0, effective_average_count: 0 }
+            });
         }
     },
     
