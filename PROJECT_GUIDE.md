@@ -113,6 +113,10 @@ Invoke-WebRequest -Method POST "https://<your-worker-domain>/api/refresh?token=<
 - 线上唯一后端为 `worker/src/index.js`。
 - `backend/` 为迁移前的本地 FastAPI 历史版本，不作为线上主逻辑维护。
 - 前端推荐通过同域 `/api/*` 调用 Worker API，不再依赖直接访问 `workers.dev` 域名。
+- 同域 `/api/*` 由 `functions/api/[[path]].js` 转发到 `worker/src/index.js`。
+- Pages 项目需要和 Worker 侧保持一致的绑定：
+  - `NBA_CACHE`
+  - `REFRESH_TOKEN`
 - `/api/fdr` 当前返回 JSON，核心字段包括：
   - `weeks`
   - `html`

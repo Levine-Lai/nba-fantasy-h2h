@@ -78,3 +78,4 @@
    - 默认 `POST /api/refresh` 只刷新一部分 UID
    - Worker 定时任务应高频执行，逐步完成整轮刷新
    - 如需全量刷新，可显式调用 `POST /api/refresh?mode=full`，但在免费版下可能触发子请求上限
+10. `pages.dev` 同域 API 需要通过 `functions/api/[[path]].js` 代理到 `worker/src/index.js`。如果 Pages 项目未绑定 `NBA_CACHE` 和 `REFRESH_TOKEN`，前端会拿到 HTML 页面或 500，而不是 JSON。
