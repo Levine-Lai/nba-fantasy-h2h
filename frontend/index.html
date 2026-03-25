@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NBA Fantasy H2H Dashboard</title>
-    <link rel="icon" type="image/jpeg" href="/LOGO.jpg">
+    <link rel="icon" type="image/jpeg" href="/LOGO.png">
     <link rel="stylesheet" href="/css/style.css">
     <script>
         window.__API_BASE__ = "https://nba-fantasy-api.nbafantasy.workers.dev";
@@ -34,7 +34,7 @@
     </div>
 
     <!-- Main Container -->
-    <div class="container page-view active" id="page-home">
+    <div class="container page-view home-layout active" id="page-home">
         <!-- Column 1: Games + Trends -->
         <div class="column">
             <div class="col-header">
@@ -63,10 +63,65 @@
             <div class="h2h-list" id="h2h-list">
                 <div class="loading"><div class="spinner"></div>Loading...</div>
             </div>
+            <div class="league-metrics" id="league-metrics">
+                <div class="metric-card">
+                    <div class="metric-label">今日平均人数</div>
+                    <div class="metric-value" id="avg-today-count">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">今日平均有效人数</div>
+                    <div class="metric-value" id="avg-effective-count">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container page-view rankings-layout" id="page-rankings">
+        <div class="column rankings-column">
+            <div class="col-header">
+                <div class="col-title">Live H2H Standings</div>
+                <span class="col-badge" id="standings-badge">实时</span>
+            </div>
+            <table class="rankings-table">
+                <thead>
+                    <tr>
+                        <th>RANK</th>
+                        <th class="team-col">TEAM</th>
+                        <th>GW</th>
+                        <th class="points-col">积分</th>
+                        <th>W</th>
+                        <th>D</th>
+                        <th>L</th>
+                    </tr>
+                </thead>
+                <tbody id="rankings-body">
+                    <tr><td colspan="7" style="text-align:center;padding:20px;">Loading...</td></tr>
+                </tbody>
+            </table>
         </div>
 
-        <!-- Column 3: FDR -->
-        <div class="column">
+        <div class="column rankings-column">
+            <div class="col-header">
+                <div class="col-title">Classic Rankings</div>
+                <span class="col-badge" id="classic-rankings-badge">League</span>
+            </div>
+            <table class="rankings-table classic-rankings-table">
+                <thead>
+                    <tr>
+                        <th class="team-col">TEAM</th>
+                        <th>总排</th>
+                        <th>总分</th>
+                        <th>周排</th>
+                        <th>周分</th>
+                    </tr>
+                </thead>
+                <tbody id="classic-rankings-body">
+                    <tr><td colspan="5" style="text-align:center;padding:20px;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="column rankings-column">
             <div class="col-header">
                 <div class="col-title">FDR Ranking</div>
                 <span class="col-badge" id="fdr-week-badge">Auto GW</span>
@@ -82,41 +137,7 @@
                     <!-- FDR data loaded by JS -->
                 </tbody>
             </table>
-            <div class="league-metrics" id="league-metrics">
-                <div class="metric-card">
-                    <div class="metric-label">今日平均人数</div>
-                    <div class="metric-value" id="avg-today-count">-</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">今日平均有效人数</div>
-                    <div class="metric-value" id="avg-effective-count">-</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="container page-view" id="page-rankings">
-        <div class="column rankings-column">
-            <div class="col-header">
-                <div class="col-title">Live H2H Standings</div>
-                <span class="col-badge" id="standings-badge">实时</span>
-            </div>
-            <table class="rankings-table">
-                <thead>
-                    <tr>
-                        <th>RANK</th>
-                        <th class="team-col">TEAM</th>
-                        <th>PTS</th>
-                        <th>W</th>
-                        <th>D</th>
-                        <th>L</th>
-                        <th>P</th>
-                    </tr>
-                </thead>
-                <tbody id="rankings-body">
-                    <tr><td colspan="7" style="text-align:center;padding:20px;">Loading...</td></tr>
-                </tbody>
-            </table>
+            <div class="fdr-note">✳️按照联赛排名和头碰头排名7:3计算FDR，仅供娱乐</div>
         </div>
     </div>
 

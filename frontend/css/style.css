@@ -151,6 +151,14 @@ body {
     margin: 0 auto;
 }
 
+.home-layout {
+    grid-template-columns: 1fr 1fr;
+}
+
+.rankings-layout {
+    grid-template-columns: 1.1fr 1fr 1fr;
+}
+
 .column {
     background: rgba(255, 255, 255, 0.9);
     border-radius: 18px;
@@ -266,25 +274,21 @@ body {
     gap: 16px;
 }
 
-.match-card {
+.match-block {
     display: flex;
-    min-height: 100px;
-    border-radius: 16px;
-    border: 1px solid #dfe7ef;
-    overflow: hidden;
-    background: #fff;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-direction: column;
+    gap: 10px;
 }
 
-.match-card:hover {
-    transform: scale(1.02);
-    box-shadow: 0 16px 30px rgba(15, 23, 42, 0.12);
-    border-color: #c8d7e6;
-    z-index: 10;
+.match-card {
+    display: grid;
+    grid-template-columns: 1fr 92px 1fr;
+    gap: 10px;
+    min-height: 110px;
+    align-items: stretch;
 }
 
 .team-side {
-    flex: 1;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -293,7 +297,11 @@ body {
     position: relative;
     gap: 6px;
     cursor: pointer;
-    transition: background 0.2s ease, opacity 0.2s ease;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease, opacity 0.22s ease;
+    border-radius: 16px;
+    border: 1px solid #dfe7ef;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
 }
 
 .team-side.winning { border-left: 4px solid #00c853; }
@@ -301,12 +309,14 @@ body {
 .team-side:last-child.winning { border-right: 4px solid #00c853; border-left: none; }
 .team-side:last-child.losing { border-right: 4px solid #ff1744; border-left: none; }
 .team-side.is-behind {
-    opacity: 0.62;
+    opacity: 0.72;
     background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
 }
 
 .team-side:hover {
     background: #f8fbff;
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
 }
 
 .team-name {
@@ -336,28 +346,37 @@ body {
 }
 
 .vs-divider {
-    width: 50px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     font-size: 12px;
-    color: #ccc;
-    font-weight: 800;
-    background: #f8f8f8;
-    border-left: 1px solid #f0f0f0;
-    border-right: 1px solid #f0f0f0;
-    gap: 6px;
+    color: #94a3b8;
+    background: #f8fafc;
+    border: 1px solid #dfe7ef;
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+    gap: 4px;
     cursor: pointer;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+}
+
+.vs-divider:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
+    background: #f5f8fc;
+}
+
+.vs-text {
+    font-size: 12px;
+    color: #7c8b9a;
+    font-weight: 700;
 }
 
 .match-diff {
-    font-size: 10px;
-    color: #334155;
-    background: #e7eef8;
-    border-radius: 999px;
-    padding: 3px 7px;
-    font-weight: 800;
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 500;
 }
 
 .match-transfer-wrap {
@@ -368,15 +387,23 @@ body {
 }
 
 .match-transfer-panel {
-    display: none;
     background: #f8fbff;
     border: 1px solid #dce8f6;
     border-radius: 14px;
-    padding: 12px;
+    padding: 0 12px;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transform: translateY(-8px);
+    transition: max-height 0.28s ease, opacity 0.22s ease, transform 0.22s ease, padding 0.22s ease;
 }
 
 .match-transfer-panel.active {
-    display: block;
+    max-height: 320px;
+    opacity: 1;
+    transform: translateY(0);
+    padding: 12px;
+    overflow: auto;
 }
 
 .transfer-panel-title {
@@ -400,6 +427,10 @@ body {
     border-bottom: none;
 }
 
+.transfer-record.align-right {
+    text-align: right;
+}
+
 .transfer-day {
     color: #64748b;
     font-weight: 800;
@@ -416,8 +447,20 @@ body {
     color: #0f766e;
 }
 
+.transfer-cost.wildcard {
+    color: #0f766e;
+}
+
 .transfer-cost.penalty {
     color: #dc2626;
+}
+
+.right-panel .transfer-panel-title,
+.right-panel .trend-empty,
+.right-panel .transfer-day,
+.right-panel .transfer-move,
+.right-panel .transfer-cost {
+    text-align: right;
 }
 
 /* ===== FDR Table ===== */
@@ -487,6 +530,13 @@ body {
     min-height: auto;
 }
 
+.fdr-note {
+    margin-top: 10px;
+    font-size: 11px;
+    color: #9aa5b1;
+    line-height: 1.5;
+}
+
 .rankings-table {
     width: 100%;
     border-collapse: collapse;
@@ -508,6 +558,12 @@ body {
 .rankings-table td.team-cell {
     text-align: left;
     font-weight: 700;
+}
+
+.rankings-table .points-col,
+.rankings-table .points-cell {
+    font-weight: 800;
+    color: #0f172a;
 }
 
 .rankings-table tr.live-row {
@@ -748,9 +804,9 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 11px;
-    color: #2563eb;
-    font-weight: 700;
+    font-size: 12px;
+    color: inherit;
+    font-weight: 400;
 }
 
 .player-score { text-align: right; }
@@ -904,12 +960,18 @@ body {
         gap: 14px;
     }
 
+    .home-layout,
+    .rankings-layout {
+        grid-template-columns: 1fr;
+    }
+
     .column {
         padding: 16px;
         border-radius: 16px;
     }
 
     .match-card {
+        grid-template-columns: 1fr 72px 1fr;
         min-height: 92px;
     }
 
@@ -925,7 +987,8 @@ body {
         padding: 12px;
         flex-direction: column;
         align-items: stretch;
-        gap: 10px;
+        gap: 12px;
+        border-radius: 14px;
     }
 
     .game-team,
@@ -939,14 +1002,31 @@ body {
         justify-content: space-between;
         align-items: center;
         text-align: left;
+        border-top: 1px solid #edf2f7;
+        padding-top: 8px;
     }
 
     .vs-divider {
-        width: 42px;
+        min-width: 72px;
     }
 
     .match-transfer-wrap {
         grid-template-columns: 1fr;
+    }
+
+    .transfer-record {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+
+    .transfer-record,
+    .transfer-record.align-right,
+    .right-panel .transfer-panel-title,
+    .right-panel .trend-empty,
+    .right-panel .transfer-day,
+    .right-panel .transfer-move,
+    .right-panel .transfer-cost {
+        text-align: left;
     }
 
     .league-metrics {

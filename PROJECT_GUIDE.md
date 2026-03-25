@@ -130,5 +130,13 @@ Invoke-WebRequest -Method POST "https://<your-worker-domain>/api/refresh?token=<
 - 首页趋势区域新增 `Ownership Top 20`，由 Worker 基于 league 内全部经理当前阵容实时计算。
 - FDR 表按 `AVG` 从高到低排序。
 - 新增 `/api/h2h-standings`，用于排行榜页面展示“GW22 基线 + 当前周实时结果”的实时 H2H 排名。
+- 新增 `/api/classic-rankings`，用于展示联赛总分排名和联赛周排名。
 - 对阵详情球员卡新增 `ownership_percent` 展示。
 - favicon 当前使用 `frontend/LOGO.jpg`。
+
+## 2026-03-25 WC / 页面布局更新
+
+- WC 逻辑更新为“仅 WC 当天转会标记为 `WC` 且不计入扣分，其余日期仍按整周累计前 2 次 `FT`、之后 `-100`”。
+- 首页仅保留 `Today's Fixtures` 与 `Live H2H` 两个主模块，`league averages` 移到 H2H 模块下。
+- `排行榜` 页面整合三块内容：实时 H2H 排行榜、Classic Rankings、FDR。
+- 前端查看单个经理阵容时会请求 `/api/picks/{uid}?fresh=1`，确保转会记录和阵容是该 UID 的最新版本，而不是仅依赖 chunk 缓存。

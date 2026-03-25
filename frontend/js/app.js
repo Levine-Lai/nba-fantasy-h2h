@@ -23,17 +23,17 @@ const API = {
     async fetch(url, options = {}) {
         const target = /^https?:\/\//.test(url) ? url : `${API_BASE}${url}`;
         try {
-            const res = await fetch(target, options);
-            if (!res.ok) {
-                if (res.status === 401) throw new Error("未授权访问");
-                if (res.status === 500) throw new Error("服务器内部错误");
-                throw new Error(`请求失败: ${res.status}`);
+            const response = await fetch(target, options);
+            if (!response.ok) {
+                if (response.status === 401) throw new Error("Unauthorized");
+                if (response.status === 500) throw new Error("Server error");
+                throw new Error(`Request failed: ${response.status}`);
             }
             ErrorBanner.hide();
-            return res;
+            return response;
         } catch (error) {
             console.error(`[API Error] ${url}`, error);
-            ErrorBanner.show("数据加载失败，请刷新重试");
+            ErrorBanner.show("Data load failed. Please refresh and try again.");
             throw error;
         }
     },
@@ -50,12 +50,16 @@ const API = {
         return (await this.fetch("/api/h2h-standings")).json();
     },
 
+    async getClassicRankings() {
+        return (await this.fetch("/api/classic-rankings")).json();
+    },
+
     async getGameDetail(fixtureId) {
         return (await this.fetch(`/api/fixture/${fixtureId}`)).json();
     },
 
     async getLineup(uid) {
-        return (await this.fetch(`/api/picks/${uid}`)).json();
+        return (await this.fetch(`/api/picks/${uid}?fresh=1`)).json();
     },
 
     async getTransferTrends() {
@@ -83,63 +87,62 @@ function escapeHtml(value) {
 function formatOwnership(player) {
     const percent = Number(player?.ownership_percent);
     if (!Number.isFinite(percent)) return "";
-    return `<span class="ownership-badge">持有 ${percent.toFixed(1)}%</span>`;
+    return `<span class="ownership-badge">${percent.toFixed(1)}%</span>`;
 }
 
-function renderTransferRecords(teamName, transferRecords) {
+function renderTransferRecords(teamName, transferRecords, side = "left") {
     if (!transferRecords || transferRecords.length === 0) {
         return `
-            <div class="transfer-panel-title">${escapeHtml(teamName)} 本周转会</div>
-            <div class="trend-empty">本周暂无转会记录</div>
+            <div class="transfer-panel-title">${escapeHtml(teamName)} This Week</div>
+            <div class="trend-empty">No transfers this week</div>
         `;
     }
 
     const rows = transferRecords.map((record) => `
-        <div class="transfer-record">
+        <div class="transfer-record ${side === "right" ? "align-right" : ""}">
             <div class="transfer-day">${escapeHtml(record.day_label || "DAY?")}</div>
             <div class="transfer-move">${escapeHtml(record.move || "")}</div>
-            <div class="transfer-cost ${record.is_free ? "" : "penalty"}">${escapeHtml(record.cost_type || "")}</div>
+            <div class="transfer-cost ${record.is_free ? "" : "penalty"} ${record.is_wildcard ? "wildcard" : ""}">${escapeHtml(record.cost_type || "")}</div>
         </div>
     `).join("");
 
     return `
-        <div class="transfer-panel-title">${escapeHtml(teamName)} 本周转会</div>
+        <div class="transfer-panel-title">${escapeHtml(teamName)} This Week</div>
         ${rows}
     `;
 }
 
 const Render = {
     updateTime() {
-        const el = document.getElementById("update-time");
-        if (el) {
-            el.textContent = new Date().toLocaleTimeString("zh-CN", {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-            });
-        }
+        const element = document.getElementById("update-time");
+        if (!element) return;
+        element.textContent = new Date().toLocaleTimeString("zh-CN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+        });
     },
 
     eventInfo(name) {
-        const el = document.getElementById("event-info");
-        if (el) el.textContent = `${name} - League #1653`;
+        const element = document.getElementById("event-info");
+        if (element) element.textContent = `${name} - League #1653`;
     },
 
     gameCount(count) {
-        const el = document.getElementById("game-count");
-        if (el) el.textContent = `${count}场`;
+        const element = document.getElementById("game-count");
+        if (element) element.textContent = `${count}场`;
     },
 
     matchCount(count) {
-        const el = document.getElementById("match-count");
-        if (el) el.textContent = `${count}场`;
+        const element = document.getElementById("match-count");
+        if (element) element.textContent = `${count}场`;
     },
 
     refreshButton(state, text) {
-        const btn = document.getElementById("refresh-btn");
-        if (!btn) return;
-        btn.disabled = state === "loading";
-        btn.textContent = text;
+        const button = document.getElementById("refresh-btn");
+        if (!button) return;
+        button.disabled = state === "loading";
+        button.textContent = text;
     },
 
     switchPage(page) {
@@ -150,15 +153,16 @@ const Render = {
     },
 
     transferTrends(data) {
-        const inEl = document.getElementById("trend-overall-in");
-        const outEl = document.getElementById("trend-overall-out");
-        const ownershipEl = document.getElementById("ownership-top");
-        if (!inEl || !outEl || !ownershipEl) return;
+        const transferIn = document.getElementById("trend-overall-in");
+        const transferOut = document.getElementById("trend-overall-out");
+        const ownership = document.getElementById("ownership-top");
+        if (!transferIn || !transferOut || !ownership) return;
 
         const renderList = (items, emptyText, labelFn, valueFn) => {
             if (!items || items.length === 0) {
                 return `<div class="trend-empty">${escapeHtml(emptyText)}</div>`;
             }
+
             return items.map((item, index) => `
                 <div class="trend-item">
                     <span class="trend-rank">#${index + 1}</span>
@@ -173,9 +177,9 @@ const Render = {
         const ownershipTop = data?.ownership_top || [];
         const managerCount = Number(data?.ownership_manager_count || 26);
 
-        inEl.innerHTML = renderList(overallIn, "No transfer-in trend data", (item) => escapeHtml(item.name), (item) => escapeHtml(item.count));
-        outEl.innerHTML = renderList(overallOut, "No transfer-out trend data", (item) => escapeHtml(item.name), (item) => escapeHtml(item.count));
-        ownershipEl.innerHTML = renderList(
+        transferIn.innerHTML = renderList(overallIn, "No transfer-in trend data", (item) => escapeHtml(item.name), (item) => escapeHtml(item.count));
+        transferOut.innerHTML = renderList(overallOut, "No transfer-out trend data", (item) => escapeHtml(item.name), (item) => escapeHtml(item.count));
+        ownership.innerHTML = renderList(
             ownershipTop,
             "No ownership data",
             (item) => `${escapeHtml(item.name)} (${item.holder_count}/${managerCount})`,
@@ -208,13 +212,14 @@ const Render = {
     gamesList(games) {
         const container = document.getElementById("game-list");
         if (!container) return;
+
         if (!games || games.length === 0) {
-            container.innerHTML = '<div style="text-align:center;padding:40px;color:#999;">暂无比赛</div>';
+            container.innerHTML = '<div style="text-align:center;padding:40px;color:#999;">No games today</div>';
             return;
         }
 
         container.innerHTML = games.map((game) => {
-            const status = game.status_label || (game.finished ? "已结束" : (game.started ? "进行中" : "未开始"));
+            const status = game.status_label || (game.finished ? "Finished" : (game.started ? "Live" : "Upcoming"));
             const homeClass = game.home_score > game.away_score ? "winning" : (game.home_score < game.away_score ? "losing" : "");
             const awayClass = game.away_score > game.home_score ? "winning" : (game.away_score < game.home_score ? "losing" : "");
 
@@ -242,9 +247,10 @@ const Render = {
     h2hList(matches) {
         const container = document.getElementById("h2h-list");
         if (!container) return;
+
         container.innerHTML = matches.map((match) => {
-            const isLeftWin = match.total1 > match.total2;
-            const isDraw = match.total1 === match.total2;
+            const isLeftWin = Number(match.total1 || 0) > Number(match.total2 || 0);
+            const isDraw = Number(match.total1 || 0) === Number(match.total2 || 0);
             const leftClass = isDraw ? "" : (isLeftWin ? "winning" : "losing");
             const rightClass = isDraw ? "" : (isLeftWin ? "losing" : "winning");
             const leftMuted = !isDraw && !isLeftWin ? "is-behind" : "";
@@ -253,25 +259,27 @@ const Render = {
             const rightPanelId = `transfers-${match.uid1}-${match.uid2}-right`;
 
             return `
-                <div class="match-card">
-                    <div class="team-side ${leftClass} ${leftMuted} js-transfer-toggle" data-panel-id="${leftPanelId}" data-uid="${match.uid1}" data-team="${escapeHtml(match.t1)}">
-                        <div class="team-name">${escapeHtml(match.t1)}</div>
-                        <div class="score-main ${leftClass}">${match.total1}</div>
-                        <div class="score-sub">今日 ${match.today1}</div>
+                <div class="match-block">
+                    <div class="match-card">
+                        <div class="team-side ${leftClass} ${leftMuted} js-transfer-toggle" data-panel-id="${leftPanelId}" data-uid="${match.uid1}" data-team="${escapeHtml(match.t1)}" data-side="left">
+                            <div class="team-name">${escapeHtml(match.t1)}</div>
+                            <div class="score-main ${leftClass}">${match.total1}</div>
+                            <div class="score-sub">Today ${match.today1}</div>
+                        </div>
+                        <div class="vs-divider js-open-lineup" data-uid1="${match.uid1}" data-name1="${escapeHtml(match.t1)}" data-uid2="${match.uid2}" data-name2="${escapeHtml(match.t2)}">
+                            <div class="vs-text">VS</div>
+                            <div class="match-diff">Diff: ${Math.abs(Number(match.diff || 0))}</div>
+                        </div>
+                        <div class="team-side ${rightClass} ${rightMuted} js-transfer-toggle" data-panel-id="${rightPanelId}" data-uid="${match.uid2}" data-team="${escapeHtml(match.t2)}" data-side="right">
+                            <div class="team-name">${escapeHtml(match.t2)}</div>
+                            <div class="score-main ${rightClass}">${match.total2}</div>
+                            <div class="score-sub">Today ${match.today2}</div>
+                        </div>
                     </div>
-                    <div class="vs-divider js-open-lineup" data-uid1="${match.uid1}" data-name1="${escapeHtml(match.t1)}" data-uid2="${match.uid2}" data-name2="${escapeHtml(match.t2)}">
-                        <div>VS</div>
-                        <div class="match-diff">DIFF ${Math.abs(match.diff || 0)}</div>
+                    <div class="match-transfer-wrap">
+                        <div id="${leftPanelId}" class="match-transfer-panel left-panel"></div>
+                        <div id="${rightPanelId}" class="match-transfer-panel right-panel"></div>
                     </div>
-                    <div class="team-side ${rightClass} ${rightMuted} js-transfer-toggle" data-panel-id="${rightPanelId}" data-uid="${match.uid2}" data-team="${escapeHtml(match.t2)}">
-                        <div class="team-name">${escapeHtml(match.t2)}</div>
-                        <div class="score-main ${rightClass}">${match.total2}</div>
-                        <div class="score-sub">今日 ${match.today2}</div>
-                    </div>
-                </div>
-                <div class="match-transfer-wrap">
-                    <div id="${leftPanelId}" class="match-transfer-panel"></div>
-                    <div id="${rightPanelId}" class="match-transfer-panel"></div>
                 </div>
             `;
         }).join("");
@@ -280,6 +288,7 @@ const Render = {
     h2hStandings(rows) {
         const body = document.getElementById("rankings-body");
         if (!body) return;
+
         if (!rows || rows.length === 0) {
             body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;">No standings data</td></tr>';
             return;
@@ -289,11 +298,37 @@ const Render = {
             <tr class="${row.live_applied ? "live-row" : ""}">
                 <td>${row.rank}</td>
                 <td class="team-cell">${escapeHtml(row.team_name)}</td>
-                <td>${row.points}</td>
+                <td>${row.played}</td>
+                <td class="points-cell">${row.points}</td>
                 <td>${row.won}</td>
                 <td>${row.draw}</td>
                 <td>${row.lost}</td>
-                <td>${row.played}</td>
+            </tr>
+        `).join("");
+    },
+
+    classicRankings(rows) {
+        const body = document.getElementById("classic-rankings-body");
+        const badge = document.getElementById("classic-rankings-badge");
+        if (!body) return;
+
+        if (badge && rows && rows.length > 0) {
+            const week = rows[0]?.current_week;
+            badge.textContent = week ? `GW${week}` : "League";
+        }
+
+        if (!rows || rows.length === 0) {
+            body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">No ranking data</td></tr>';
+            return;
+        }
+
+        body.innerHTML = rows.map((row) => `
+            <tr>
+                <td class="team-cell">${escapeHtml(row.team_name)}</td>
+                <td>${row.overall_rank ?? "-"}</td>
+                <td>${row.overall_score ?? "-"}</td>
+                <td>${row.weekly_rank ?? "-"}</td>
+                <td>${row.weekly_score ?? "-"}</td>
             </tr>
         `).join("");
     },
@@ -301,13 +336,13 @@ const Render = {
     modalLoading(modalId, bodyId, titleId, title) {
         const modal = document.getElementById(modalId);
         const body = document.getElementById(bodyId);
-        const titleEl = titleId ? document.getElementById(titleId) : null;
+        const titleElement = titleId ? document.getElementById(titleId) : null;
         if (modal) modal.classList.add("active");
-        if (body) body.innerHTML = '<div class="loading"><div class="spinner"></div>加载中...</div>';
-        if (titleEl && title) titleEl.textContent = title;
+        if (body) body.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        if (titleElement && title) titleElement.textContent = title;
     },
 
-    modalError(bodyId, message = "加载失败") {
+    modalError(bodyId, message = "Load failed") {
         const body = document.getElementById(bodyId);
         if (body) body.innerHTML = `<div style="text-align:center;padding:20px;">${escapeHtml(message)}</div>`;
     },
@@ -315,8 +350,10 @@ const Render = {
     gameDetail(data) {
         const body = document.getElementById("game-body");
         const title = document.getElementById("game-title");
+        if (!body) return;
+
         if (!data.home_players) {
-            this.modalError("game-body", "暂无数据");
+            this.modalError("game-body", "No data");
             return;
         }
 
@@ -328,13 +365,13 @@ const Render = {
                 <table class="stats-table">
                     <thead>
                         <tr>
-                            <th>球员</th>
-                            <th>位置</th>
-                            <th>得分</th>
-                            <th>篮板</th>
-                            <th>助攻</th>
-                            <th>抢断</th>
-                            <th>盖帽</th>
+                            <th>Player</th>
+                            <th>Pos</th>
+                            <th>PTS</th>
+                            <th>REB</th>
+                            <th>AST</th>
+                            <th>STL</th>
+                            <th>BLK</th>
                             <th>Fantasy</th>
                         </tr>
                     </thead>
@@ -356,25 +393,24 @@ const Render = {
             </div>
         `;
 
-        if (body) {
-            body.innerHTML = `
-                <div class="game-detail-container">
-                    ${createTable(data.away_players, data.away_team)}
-                    ${createTable(data.home_players, data.home_team)}
-                </div>
-            `;
-        }
+        body.innerHTML = `
+            <div class="game-detail-container">
+                ${createTable(data.away_players, data.away_team)}
+                ${createTable(data.home_players, data.home_team)}
+            </div>
+        `;
     },
 
     lineup(data, name, isDual = false, dualData = null, dualName = null) {
         const body = document.getElementById("lineup-body");
         const title = document.getElementById("lineup-title");
-        if (title) title.textContent = isDual ? `${name} VS ${dualName}` : `${name} 的阵容`;
+        if (!body) return;
+        if (title) title.textContent = isDual ? `${name} VS ${dualName}` : `${name} Lineup`;
 
         const createPlayerCard = (player) => {
-            const isCaptain = player.is_captain && player.multiplier > 1;
+            const isCaptain = player.is_captain && Number(player.multiplier || 1) > 1;
             const badge = isCaptain ? '<span class="captain-badge">C</span>' : "";
-            const injuryBadge = player.injury ? `<span class="injury-badge" title="${escapeHtml(player.injury)}">伤 ${escapeHtml(player.injury)}</span>` : "";
+            const injuryBadge = player.injury ? `<span class="injury-badge" title="${escapeHtml(player.injury)}">INJ ${escapeHtml(player.injury)}</span>` : "";
             const effectiveClass = player.is_effective ? "effective" : "ineffective";
             const posClass = player.position_name === "BC" ? "pos-BC" : "pos-FC";
             const ownership = formatOwnership(player);
@@ -389,8 +425,7 @@ const Render = {
                             ${injuryBadge}
                         </div>
                         <div class="player-stats">
-                            ${player.stats.points}分 ${player.stats.rebounds}板 ${player.stats.assists}助 ${player.stats.steals}断 ${player.stats.blocks}帽
-                            ${ownership}
+                            ${Number(player?.stats?.points || 0)}分 ${Number(player?.stats?.rebounds || 0)}板 ${Number(player?.stats?.assists || 0)}助 ${Number(player?.stats?.steals || 0)}断 ${Number(player?.stats?.blocks || 0)}帽 ${ownership}
                         </div>
                     </div>
                     <div class="player-score">
@@ -401,18 +436,19 @@ const Render = {
         };
 
         const createLineupSection = (lineupData, teamName) => {
-            if (!lineupData.players || lineupData.players.length === 0) {
-                return '<div style="text-align:center;padding:20px;">暂无数据</div>';
+            const players = Array.isArray(lineupData?.players) ? lineupData.players : [];
+            if (players.length === 0) {
+                return '<div style="text-align:center;padding:20px;">No lineup data</div>';
             }
 
-            const starters = lineupData.players.filter((player) => player.lineup_position <= 5);
-            const bench = lineupData.players.filter((player) => player.lineup_position > 5);
-            const penaltyLine = lineupData.penalty_score > 0
-                ? `<div class="score-sub" style="color:#ff6b6b;">- ${lineupData.penalty_score} Transfer Penalty (${lineupData.transfer_count} transfers)</div>`
+            const starters = players.filter((player) => Number(player.lineup_position) <= 5);
+            const bench = players.filter((player) => Number(player.lineup_position) > 5);
+            const penaltyLine = Number(lineupData.penalty_score || 0) > 0
+                ? `<div class="score-sub" style="color:#ff6b6b;">- ${lineupData.penalty_score} Transfer Penalty (${lineupData.penalty_transfer_count || lineupData.transfer_count || 0} non-WC moves)</div>`
                 : "";
-            const wildcardLine = lineupData.wildcard_active
-                ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>'
-                : "";
+            const wildcardLine = lineupData.wildcard_day
+                ? `<div class="score-sub" style="color:#4ade80;">WC Day ${lineupData.wildcard_day}</div>`
+                : (lineupData.wildcard_active ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>' : "");
 
             return `
                 <div class="${isDual ? "dual-lineup-side" : ""}">
@@ -443,7 +479,6 @@ const Render = {
             `;
         };
 
-        if (!body) return;
         if (isDual && dualData) {
             body.innerHTML = `
                 <div class="dual-lineup-container">
@@ -451,9 +486,10 @@ const Render = {
                     ${createLineupSection(dualData, dualName)}
                 </div>
             `;
-        } else {
-            body.innerHTML = createLineupSection(data, name);
+            return;
         }
+
+        body.innerHTML = createLineupSection(data, name);
     },
 };
 
@@ -528,13 +564,18 @@ const App = {
 
     async loadRankings() {
         try {
-            Render.h2hStandings(await API.getH2HStandings());
+            const [h2hStandings, classicRankings] = await Promise.all([
+                API.getH2HStandings(),
+                API.getClassicRankings(),
+            ]);
+            Render.h2hStandings(h2hStandings);
+            Render.classicRankings(classicRankings);
         } catch (error) {
             console.error("Standings error:", error);
         }
     },
 
-    async toggleTransferPanel(event, panelId, uid, teamName) {
+    async toggleTransferPanel(event, panelId, uid, teamName, side = "left") {
         event?.stopPropagation?.();
         const panel = document.getElementById(panelId);
         if (!panel) return;
@@ -545,11 +586,11 @@ const App = {
 
         try {
             const data = await this.getLineupCached(uid);
-            panel.innerHTML = renderTransferRecords(teamName, data.transfer_records || []);
+            panel.innerHTML = renderTransferRecords(teamName, data.transfer_records || [], side);
             panel.classList.add("active");
         } catch (error) {
             console.error("Transfer panel error:", error);
-            panel.innerHTML = `<div class="transfer-panel-title">${escapeHtml(teamName)} 本周转会</div><div class="trend-empty">加载失败</div>`;
+            panel.innerHTML = `<div class="transfer-panel-title">${escapeHtml(teamName)} This Week</div><div class="trend-empty">Load failed</div>`;
             panel.classList.add("active");
         }
     },
@@ -565,7 +606,7 @@ const App = {
     },
 
     async showLineup(uid, name) {
-        Render.modalLoading("lineup-modal", "lineup-body", "lineup-title", `${name} 的阵容`);
+        Render.modalLoading("lineup-modal", "lineup-body", "lineup-title", `${name} Lineup`);
         try {
             Render.lineup(await this.getLineupCached(uid), name);
         } catch (error) {
@@ -586,7 +627,7 @@ const App = {
     },
 
     async manualRefresh() {
-        Render.refreshButton("loading", "刷新中...");
+        Render.refreshButton("loading", "Refreshing...");
         try {
             const data = await API.refresh();
             if (data.current_event_name) Render.eventInfo(data.current_event_name);
@@ -629,7 +670,8 @@ const App = {
                     event,
                     transferTrigger.dataset.panelId,
                     transferTrigger.dataset.uid,
-                    transferTrigger.dataset.team
+                    transferTrigger.dataset.team,
+                    transferTrigger.dataset.side || "left"
                 );
             }
         });

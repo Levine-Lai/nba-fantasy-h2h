@@ -678,16 +678,25 @@ function resolveTransferGwDay(transfer, eventMetaById) {
   return { gw, day };
 }
 
-function isWildcardActiveFromHistory(historyData, currentGw, currentEvent, eventMetaById) {
+function getWildcardDayFromHistory(historyData, currentGw, currentEvent, eventMetaById) {
   for (const item of extractHistoryRecords(historyData)) {
     const name = String(item?.name || "").toLowerCase();
     if (name !== "wildcard" && name !== "wild_card") continue;
     const itemEvent = item?.event;
     const eventMeta = eventMetaById?.[Number(itemEvent)] || {};
     const itemGw = item?.gw || item?.gameweek || eventMeta.gw || extractGwNumber(itemEvent);
-    if (itemGw === currentGw || itemEvent === currentEvent) return true;
+    if (itemGw !== currentGw && itemEvent !== currentEvent) continue;
+    const day = Number(eventMeta.day || item?.day || 0) || null;
+    if (day) return day;
+    if (Number(itemEvent) === Number(currentEvent)) {
+      return Number(eventMetaById?.[Number(currentEvent)]?.day || 0) || null;
+    }
   }
-  return false;
+  return null;
+}
+
+function isWildcardActiveFromHistory(historyData, currentGw, currentEvent, eventMetaById) {
+  return getWildcardDayFromHistory(historyData, currentGw, currentEvent, eventMetaById) !== null;
 }
 
 function countTransfersInGw(transfers, currentGw, eventMetaById) {
@@ -709,8 +718,7 @@ function countTransfersInGd1(transfers, currentGw, eventMetaById) {
   return count;
 }
 
-function calculateTransferPenalty(transferCount, wildcardActive) {
-  if (wildcardActive) return 0;
+function calculateTransferPenalty(transferCount) {
   return Math.max(0, transferCount - 2) * 100;
 }
 
@@ -860,7 +868,7 @@ function buildLeagueDailyAverages(picksByUid, teamsPlayingToday) {
   };
 }
 
-function buildWeeklyTransferRecords(transfers, currentGw, eventMetaById, elements, wildcardActive) {
+function buildWeeklyTransferSummary(transfers, currentGw, eventMetaById, elements, wildcardDay = null) {
   const weeklyTransfers = [];
   for (const [index, transfer] of (transfers || []).entries()) {
     const { gw, day } = resolveTransferGwDay(transfer, eventMetaById);
@@ -880,18 +888,41 @@ function buildWeeklyTransferRecords(transfers, currentGw, eventMetaById, element
 
   weeklyTransfers.sort((a, b) => a.day - b.day || a.event - b.event || a.index - b.index);
 
-  return weeklyTransfers.map((item, idx) => {
-    const isFree = wildcardActive || idx < 2;
+  let nonWildcardTransferCount = 0;
+  let gd1TransferCount = 0;
+  const records = weeklyTransfers.map((item) => {
+    const isWildcardTransfer = wildcardDay !== null && Number(item.day || 0) === Number(wildcardDay);
+    let costType = "FT";
+    let isFree = true;
+
+    if (isWildcardTransfer) {
+      costType = "WC";
+    } else {
+      nonWildcardTransferCount += 1;
+      if (Number(item.day || 0) === 1) gd1TransferCount += 1;
+      isFree = nonWildcardTransferCount <= 2;
+      costType = isFree ? "FT" : "-100";
+    }
+
     return {
       day: item.day || null,
       day_label: item.day ? `DAY${item.day}` : "DAY?",
       move: `${item.out_name} -> ${item.in_name}`,
       out_name: item.out_name,
       in_name: item.in_name,
-      cost_type: isFree ? "FT" : "-100",
+      cost_type: costType,
       is_free: isFree,
+      is_wildcard: isWildcardTransfer,
     };
   });
+
+  return {
+    records,
+    total_transfer_count: weeklyTransfers.length,
+    penalty_transfer_count: nonWildcardTransferCount,
+    gd1_transfer_count: gd1TransferCount,
+    penalty_score: calculateTransferPenalty(nonWildcardTransferCount),
+  };
 }
 
 function buildOwnershipSummary(picksByUid) {
@@ -929,6 +960,42 @@ function buildOwnershipSummary(picksByUid) {
     top20,
     manager_count: managerCount,
   };
+}
+
+function buildClassicRankingsPayload(overallRows, weeklyRows, currentWeek, weeklyPhase) {
+  const overallByUid = {};
+  const weeklyByUid = {};
+
+  for (const row of overallRows || []) {
+    const uid = normalizeUid(row?.entry);
+    if (!uid) continue;
+    overallByUid[uid] = row;
+  }
+
+  for (const row of weeklyRows || []) {
+    const uid = normalizeUid(row?.entry);
+    if (!uid) continue;
+    weeklyByUid[uid] = row;
+  }
+
+  return UID_LIST.map((uid) => {
+    const overall = overallByUid[uid] || {};
+    const weekly = weeklyByUid[uid] || {};
+    return {
+      uid: uidToNumber(uid),
+      team_name: UID_MAP[uidToNumber(uid)] || uid,
+      overall_rank: Number(overall.rank || 0) || null,
+      overall_score: overall.entry ? Math.round(Number(overall.total || 0) / 10) : null,
+      weekly_rank: Number(weekly.rank || 0) || null,
+      weekly_score: weekly.entry ? Math.round(Number(weekly.total || 0) / 10) : null,
+      current_week: Number(currentWeek || 0) || null,
+      weekly_phase: Number(weeklyPhase || 0) || null,
+    };
+  }).sort((a, b) => {
+    const aRank = Number.isFinite(Number(a.overall_rank)) && Number(a.overall_rank) > 0 ? Number(a.overall_rank) : Number.MAX_SAFE_INTEGER;
+    const bRank = Number.isFinite(Number(b.overall_rank)) && Number(b.overall_rank) > 0 ? Number(b.overall_rank) : Number.MAX_SAFE_INTEGER;
+    return aRank - bRank || a.team_name.localeCompare(b.team_name);
+  });
 }
 
 function buildLiveH2HStandings(baseStatsByUid, liveMatches) {
@@ -1019,7 +1086,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   const eventMetaById = buildEventMetaById(events);
   const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(currentEventName);
   const currentWeek = currentMeta.gw || extractGwNumber(currentEventName) || extractGwNumber(currentEvent) || 22;
-  const currentPhase = Number(currentWeek || 1);
+  const weeklyStandingsPhase = currentWeek >= 1 && currentWeek <= 25 ? currentWeek + 1 : null;
   const previousPicksByUid = buildPreviousPicksByUid(previousState);
 
   const teams = {};
@@ -1042,10 +1109,11 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     };
   }
 
-  const [liveRaw, fixturesRaw, standingsRows] = await Promise.all([
+  const [liveRaw, fixturesRaw, overallStandingsRows, weeklyStandingsRows] = await Promise.all([
     fetchJson(`/event/${currentEvent}/live/`),
     fetchJson(`/fixtures/?event=${currentEvent}`),
-    fetchAllStandings(currentPhase),
+    fetchAllStandings(1),
+    weeklyStandingsPhase ? fetchAllStandings(weeklyStandingsPhase) : Promise.resolve([]),
   ]);
 
   const liveElements = {};
@@ -1105,34 +1173,48 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     };
   }
 
-  const standingsRowsByUid = {};
-  for (const row of standingsRows || []) {
+  const overallStandingsByUid = {};
+  for (const row of overallStandingsRows || []) {
     const uid = normalizeUid(row?.entry);
     if (!uid || !UID_MAP[uidToNumber(uid)]) continue;
-    standingsRowsByUid[uid] = row;
+    overallStandingsByUid[uid] = row;
+  }
+
+  const weeklyStandingsByUid = {};
+  for (const row of weeklyStandingsRows || []) {
+    const uid = normalizeUid(row?.entry);
+    if (!uid || !UID_MAP[uidToNumber(uid)]) continue;
+    weeklyStandingsByUid[uid] = row;
   }
 
   const standingsByUid = {};
   for (const uid of UID_LIST) {
-    const row = standingsRowsByUid[uid] || {};
+    const overallRow = overallStandingsByUid[uid] || {};
+    const weeklyRow = weeklyStandingsByUid[uid] || {};
     const previous = previousPicksByUid[uid] || {};
     standingsByUid[uid] = {
-      week_total: Number(previous.event_total || 0),
-      overall_total: row.entry ? Math.floor(Number(row.total || 0) / 10) : Number(previous.overall_total || previous.event_total || 0),
-      classic_rank: Number(previous.classic_rank || 0),
+      week_total: weeklyRow.entry ? Math.round(Number(weeklyRow.total || 0) / 10) : Number(previous.event_total || 0),
+      overall_total: overallRow.entry ? Math.round(Number(overallRow.total || 0) / 10) : Number(previous.overall_total || previous.event_total || 0),
+      classic_rank: Number(overallRow.rank || previous.classic_rank || 0),
+      classic_week_rank: Number(weeklyRow.rank || previous.classic_week_rank || 0),
+      classic_week_total: weeklyRow.entry ? Math.round(Number(weeklyRow.total || 0) / 10) : Number(previous.classic_week_total || 0),
       today_live: Number(previous.total_live || 0),
       raw_today_live: Number(previous.raw_total_live || previous.total_live || 0),
       penalty_score: Number(previous.penalty_score || 0),
       transfer_count: Number(previous.transfer_count || 0),
+      penalty_transfer_count: Number(previous.penalty_transfer_count || previous.transfer_count || 0),
       gd1_transfer_count: Number(previous.gd1_transfer_count || 0),
       gd1_missing_penalty: Number(previous.gd1_missing_penalty || 0),
       wildcard_active: !!previous.wildcard_active,
+      wildcard_day: Number(previous.wildcard_day || 0) || null,
       transfer_records: Array.isArray(previous.transfer_records) ? previous.transfer_records : [],
       picks: Array.isArray(previous.players) ? previous.players : [],
     };
     debugUid("base_data", uid, {
-      row_total: row.entry ? Math.floor(Number(row.total || 0) / 10) : null,
-      row_rank: Number(row.rank || 0),
+      overall_total: overallRow.entry ? Math.round(Number(overallRow.total || 0) / 10) : null,
+      overall_rank: Number(overallRow.rank || 0),
+      weekly_total: weeklyRow.entry ? Math.round(Number(weeklyRow.total || 0) / 10) : null,
+      weekly_rank: Number(weeklyRow.rank || 0),
       previous_event_total: Number(previous.event_total || 0),
       previous_total_live: Number(previous.total_live || 0),
       previous_players: Array.isArray(previous.players) ? previous.players.length : 0,
@@ -1146,17 +1228,11 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     const previous = previousPicksByUid[uid] || {};
     debugUid("input_uid", uid, { uid, uid_number: uidNumber });
 
-    let [profileRes, picksRes, transfersRes, historyRes] = await Promise.all([
-      fetchJsonSafe(`/entry/${uidNumber}/`, 4),
+    let [picksRes, transfersRes, historyRes] = await Promise.all([
       fetchJsonSafe(`/entry/${uidNumber}/event/${currentEvent}/picks/`, 4),
       fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 4),
       fetchJsonSafe(`/entry/${uidNumber}/history/`, 4),
     ]);
-
-    if (!profileRes.ok) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      profileRes = await fetchJsonSafe(`/entry/${uidNumber}/`, 4);
-    }
     // Retry once for failed endpoints to reduce random empty states.
     if (!picksRes.ok) {
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -1171,19 +1247,14 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       transfersRes = await fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 4);
     }
 
-    const profileData = profileRes.ok && typeof profileRes.data === "object" && profileRes.data ? profileRes.data : {};
     const picksData = picksRes.ok ? picksRes.data : null;
     const transfersData = transfersRes.ok && Array.isArray(transfersRes.data) ? transfersRes.data : [];
     const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : {};
     transfersByUid[uid] = transfersData;
-    const classicRank =
-      extractLeagueClassicRank(profileData, LEAGUE_ID) ||
-      Number(standingsByUid[uid].classic_rank || 0) ||
-      Number(standingsRowsByUid[uid]?.rank || 0) ||
-      0;
+    const classicRank = Number(standingsByUid[uid].classic_rank || 0);
     standingsByUid[uid].classic_rank = classicRank;
     debugUid("fetch_status", uid, {
-      profile_ok: !!profileRes.ok,
+      profile_ok: classicRank > 0,
       picks_ok: !!picksRes.ok,
       transfers_ok: !!transfersRes.ok,
       history_ok: !!historyRes.ok,
@@ -1196,32 +1267,32 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     debugUid("avatar_data", uid, null);
 
     const canRecomputePenalty = !!transfersRes.ok && !!historyRes.ok;
-    const transferCount = canRecomputePenalty
-      ? countTransfersInGw(transfersData, currentWeek, eventMetaById)
-      : Number(previous.transfer_count || 0);
-    const gd1TransferCount = canRecomputePenalty
-      ? countTransfersInGd1(transfersData, currentWeek, eventMetaById)
-      : Number(previous.gd1_transfer_count || 0);
-    const wildcardActive = canRecomputePenalty
-      ? isWildcardActiveFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
-      : !!previous.wildcard_active;
-    const penaltyScore = canRecomputePenalty
-      ? calculateTransferPenalty(transferCount, wildcardActive)
-      : Number(previous.penalty_score || 0);
+    const wildcardDay = canRecomputePenalty
+      ? getWildcardDayFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
+      : Number(previous.wildcard_day || 0) || null;
+    const transferSummary = canRecomputePenalty
+      ? buildWeeklyTransferSummary(transfersData, currentWeek, eventMetaById, elements, wildcardDay)
+      : {
+          records: Array.isArray(previous.transfer_records) ? previous.transfer_records : [],
+          total_transfer_count: Number(previous.transfer_count || 0),
+          penalty_transfer_count: Number(previous.penalty_transfer_count || previous.transfer_count || 0),
+          gd1_transfer_count: Number(previous.gd1_transfer_count || 0),
+          penalty_score: Number(previous.penalty_score || 0),
+        };
+    const transferCount = Number(transferSummary.total_transfer_count || 0);
+    const gd1TransferCount = Number(transferSummary.gd1_transfer_count || 0);
+    const wildcardActive = wildcardDay !== null;
+    const penaltyScore = Number(transferSummary.penalty_score || 0);
     const historyWeek = calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
 
     standingsByUid[uid].penalty_score = penaltyScore;
     standingsByUid[uid].transfer_count = transferCount;
+    standingsByUid[uid].penalty_transfer_count = Number(transferSummary.penalty_transfer_count || 0);
     standingsByUid[uid].gd1_transfer_count = gd1TransferCount;
     standingsByUid[uid].gd1_missing_penalty = 0;
     standingsByUid[uid].wildcard_active = wildcardActive;
-    standingsByUid[uid].transfer_records = buildWeeklyTransferRecords(
-      transfersData,
-      currentWeek,
-      eventMetaById,
-      elements,
-      wildcardActive
-    );
+    standingsByUid[uid].wildcard_day = wildcardDay;
+    standingsByUid[uid].transfer_records = transferSummary.records;
     if (historyWeek.has_week_rows) {
       standingsByUid[uid].week_total = Math.max(0, Number(historyWeek.weekly_points || 0) - penaltyScore);
     }
@@ -1248,7 +1319,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       standingsByUid[uid].raw_today_live = todayFallback;
       standingsByUid[uid].today_live = todayFallback;
       standingsByUid[uid].fetch_status = {
-        profile_ok: !!profileRes.ok,
+        profile_ok: classicRank > 0,
         picks_ok: !!picksRes.ok,
         history_ok: !!historyRes.ok,
         transfers_ok: !!transfersRes.ok,
@@ -1319,7 +1390,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     standingsByUid[uid].week_total = finalWeekTotal;
     standingsByUid[uid].picks = picks;
     standingsByUid[uid].fetch_status = {
-      profile_ok: !!profileRes.ok,
+      profile_ok: classicRank > 0,
       picks_ok: true,
       history_ok: !!historyRes.ok,
       transfers_ok: !!transfersRes.ok,
@@ -1386,13 +1457,17 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       raw_total_live: s.raw_today_live || s.today_live || 0,
       penalty_score: s.penalty_score || 0,
       transfer_count: s.transfer_count || 0,
+      penalty_transfer_count: s.penalty_transfer_count || 0,
       gd1_transfer_count: s.gd1_transfer_count || 0,
       gd1_missing_penalty: s.gd1_missing_penalty || 0,
       wildcard_active: !!s.wildcard_active,
+      wildcard_day: s.wildcard_day || null,
       fetch_status: s.fetch_status || { picks_ok: true, history_ok: true, transfers_ok: true },
       event_total: s.week_total || 0,
       overall_total: s.overall_total || s.week_total || 0,
       classic_rank: s.classic_rank || 0,
+      classic_week_rank: s.classic_week_rank || 0,
+      classic_week_total: s.classic_week_total || 0,
       transfer_records: Array.isArray(s.transfer_records) ? s.transfer_records : [],
       formation,
       current_event: currentEvent,
@@ -1431,6 +1506,12 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   });
   fdr.daily_averages = league_daily_averages;
   const h2hStandings = buildLiveH2HStandings(H2H_BASE_STATS_BY_UID, h2h);
+  const classicRankings = buildClassicRankingsPayload(
+    overallStandingsRows,
+    weeklyStandingsRows,
+    currentWeek,
+    weeklyStandingsPhase
+  );
 
   return {
     generated_at: new Date().toISOString(),
@@ -1445,6 +1526,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     fixture_details: fixtureDetails,
     h2h,
     h2h_standings: h2hStandings,
+    classic_rankings: classicRankings,
     picks_by_uid: picksByUid,
     transfer_trends: transferTrends,
     ownership: ownershipSummary,
@@ -1520,6 +1602,7 @@ export default {
     if (path === "/api/fixtures") return jsonResponse(state.fixtures);
     if (path === "/api/h2h") return jsonResponse(state.h2h);
     if (path === "/api/h2h-standings") return jsonResponse(state.h2h_standings || []);
+    if (path === "/api/classic-rankings") return jsonResponse(state.classic_rankings || []);
     if (path.startsWith("/api/fixture/")) {
       const id = Number(path.split("/").pop());
       return jsonResponse(state.fixture_details[String(id)] || state.fixture_details[id] || {});
@@ -1527,8 +1610,10 @@ export default {
     if (path.startsWith("/api/picks/")) {
       const uid = normalizeUid(Number(path.split("/").pop()));
       let payload = state.picks_by_uid[uid] || {};
-      if (!payload.players || payload.players.length === 0) {
-        state = await refreshState(env);
+      const forceFresh = url.searchParams.get("fresh") === "1";
+      if (forceFresh || !payload.players || payload.players.length === 0) {
+        state = await buildState(state, [uid]);
+        await env.NBA_CACHE.put(CACHE_KEY, JSON.stringify(state));
         payload = state.picks_by_uid[uid] || {};
       }
       debugUid("api_response", uid, {
