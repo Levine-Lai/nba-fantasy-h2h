@@ -2,6 +2,65 @@ const BASE_URL = "https://nbafantasy.nba.com/api";
 const LEAGUE_ID = 1653;
 const CURRENT_PHASE = 23;
 const CACHE_KEY = "latest_state";
+const UID_LIST = [
+  "5410",
+  "3455",
+  "32",
+  "4319",
+  "17",
+  "2",
+  "10",
+  "14",
+  "6",
+  "189",
+  "9",
+  "4224",
+  "22761",
+  "4",
+  "16447",
+  "6562",
+  "23",
+  "11",
+  "5101",
+  "6441",
+  "15",
+  "5095",
+  "5467",
+  "6412",
+  "8580",
+  "42",
+];
+const DEBUG_UIDS = new Set(["5095", "6412", "8580", "16447", "5467", "5410", "6441", "6562", "22761", "5101", "4319"]);
+const FDR_TOTAL_WEIGHT = 0.7;
+const FDR_H2H_WEIGHT = 0.3;
+const FDR_H2H_RANK_BY_UID = {
+  "2": 1,
+  "15": 2,
+  "3455": 3,
+  "4319": 4,
+  "5095": 5,
+  "17": 6,
+  "10": 7,
+  "14": 8,
+  "6": 9,
+  "5410": 10,
+  "9": 11,
+  "189": 12,
+  "4224": 13,
+  "5101": 14,
+  "32": 15,
+  "16447": 16,
+  "6441": 17,
+  "23": 18,
+  "4": 19,
+  "11": 20,
+  "6412": 21,
+  "22761": 22,
+  "42": 23,
+  "5467": 24,
+  "6562": 25,
+  "8580": 26,
+};
 
 const UID_MAP = {
   5410: "kusuri",
@@ -48,6 +107,91 @@ const NAME_MAP = {
   "崇明座山雕": "雕哥",
   "笨笨是大骗子": "笨笨",
 };
+
+function normalizeUid(uid) {
+  if (uid === null || uid === undefined) return "";
+  return String(uid).trim();
+}
+
+function uidToNumber(uid) {
+  const normalized = normalizeUid(uid);
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getMapValueByUid(source, uid) {
+  if (!source || typeof source !== "object") return null;
+  const normalized = normalizeUid(uid);
+  if (normalized in source) return source[normalized];
+  const numeric = uidToNumber(normalized);
+  if (numeric !== null && numeric in source) return source[numeric];
+  return null;
+}
+
+function isDebugUid(uid) {
+  return DEBUG_UIDS.has(normalizeUid(uid));
+}
+
+function summarizePlayersForDebug(players) {
+  return (players || []).map((player) => ({
+    element_id: player?.element_id ?? player?.id ?? null,
+    name: player?.name || "",
+    lineup_position: player?.lineup_position ?? null,
+    position_name: player?.position_name || "",
+    final_points: Number(player?.final_points || 0),
+    is_effective: !!player?.is_effective,
+  }));
+}
+
+function debugUid(stage, uid, payload) {
+  if (!isDebugUid(uid)) return;
+  let serialized = "";
+  try {
+    serialized = JSON.stringify(payload);
+  } catch {
+    serialized = String(payload);
+  }
+  console.log(`[uid-debug][${normalizeUid(uid)}][${stage}] ${serialized}`);
+}
+
+function buildPreviousPicksByUid(previousState) {
+  const currentShape = previousState?.picks_by_uid;
+  if (currentShape && typeof currentShape === "object") {
+    const normalized = {};
+    for (const [uid, payload] of Object.entries(currentShape)) {
+      normalized[normalizeUid(uid)] = payload;
+    }
+    return normalized;
+  }
+
+  const legacyUserPicks = previousState?.user_picks;
+  const legacyStandings = previousState?.standings;
+  const migrated = {};
+
+  for (const uid of UID_LIST) {
+    const standing = getMapValueByUid(legacyStandings, uid) || {};
+    const players = getMapValueByUid(legacyUserPicks, uid) || standing?.picks || [];
+    if (!standing || (Object.keys(standing).length === 0 && (!Array.isArray(players) || players.length === 0))) {
+      continue;
+    }
+    migrated[uid] = {
+      uid: uidToNumber(uid),
+      team_name: UID_MAP[uidToNumber(uid)],
+      total_live: Number(standing?.today_live || 0),
+      raw_total_live: Number(standing?.raw_today_live ?? standing?.today_live ?? 0),
+      penalty_score: Number(standing?.penalty_score || 0),
+      transfer_count: Number(standing?.transfer_count || 0),
+      gd1_transfer_count: Number(standing?.gd1_transfer_count || 0),
+      gd1_missing_penalty: Number(standing?.gd1_missing_penalty || 0),
+      wildcard_active: !!standing?.wildcard_active,
+      event_total: Number(standing?.total || 0),
+      players: Array.isArray(players) ? players : [],
+    };
+  }
+
+  return migrated;
+}
 
 const ALL_FIXTURES = [
   [22, "AI", "纪导"],
@@ -113,7 +257,7 @@ function normalizeName(name) {
 function resolveUidByName(name) {
   const normalized = normalizeName(name);
   if (!normalized) return null;
-  if (NAME_TO_UID[normalized]) return NAME_TO_UID[normalized];
+  if (NAME_TO_UID[normalized] !== undefined) return Number(NAME_TO_UID[normalized]);
 
   const lower = normalized.toLowerCase();
   for (const [uid, displayName] of Object.entries(UID_MAP)) {
@@ -124,8 +268,15 @@ function resolveUidByName(name) {
   return null;
 }
 
-function buildFdrHtmlFromFixtures(standingsByUid = {}) {
-  const weeks = [22, 23, 24, 25];
+function getFutureFixtureWeeks(currentWeek) {
+  const availableWeeks = [...new Set(ALL_FIXTURES.map(([gw]) => Number(gw)))].sort((a, b) => a - b);
+  const futureWeeks = availableWeeks.filter((week) => week >= Number(currentWeek || 0)).slice(0, 3);
+  if (futureWeeks.length > 0) return futureWeeks;
+  return availableWeeks.slice(-3);
+}
+
+function buildFdrPayload({ standingsByUid = {}, currentWeek }) {
+  const weeks = getFutureFixtureWeeks(currentWeek);
   const byTeam = {};
   for (const [gw, team1, team2] of ALL_FIXTURES) {
     const t1 = normalizeName(team1);
@@ -136,31 +287,49 @@ function buildFdrHtmlFromFixtures(standingsByUid = {}) {
     byTeam[t2][gw] = t1;
   }
 
-  const teams = Object.values(UID_MAP).filter((name) => byTeam[name]);
-  const ranked = teams
-    .map((name) => ({
-      name,
-      total: Number(standingsByUid?.[resolveUidByName(name)]?.total || 0),
+  const teams = UID_LIST.map((uid) => UID_MAP[uidToNumber(uid)]).filter((name) => byTeam[name]);
+  const rankedByTotal = UID_LIST
+    .filter((uid) => byTeam[UID_MAP[uidToNumber(uid)]])
+    .map((uid) => ({
+      uid,
+      name: UID_MAP[uidToNumber(uid)],
+      overall_total: Number(getMapValueByUid(standingsByUid, uid)?.overall_total || 0),
     }))
-    .sort((a, b) => a.total - b.total);
+    .sort((a, b) => b.overall_total - a.overall_total);
 
-  const percentileByName = {};
-  const denom = Math.max(1, ranked.length - 1);
-  ranked.forEach((item, idx) => {
-    percentileByName[item.name] = idx / denom;
+  const totalStrengthByUid = {};
+  const totalDenom = Math.max(1, rankedByTotal.length - 1);
+  rankedByTotal.forEach((item, idx) => {
+    totalStrengthByUid[item.uid] = 1 - idx / totalDenom;
+  });
+
+  const rankedByH2h = Object.entries(FDR_H2H_RANK_BY_UID)
+    .map(([uid, rank]) => ({ uid: normalizeUid(uid), rank: Number(rank) }))
+    .filter((item) => item.uid && Number.isFinite(item.rank))
+    .sort((a, b) => a.rank - b.rank);
+
+  const h2hStrengthByUid = {};
+  const h2hDenom = Math.max(1, rankedByH2h.length - 1);
+  rankedByH2h.forEach((item, idx) => {
+    h2hStrengthByUid[item.uid] = 1 - idx / h2hDenom;
   });
 
   const difficultyClass = (opponent) => {
-    const pct = percentileByName[opponent];
-    if (pct === undefined) return 3;
-    if (pct < 0.2) return 1;
-    if (pct < 0.4) return 2;
-    if (pct < 0.6) return 3;
-    if (pct < 0.8) return 4;
+    const opponentUid = normalizeUid(resolveUidByName(opponent));
+    if (!opponentUid) return 3;
+
+    const totalStrength = totalStrengthByUid[opponentUid] ?? 0.5;
+    const h2hStrength = h2hStrengthByUid[opponentUid] ?? totalStrength;
+    const weightedStrength = totalStrength * FDR_TOTAL_WEIGHT + h2hStrength * FDR_H2H_WEIGHT;
+
+    if (weightedStrength < 0.2) return 1;
+    if (weightedStrength < 0.4) return 2;
+    if (weightedStrength < 0.6) return 3;
+    if (weightedStrength < 0.8) return 4;
     return 5;
   };
 
-  return teams
+  const html = teams
     .map((team) => {
       let sum = 0;
       let count = 0;
@@ -175,6 +344,16 @@ function buildFdrHtmlFromFixtures(standingsByUid = {}) {
       return `<tr><td class='t-name'>${team}</td>${cells.join("")}<td class='avg-col'>${avg}</td></tr>`;
     })
     .join("");
+
+  return {
+    weeks,
+    html,
+    uses_h2h: rankedByH2h.length > 0,
+    weights: {
+      total: FDR_TOTAL_WEIGHT,
+      h2h: FDR_H2H_WEIGHT,
+    },
+  };
 }
 
 function formatKickoffBj(isoTime) {
@@ -638,7 +817,7 @@ async function buildState(previousState = null) {
   const eventMetaById = buildEventMetaById(events);
   const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(currentEventName);
   const currentWeek = currentMeta.gw || extractGwNumber(currentEventName) || extractGwNumber(currentEvent) || 22;
-  const previousPicksByUid = previousState?.picks_by_uid || {};
+  const previousPicksByUid = buildPreviousPicksByUid(previousState);
 
   const teams = {};
   for (const t of bootstrap.teams || []) teams[t.id] = t.name;
@@ -719,18 +898,18 @@ async function buildState(previousState = null) {
 
   const standingsRowsByUid = {};
   for (const row of standingsRows || []) {
-    const uid = Number(row.entry);
-    if (!UID_MAP[uid]) continue;
+    const uid = normalizeUid(row?.entry);
+    if (!uid || !UID_MAP[uidToNumber(uid)]) continue;
     standingsRowsByUid[uid] = row;
   }
 
   const standingsByUid = {};
-  for (const uidText of Object.keys(UID_MAP)) {
-    const uid = Number(uidText);
+  for (const uid of UID_LIST) {
     const row = standingsRowsByUid[uid] || {};
-    const previous = previousPicksByUid[String(uid)] || {};
+    const previous = previousPicksByUid[uid] || {};
     standingsByUid[uid] = {
       total: row.entry ? Math.floor(Number(row.total || 0) / 10) : Number(previous.event_total || 0),
+      overall_total: row.entry ? Math.floor(Number(row.total || 0) / 10) : Number(previous.overall_total || previous.event_total || 0),
       today_live: Number(previous.total_live || 0),
       raw_today_live: Number(previous.raw_total_live || previous.total_live || 0),
       penalty_score: Number(previous.penalty_score || 0),
@@ -740,37 +919,55 @@ async function buildState(previousState = null) {
       wildcard_active: !!previous.wildcard_active,
       picks: Array.isArray(previous.players) ? previous.players : [],
     };
+    debugUid("base_data", uid, {
+      row_total: row.entry ? Math.floor(Number(row.total || 0) / 10) : null,
+      previous_event_total: Number(previous.event_total || 0),
+      previous_total_live: Number(previous.total_live || 0),
+      previous_players: Array.isArray(previous.players) ? previous.players.length : 0,
+    });
   }
 
-  const uids = Object.keys(UID_MAP).map(Number);
+  const uids = [...UID_LIST];
   const transfersByUid = {};
   await mapLimit(uids, 1, async (uid) => {
-    const previous = previousPicksByUid[String(uid)] || {};
+    const uidNumber = uidToNumber(uid);
+    const previous = previousPicksByUid[uid] || {};
+    debugUid("input_uid", uid, { uid, uid_number: uidNumber });
 
     let [picksRes, transfersRes, historyRes] = await Promise.all([
-      fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 4),
-      fetchJsonSafe(`/entry/${uid}/transfers/`, 4),
-      fetchJsonSafe(`/entry/${uid}/history/`, 4),
+      fetchJsonSafe(`/entry/${uidNumber}/event/${currentEvent}/picks/`, 4),
+      fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 4),
+      fetchJsonSafe(`/entry/${uidNumber}/history/`, 4),
     ]);
 
     // Retry once for failed endpoints to reduce random empty states.
     if (!picksRes.ok) {
       await new Promise((resolve) => setTimeout(resolve, 300));
-      picksRes = await fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 4);
+      picksRes = await fetchJsonSafe(`/entry/${uidNumber}/event/${currentEvent}/picks/`, 4);
     }
     if (!historyRes.ok) {
       await new Promise((resolve) => setTimeout(resolve, 300));
-      historyRes = await fetchJsonSafe(`/entry/${uid}/history/`, 4);
+      historyRes = await fetchJsonSafe(`/entry/${uidNumber}/history/`, 4);
     }
     if (!transfersRes.ok) {
       await new Promise((resolve) => setTimeout(resolve, 200));
-      transfersRes = await fetchJsonSafe(`/entry/${uid}/transfers/`, 4);
+      transfersRes = await fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 4);
     }
 
     const picksData = picksRes.ok ? picksRes.data : null;
     const transfersData = transfersRes.ok && Array.isArray(transfersRes.data) ? transfersRes.data : [];
     const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : {};
     transfersByUid[uid] = transfersData;
+    debugUid("fetch_status", uid, {
+      picks_ok: !!picksRes.ok,
+      transfers_ok: !!transfersRes.ok,
+      history_ok: !!historyRes.ok,
+      picks_count: Array.isArray(picksData?.picks) ? picksData.picks.length : 0,
+      transfer_count_raw: transfersData.length,
+      history_rows: Array.isArray(historyData?.current) ? historyData.current.length : 0,
+    });
+    debugUid("trend_data", uid, null);
+    debugUid("avatar_data", uid, null);
 
     const canRecomputePenalty = !!transfersRes.ok && !!historyRes.ok;
     const transferCount = canRecomputePenalty
@@ -817,6 +1014,12 @@ async function buildState(previousState = null) {
         history_ok: !!historyRes.ok,
         transfers_ok: !!transfersRes.ok,
       };
+      debugUid("final_payload", uid, {
+        fallback: true,
+        total_live: standingsByUid[uid].today_live,
+        event_total: standingsByUid[uid].total,
+        players: summarizePlayersForDebug(standingsByUid[uid].picks),
+      });
       return;
     }
 
@@ -846,6 +1049,10 @@ async function buildState(previousState = null) {
     });
 
     const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
+    debugUid("merge_data", uid, {
+      players: summarizePlayersForDebug(picks),
+      effective_score: effectiveScore,
+    });
     const previousEventTotal = Number(previous.event_total);
     const previousRawToday = Number(previous.raw_total_live ?? previous.total_live);
 
@@ -877,6 +1084,13 @@ async function buildState(previousState = null) {
       history_ok: !!historyRes.ok,
       transfers_ok: !!transfersRes.ok,
     };
+    debugUid("final_payload", uid, {
+      total_live: standingsByUid[uid].today_live,
+      raw_total_live: standingsByUid[uid].raw_today_live,
+      event_total: standingsByUid[uid].total,
+      penalty_score: standingsByUid[uid].penalty_score,
+      players: summarizePlayersForDebug(picks),
+    });
   });
 
   const availableWeeks = [...new Set(ALL_FIXTURES.map(([gw]) => gw))].sort((a, b) => a - b);
@@ -889,16 +1103,16 @@ async function buildState(previousState = null) {
   const h2h = weeklyFixtures.map(([gw, raw1, raw2]) => {
     const t1 = normalizeName(raw1);
     const t2 = normalizeName(raw2);
-    const uid1 = resolveUidByName(t1);
-    const uid2 = resolveUidByName(t2);
+    const uid1 = normalizeUid(resolveUidByName(t1));
+    const uid2 = normalizeUid(resolveUidByName(t2));
     const s1 = standingsByUid[uid1] || { total: 0, today_live: 0 };
     const s2 = standingsByUid[uid2] || { total: 0, today_live: 0 };
     return {
       gameweek: fixtureWeek,
       t1,
       t2,
-      uid1,
-      uid2,
+      uid1: uidToNumber(uid1),
+      uid2: uidToNumber(uid2),
       total1: s1.total || 0,
       total2: s2.total || 0,
       today1: s1.today_live || 0,
@@ -915,9 +1129,9 @@ async function buildState(previousState = null) {
   });
 
   const picksByUid = {};
-  for (const uid of Object.keys(UID_MAP)) {
-    const uidNum = Number(uid);
-    const s = standingsByUid[uidNum] || {};
+  for (const uid of UID_LIST) {
+    const uidNum = uidToNumber(uid);
+    const s = standingsByUid[uid] || {};
     const picks = s.picks || [];
     let formation = "N/A";
     if (picks.length) {
@@ -936,6 +1150,7 @@ async function buildState(previousState = null) {
       wildcard_active: !!s.wildcard_active,
       fetch_status: s.fetch_status || { picks_ok: true, history_ok: true, transfers_ok: true },
       event_total: s.total || 0,
+      overall_total: s.overall_total || s.total || 0,
       formation,
       current_event: currentEvent,
       current_event_name: currentEventName,
@@ -949,6 +1164,10 @@ async function buildState(previousState = null) {
     currentWeek,
     eventMetaById,
     elements,
+  });
+  const fdr = buildFdrPayload({
+    standingsByUid,
+    currentWeek,
   });
 
   return {
@@ -965,7 +1184,8 @@ async function buildState(previousState = null) {
     h2h,
     picks_by_uid: picksByUid,
     transfer_trends: transferTrends,
-    fdr_html: buildFdrHtmlFromFixtures(standingsByUid),
+    fdr,
+    fdr_html: fdr.html,
   };
 }
 
@@ -1016,16 +1236,30 @@ export default {
       return jsonResponse(state.fixture_details[String(id)] || state.fixture_details[id] || {});
     }
     if (path.startsWith("/api/picks/")) {
-      const uid = String(Number(path.split("/").pop()));
+      const uid = normalizeUid(Number(path.split("/").pop()));
       let payload = state.picks_by_uid[uid] || {};
       if (!payload.players || payload.players.length === 0) {
         state = await refreshState(env);
         payload = state.picks_by_uid[uid] || {};
       }
+      debugUid("api_response", uid, {
+        total_live: payload.total_live || 0,
+        event_total: payload.event_total || 0,
+        players: summarizePlayersForDebug(payload.players || []),
+      });
       return jsonResponse(payload);
     }
     if (path === "/api/trends/transfers") return jsonResponse(state.transfer_trends || { league: {}, global: {} });
-    if (path === "/api/fdr") return jsonResponse({ html: state.fdr_html || "" });
+    if (path === "/api/fdr") {
+      return jsonResponse(
+        state.fdr || {
+          weeks: [],
+          html: state.fdr_html || "",
+          uses_h2h: false,
+          weights: { total: FDR_TOTAL_WEIGHT, h2h: FDR_H2H_WEIGHT },
+        }
+      );
+    }
     if (path === "/api/health") {
       return jsonResponse({
         status: "ok",

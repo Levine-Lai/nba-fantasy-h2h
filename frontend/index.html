@@ -63,9 +63,8 @@
             </div>
             <table class="fdr-table">
                 <thead>
-                    <tr>
+                    <tr id="fdr-header-row">
                         <th class="t-name">TEAM</th>
-                        <th>22</th><th>23</th><th>24</th><th>25</th>
                         <th class="avg-col">AVG</th>
                     </tr>
                 </thead>
@@ -103,15 +102,6 @@
     </div>
 
     <script src="/js/app.js"></script>
-    <script>
-        // Load FDR HTML from backend
-        const apiBase = (window.__API_BASE__ || '').trim().replace(/\/+$/, '');
-        fetch(`${apiBase}/api/fdr`).then(r => r.json()).then(data => {
-            document.getElementById('fdr-body').innerHTML = data.html;
-        }).catch(() => {
-            document.getElementById('fdr-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Load failed</td></tr>';
-        });
-    </script>
 </body>
 </html>
 

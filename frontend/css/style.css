@@ -685,7 +685,7 @@ body {
 
 .trend-item {
     display: grid;
-    grid-template-columns: 34px 24px 1fr 42px;
+    grid-template-columns: 34px 1fr 42px;
     align-items: center;
     gap: 6px;
     font-size: 11px;
@@ -700,26 +700,6 @@ body {
 .trend-rank {
     color: #888;
     font-weight: 700;
-}
-
-.trend-avatar-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.trend-avatar {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 1px solid #e4e4e4;
-    background: #fff;
-}
-
-.trend-avatar-fallback {
-    display: inline-block;
-    background: #f0f0f0;
 }
 
 .trend-name {

@@ -89,6 +89,11 @@ const API = {
     async getTransferTrends() {
         const res = await this.fetch('/api/trends/transfers');
         return res.json();
+    },
+
+    async getFdr() {
+        const res = await this.fetch('/api/fdr');
+        return res.json();
     }
 };
 
@@ -129,9 +134,6 @@ const Render = {
             return items.map((x, idx) => `
                 <div class="trend-item">
                     <span class="trend-rank">#${idx + 1}</span>
-                    <span class="trend-avatar-wrap">
-                        ${x.avatar ? `<img class="trend-avatar" src="${x.avatar}" alt="${x.name}">` : '<span class="trend-avatar trend-avatar-fallback"></span>'}
-                    </span>
                     <span class="trend-name">${x.name}</span>
                     <span class="trend-count">${x.count}</span>
                 </div>
@@ -142,6 +144,19 @@ const Render = {
         const overallOut = data?.overall?.top_out || data?.global?.top_out || [];
         inEl.innerHTML = toList(overallIn, 'No transfer-in trend data');
         outEl.innerHTML = toList(overallOut, 'No transfer-out trend data');
+    },
+
+    fdr(data) {
+        const headerRow = document.getElementById('fdr-header-row');
+        const badge = document.getElementById('fdr-week-badge');
+        const body = document.getElementById('fdr-body');
+        if (!headerRow || !badge || !body) return;
+
+        const weeks = Array.isArray(data?.weeks) ? data.weeks : [];
+        const weekHeaders = weeks.map((week) => `<th>${week}</th>`).join('');
+        headerRow.innerHTML = `<th class="t-name">TEAM</th>${weekHeaders}<th class="avg-col">AVG</th>`;
+        badge.textContent = weeks.length ? `GW ${weeks.join('-')}` : 'Auto GW';
+        body.innerHTML = data?.html || '<tr><td colspan="5" style="text-align:center;padding:20px;">No FDR data</td></tr>';
     },
     
     gamesList(games) {
@@ -447,7 +462,7 @@ const Render = {
 const App = {
     async loadAll() {
         try {
-            await Promise.all([this.loadGames(), this.loadH2H(), this.loadTrends()]);
+            await Promise.all([this.loadGames(), this.loadH2H(), this.loadTrends(), this.loadFdr()]);
             Render.updateTime();
         } catch (e) {
             console.error('LoadAll error:', e);
@@ -490,6 +505,16 @@ const App = {
             Render.transferTrends(data);
         } catch (e) {
             console.error('Trends error:', e);
+        }
+    },
+
+    async loadFdr() {
+        try {
+            const data = await API.getFdr();
+            Render.fdr(data);
+        } catch (e) {
+            console.error('FDR error:', e);
+            Render.fdr({ weeks: [], html: '<tr><td colspan="5" style="text-align:center;padding:20px;">Load failed</td></tr>' });
         }
     },
     
