@@ -63,6 +63,35 @@ const FDR_H2H_RANK_BY_UID = {
   "8580": 26,
 };
 
+const H2H_BASE_STATS_BY_UID = {
+  "2": { points: 49, played: 22, won: 16, draw: 1, lost: 5, scored: 27342, conceded: 25056 },
+  "15": { points: 48, played: 22, won: 16, draw: 0, lost: 6, scored: 24182, conceded: 25293 },
+  "3455": { points: 45, played: 22, won: 15, draw: 0, lost: 7, scored: 27902, conceded: 26220 },
+  "4319": { points: 45, played: 22, won: 15, draw: 0, lost: 7, scored: 27532, conceded: 25862 },
+  "5095": { points: 45, played: 22, won: 15, draw: 0, lost: 7, scored: 24714, conceded: 26281 },
+  "17": { points: 43, played: 22, won: 14, draw: 1, lost: 7, scored: 27604, conceded: 24807 },
+  "10": { points: 42, played: 22, won: 14, draw: 0, lost: 8, scored: 27218, conceded: 26355 },
+  "14": { points: 42, played: 22, won: 14, draw: 0, lost: 8, scored: 27241, conceded: 26827 },
+  "6": { points: 39, played: 22, won: 13, draw: 0, lost: 9, scored: 27000, conceded: 26012 },
+  "5410": { points: 36, played: 22, won: 12, draw: 0, lost: 10, scored: 27946, conceded: 26516 },
+  "9": { points: 36, played: 22, won: 12, draw: 0, lost: 10, scored: 26668, conceded: 26116 },
+  "189": { points: 36, played: 22, won: 12, draw: 0, lost: 10, scored: 26303, conceded: 26292 },
+  "4224": { points: 33, played: 22, won: 11, draw: 0, lost: 11, scored: 26720, conceded: 26570 },
+  "5101": { points: 33, played: 22, won: 11, draw: 0, lost: 11, scored: 25445, conceded: 25823 },
+  "32": { points: 30, played: 22, won: 10, draw: 0, lost: 12, scored: 27902, conceded: 25879 },
+  "16447": { points: 30, played: 22, won: 10, draw: 0, lost: 12, scored: 26362, conceded: 26585 },
+  "6441": { points: 30, played: 22, won: 10, draw: 0, lost: 12, scored: 25028, conceded: 25519 },
+  "23": { points: 27, played: 22, won: 9, draw: 0, lost: 13, scored: 26194, conceded: 26417 },
+  "4": { points: 27, played: 22, won: 9, draw: 0, lost: 13, scored: 26513, conceded: 26939 },
+  "11": { points: 24, played: 22, won: 8, draw: 0, lost: 14, scored: 26123, conceded: 27251 },
+  "6412": { points: 24, played: 22, won: 8, draw: 0, lost: 14, scored: 24187, conceded: 25598 },
+  "22761": { points: 21, played: 22, won: 7, draw: 0, lost: 15, scored: 26483, conceded: 26700 },
+  "42": { points: 21, played: 22, won: 7, draw: 0, lost: 15, scored: 23754, conceded: 26087 },
+  "5467": { points: 21, played: 22, won: 7, draw: 0, lost: 15, scored: 24690, conceded: 27188 },
+  "6562": { points: 15, played: 22, won: 5, draw: 0, lost: 17, scored: 26210, conceded: 26321 },
+  "8580": { points: 15, played: 22, won: 5, draw: 0, lost: 17, scored: 23798, conceded: 26547 },
+};
+
 const UID_MAP = {
   5410: "kusuri",
   3455: "Paul",
@@ -311,7 +340,7 @@ function buildFdrPayload({ standingsByUid = {}, currentWeek }) {
     return 5;
   };
 
-  const html = teams
+  const rows = teams
     .map((uid) => {
       const team = UID_MAP[uidToNumber(uid)] || uid;
       let sum = 0;
@@ -324,10 +353,16 @@ function buildFdrPayload({ standingsByUid = {}, currentWeek }) {
         count += 1;
         return `<td><div class='box fdr-${cls}'>${opponent}</div></td>`;
       });
-      const avg = (sum / Math.max(1, count)).toFixed(2).replace(/\.00$/, "");
-      return `<tr><td class='t-name'>${team}</td>${cells.join("")}<td class='avg-col'>${avg}</td></tr>`;
+      const avgValue = Number((sum / Math.max(1, count)).toFixed(2));
+      const avg = String(avgValue).replace(/\.00$/, "");
+      return {
+        uid,
+        avgValue,
+        html: `<tr><td class='t-name'>${team}</td>${cells.join("")}<td class='avg-col'>${avg}</td></tr>`,
+      };
     })
-    .join("");
+    .sort((a, b) => b.avgValue - a.avgValue || (UID_MAP[uidToNumber(a.uid)] || "").localeCompare(UID_MAP[uidToNumber(b.uid)] || ""));
+  const html = rows.map((row) => row.html).join("");
 
   return {
     weeks,
@@ -825,6 +860,144 @@ function buildLeagueDailyAverages(picksByUid, teamsPlayingToday) {
   };
 }
 
+function buildWeeklyTransferRecords(transfers, currentGw, eventMetaById, elements, wildcardActive) {
+  const weeklyTransfers = [];
+  for (const [index, transfer] of (transfers || []).entries()) {
+    const { gw, day } = resolveTransferGwDay(transfer, eventMetaById);
+    if (gw !== currentGw) continue;
+    const inId = Number(transfer?.element_in || 0);
+    const outId = Number(transfer?.element_out || 0);
+    weeklyTransfers.push({
+      index,
+      day: Number(day || 0),
+      event: Number(transfer?.event || 0),
+      in_id: inId,
+      out_id: outId,
+      in_name: elements[inId]?.name || `#${inId}`,
+      out_name: elements[outId]?.name || `#${outId}`,
+    });
+  }
+
+  weeklyTransfers.sort((a, b) => a.day - b.day || a.event - b.event || a.index - b.index);
+
+  return weeklyTransfers.map((item, idx) => {
+    const isFree = wildcardActive || idx < 2;
+    return {
+      day: item.day || null,
+      day_label: item.day ? `DAY${item.day}` : "DAY?",
+      move: `${item.out_name} -> ${item.in_name}`,
+      out_name: item.out_name,
+      in_name: item.in_name,
+      cost_type: isFree ? "FT" : "-100",
+      is_free: isFree,
+    };
+  });
+}
+
+function buildOwnershipSummary(picksByUid) {
+  const holderMap = {};
+  const managerCount = UID_LIST.length;
+
+  for (const uid of UID_LIST) {
+    const players = Array.isArray(picksByUid?.[uid]?.players) ? picksByUid[uid].players : [];
+    const seen = new Set();
+    for (const player of players) {
+      const elementId = Number(player?.element_id || 0);
+      if (!elementId || seen.has(elementId)) continue;
+      seen.add(elementId);
+      if (!holderMap[elementId]) {
+        holderMap[elementId] = {
+          element_id: elementId,
+          name: player?.name || `#${elementId}`,
+          holder_count: 0,
+        };
+      }
+      holderMap[elementId].holder_count += 1;
+    }
+  }
+
+  const top20 = Object.values(holderMap)
+    .map((item) => ({
+      ...item,
+      ownership_percent: Number(((item.holder_count / Math.max(1, managerCount)) * 100).toFixed(1)),
+    }))
+    .sort((a, b) => b.ownership_percent - a.ownership_percent || b.holder_count - a.holder_count || a.name.localeCompare(b.name))
+    .slice(0, 20);
+
+  return {
+    by_element: holderMap,
+    top20,
+    manager_count: managerCount,
+  };
+}
+
+function buildLiveH2HStandings(baseStatsByUid, liveMatches) {
+  const table = {};
+  for (const uid of UID_LIST) {
+    const base = baseStatsByUid[uid] || { points: 0, played: 0, won: 0, draw: 0, lost: 0, scored: 0, conceded: 0 };
+    table[uid] = {
+      uid: uidToNumber(uid),
+      team_name: UID_MAP[uidToNumber(uid)] || uid,
+      points: Number(base.points || 0),
+      played: Number(base.played || 0),
+      won: Number(base.won || 0),
+      draw: Number(base.draw || 0),
+      lost: Number(base.lost || 0),
+      scored: Number(base.scored || 0),
+      conceded: Number(base.conceded || 0),
+      live_applied: false,
+    };
+  }
+
+  for (const match of liveMatches || []) {
+    const left = table[normalizeUid(match.uid1)];
+    const right = table[normalizeUid(match.uid2)];
+    if (!left || !right) continue;
+
+    left.played += 1;
+    right.played += 1;
+    left.scored += Number(match.total1 || 0);
+    left.conceded += Number(match.total2 || 0);
+    right.scored += Number(match.total2 || 0);
+    right.conceded += Number(match.total1 || 0);
+    left.live_applied = true;
+    right.live_applied = true;
+
+    if (Number(match.total1 || 0) > Number(match.total2 || 0)) {
+      left.won += 1;
+      right.lost += 1;
+      left.points += 3;
+    } else if (Number(match.total2 || 0) > Number(match.total1 || 0)) {
+      right.won += 1;
+      left.lost += 1;
+      right.points += 3;
+    } else {
+      left.draw += 1;
+      right.draw += 1;
+      left.points += 1;
+      right.points += 1;
+    }
+  }
+
+  return Object.values(table)
+    .map((row) => ({
+      ...row,
+      diff: row.scored - row.conceded,
+      win_rate: row.played > 0 ? Number(((row.won + row.draw / 2) / row.played * 100).toFixed(1)) : 0,
+    }))
+    .sort((a, b) =>
+      b.points - a.points ||
+      b.won - a.won ||
+      (b.scored - b.conceded) - (a.scored - a.conceded) ||
+      b.scored - a.scored ||
+      a.team_name.localeCompare(b.team_name)
+    )
+    .map((row, index) => ({
+      ...row,
+      rank: index + 1,
+    }));
+}
+
 async function mapLimit(list, limit, fn) {
   const results = new Array(list.length);
   let index = 0;
@@ -954,6 +1127,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       gd1_transfer_count: Number(previous.gd1_transfer_count || 0),
       gd1_missing_penalty: Number(previous.gd1_missing_penalty || 0),
       wildcard_active: !!previous.wildcard_active,
+      transfer_records: Array.isArray(previous.transfer_records) ? previous.transfer_records : [],
       picks: Array.isArray(previous.players) ? previous.players : [],
     };
     debugUid("base_data", uid, {
@@ -1041,6 +1215,13 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     standingsByUid[uid].gd1_transfer_count = gd1TransferCount;
     standingsByUid[uid].gd1_missing_penalty = 0;
     standingsByUid[uid].wildcard_active = wildcardActive;
+    standingsByUid[uid].transfer_records = buildWeeklyTransferRecords(
+      transfersData,
+      currentWeek,
+      eventMetaById,
+      elements,
+      wildcardActive
+    );
     if (historyWeek.has_week_rows) {
       standingsByUid[uid].week_total = Math.max(0, Number(historyWeek.weekly_points || 0) - penaltyScore);
     }
@@ -1174,6 +1355,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       uid2: uidToNumber(uid2),
       total1: s1.week_total || 0,
       total2: s2.week_total || 0,
+      diff: Math.abs(Number(s1.week_total || 0) - Number(s2.week_total || 0)),
       today1: s1.today_live || 0,
       today2: s2.today_live || 0,
       raw_today1: s1.raw_today_live || s1.today_live || 0,
@@ -1211,11 +1393,22 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       event_total: s.week_total || 0,
       overall_total: s.overall_total || s.week_total || 0,
       classic_rank: s.classic_rank || 0,
+      transfer_records: Array.isArray(s.transfer_records) ? s.transfer_records : [],
       formation,
       current_event: currentEvent,
       current_event_name: currentEventName,
       players: picks,
     };
+  }
+
+  const ownershipSummary = buildOwnershipSummary(picksByUid);
+  for (const uid of UID_LIST) {
+    const players = Array.isArray(picksByUid[uid]?.players) ? picksByUid[uid].players : [];
+    for (const player of players) {
+      const ownership = ownershipSummary.by_element[Number(player?.element_id || 0)];
+      player.ownership_count = Number(ownership?.holder_count || 0);
+      player.ownership_percent = Number((((ownership?.holder_count || 0) / Math.max(1, ownershipSummary.manager_count)) * 100).toFixed(1));
+    }
   }
 
   const league_daily_averages = buildLeagueDailyAverages(picksByUid, teamsPlayingToday);
@@ -1230,11 +1423,14 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
         elements,
       })
     : previousState?.transfer_trends || { league: {}, global: {}, overall: {} };
+  transferTrends.ownership_top = ownershipSummary.top20;
+  transferTrends.ownership_manager_count = ownershipSummary.manager_count;
   const fdr = buildFdrPayload({
     standingsByUid,
     currentWeek,
   });
   fdr.daily_averages = league_daily_averages;
+  const h2hStandings = buildLiveH2HStandings(H2H_BASE_STATS_BY_UID, h2h);
 
   return {
     generated_at: new Date().toISOString(),
@@ -1248,8 +1444,10 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     },
     fixture_details: fixtureDetails,
     h2h,
+    h2h_standings: h2hStandings,
     picks_by_uid: picksByUid,
     transfer_trends: transferTrends,
+    ownership: ownershipSummary,
     fdr,
     fdr_html: fdr.html,
     league_daily_averages,
@@ -1321,6 +1519,7 @@ export default {
     if (path === "/api/state") return jsonResponse(state);
     if (path === "/api/fixtures") return jsonResponse(state.fixtures);
     if (path === "/api/h2h") return jsonResponse(state.h2h);
+    if (path === "/api/h2h-standings") return jsonResponse(state.h2h_standings || []);
     if (path.startsWith("/api/fixture/")) {
       const id = Number(path.split("/").pop());
       return jsonResponse(state.fixture_details[String(id)] || state.fixture_details[id] || {});
@@ -1339,7 +1538,8 @@ export default {
       });
       return jsonResponse(payload);
     }
-    if (path === "/api/trends/transfers") return jsonResponse(state.transfer_trends || { league: {}, global: {} });
+    if (path === "/api/trends/transfers")
+      return jsonResponse(state.transfer_trends || { league: {}, global: {}, ownership_top: [], ownership_manager_count: UID_LIST.length });
     if (path === "/api/fdr") {
       return jsonResponse(
         state.fdr || {

@@ -123,3 +123,12 @@ Invoke-WebRequest -Method POST "https://<your-worker-domain>/api/refresh?token=<
   - `weights`
   - `ranking_source`
   - `daily_averages`
+
+## 2026-03-25 UI / 数据补充
+
+- 首页 H2H 对阵卡支持点击左右两侧展开本周转会记录，数据来自 `/api/picks/{uid}` 的 `transfer_records`。
+- 首页趋势区域新增 `Ownership Top 20`，由 Worker 基于 league 内全部经理当前阵容实时计算。
+- FDR 表按 `AVG` 从高到低排序。
+- 新增 `/api/h2h-standings`，用于排行榜页面展示“GW22 基线 + 当前周实时结果”的实时 H2H 排名。
+- 对阵详情球员卡新增 `ownership_percent` 展示。
+- favicon 当前使用 `frontend/LOGO.jpg`。

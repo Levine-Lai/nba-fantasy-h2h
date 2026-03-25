@@ -1,305 +1,361 @@
-/**
- * NBA Fantasy H2H Dashboard 前端逻辑
- * 
- * 修改日期: 2026-03-20
- * 修改点:
- * 1. 分离为API、Render、App三个对象，模块化组织
- * 2. 添加全局错误处理，API失败时显示友好提示
- * 3. 在页面顶部添加错误提示div
- */
+const API_BASE = (window.__API_BASE__ || "").trim().replace(/\/+$/, "");
 
-const POSITION_NAME = {1: 'BC', 2: 'FC'};
-let currentEventName = "";
-const API_BASE = (window.__API_BASE__ || '').trim().replace(/\/+$/, '');
-
-// ===== 错误提示组件 =====
 const ErrorBanner = {
     show(message) {
-        let banner = document.getElementById('error-banner');
+        let banner = document.getElementById("error-banner");
         if (!banner) {
-            banner = document.createElement('div');
-            banner.id = 'error-banner';
-            banner.style.cssText = 'display:none; background:#dc3545; color:white; padding:10px; text-align:center; position:fixed; top:0; left:0; right:0; z-index:10000;';
+            banner = document.createElement("div");
+            banner.id = "error-banner";
+            banner.style.cssText = "display:none;background:#dc3545;color:#fff;padding:10px;text-align:center;position:fixed;top:0;left:0;right:0;z-index:10000;";
             document.body.insertBefore(banner, document.body.firstChild);
         }
         banner.textContent = message;
-        banner.style.display = 'block';
+        banner.style.display = "block";
     },
-    
+
     hide() {
-        const banner = document.getElementById('error-banner');
-        if (banner) {
-            banner.style.display = 'none';
-        }
-    }
+        const banner = document.getElementById("error-banner");
+        if (banner) banner.style.display = "none";
+    },
 };
 
-// ===== API对象：封装所有fetch调用 =====
 const API = {
     async fetch(url, options = {}) {
+        const target = /^https?:\/\//.test(url) ? url : `${API_BASE}${url}`;
         try {
-            const target = /^https?:\/\//.test(url) ? url : `${API_BASE}${url}`;
             const res = await fetch(target, options);
-            
-            // 统一处理错误状态码
             if (!res.ok) {
-                if (res.status === 401) {
-                    throw new Error('未授权访问');
-                } else if (res.status === 500) {
-                    throw new Error('服务器内部错误');
-                } else {
-                    throw new Error(`请求失败: ${res.status}`);
-                }
+                if (res.status === 401) throw new Error("未授权访问");
+                if (res.status === 500) throw new Error("服务器内部错误");
+                throw new Error(`请求失败: ${res.status}`);
             }
-            
             ErrorBanner.hide();
             return res;
-        } catch (e) {
-            console.error(`[API Error] ${url}:`, e);
-            ErrorBanner.show('数据加载失败，请刷新重试');
-            throw e;
+        } catch (error) {
+            console.error(`[API Error] ${url}`, error);
+            ErrorBanner.show("数据加载失败，请刷新重试");
+            throw error;
         }
     },
-    
+
     async getGames() {
-        const res = await this.fetch('/api/fixtures');
-        return res.json();
+        return (await this.fetch("/api/fixtures")).json();
     },
-    
+
     async getH2H() {
-        const res = await this.fetch('/api/h2h');
-        return res.json();
+        return (await this.fetch("/api/h2h")).json();
     },
-    
+
+    async getH2HStandings() {
+        return (await this.fetch("/api/h2h-standings")).json();
+    },
+
     async getGameDetail(fixtureId) {
-        const res = await this.fetch(`/api/fixture/${fixtureId}`);
-        return res.json();
+        return (await this.fetch(`/api/fixture/${fixtureId}`)).json();
     },
-    
+
     async getLineup(uid) {
-        const res = await this.fetch(`/api/picks/${uid}`);
-        return res.json();
-    },
-    
-    async refresh() {
-        const res = await this.fetch('/api/refresh', {method: 'POST'});
-        return res.json();
+        return (await this.fetch(`/api/picks/${uid}`)).json();
     },
 
     async getTransferTrends() {
-        const res = await this.fetch('/api/trends/transfers');
-        return res.json();
+        return (await this.fetch("/api/trends/transfers")).json();
     },
 
     async getFdr() {
-        const res = await this.fetch('/api/fdr');
-        return res.json();
-    }
+        return (await this.fetch("/api/fdr")).json();
+    },
+
+    async refresh() {
+        return (await this.fetch("/api/refresh", { method: "POST" })).json();
+    },
 };
 
-// ===== Render对象：所有DOM操作 =====
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function formatOwnership(player) {
+    const percent = Number(player?.ownership_percent);
+    if (!Number.isFinite(percent)) return "";
+    return `<span class="ownership-badge">持有 ${percent.toFixed(1)}%</span>`;
+}
+
+function renderTransferRecords(teamName, transferRecords) {
+    if (!transferRecords || transferRecords.length === 0) {
+        return `
+            <div class="transfer-panel-title">${escapeHtml(teamName)} 本周转会</div>
+            <div class="trend-empty">本周暂无转会记录</div>
+        `;
+    }
+
+    const rows = transferRecords.map((record) => `
+        <div class="transfer-record">
+            <div class="transfer-day">${escapeHtml(record.day_label || "DAY?")}</div>
+            <div class="transfer-move">${escapeHtml(record.move || "")}</div>
+            <div class="transfer-cost ${record.is_free ? "" : "penalty"}">${escapeHtml(record.cost_type || "")}</div>
+        </div>
+    `).join("");
+
+    return `
+        <div class="transfer-panel-title">${escapeHtml(teamName)} 本周转会</div>
+        ${rows}
+    `;
+}
+
 const Render = {
     updateTime() {
-        const now = new Date();
-        const timeEl = document.getElementById('update-time');
-        if (timeEl) {
-            timeEl.textContent = now.toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        const el = document.getElementById("update-time");
+        if (el) {
+            el.textContent = new Date().toLocaleTimeString("zh-CN", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+            });
         }
     },
-    
-    gameCount(count) {
-        const el = document.getElementById('game-count');
-        if (el) el.textContent = count + '场';
-    },
-    
+
     eventInfo(name) {
-        const el = document.getElementById('event-info');
-        if (el) el.textContent = `${name} • League #1653`;
+        const el = document.getElementById("event-info");
+        if (el) el.textContent = `${name} - League #1653`;
     },
-    
+
+    gameCount(count) {
+        const el = document.getElementById("game-count");
+        if (el) el.textContent = `${count}场`;
+    },
+
     matchCount(count) {
-        const el = document.getElementById('match-count');
-        if (el) el.textContent = count + '场';
+        const el = document.getElementById("match-count");
+        if (el) el.textContent = `${count}场`;
+    },
+
+    refreshButton(state, text) {
+        const btn = document.getElementById("refresh-btn");
+        if (!btn) return;
+        btn.disabled = state === "loading";
+        btn.textContent = text;
+    },
+
+    switchPage(page) {
+        document.getElementById("page-home")?.classList.toggle("active", page === "home");
+        document.getElementById("page-rankings")?.classList.toggle("active", page === "rankings");
+        document.getElementById("nav-home")?.classList.toggle("active", page === "home");
+        document.getElementById("nav-rankings")?.classList.toggle("active", page === "rankings");
     },
 
     transferTrends(data) {
-        const inEl = document.getElementById('trend-overall-in');
-        const outEl = document.getElementById('trend-overall-out');
-        if (!inEl || !outEl) return;
+        const inEl = document.getElementById("trend-overall-in");
+        const outEl = document.getElementById("trend-overall-out");
+        const ownershipEl = document.getElementById("ownership-top");
+        if (!inEl || !outEl || !ownershipEl) return;
 
-        const toList = (items, emptyText) => {
+        const renderList = (items, emptyText, labelFn, valueFn) => {
             if (!items || items.length === 0) {
-                return `<div class="trend-empty">${emptyText}</div>`;
+                return `<div class="trend-empty">${escapeHtml(emptyText)}</div>`;
             }
-            return items.map((x, idx) => `
+            return items.map((item, index) => `
                 <div class="trend-item">
-                    <span class="trend-rank">#${idx + 1}</span>
-                    <span class="trend-name">${x.name}</span>
-                    <span class="trend-count">${x.count}</span>
+                    <span class="trend-rank">#${index + 1}</span>
+                    <span class="trend-name">${labelFn(item)}</span>
+                    <span class="trend-count">${valueFn(item)}</span>
                 </div>
-            `).join('');
+            `).join("");
         };
 
         const overallIn = data?.overall?.top_in || data?.global?.top_in || [];
         const overallOut = data?.overall?.top_out || data?.global?.top_out || [];
-        inEl.innerHTML = toList(overallIn, 'No transfer-in trend data');
-        outEl.innerHTML = toList(overallOut, 'No transfer-out trend data');
+        const ownershipTop = data?.ownership_top || [];
+        const managerCount = Number(data?.ownership_manager_count || 26);
+
+        inEl.innerHTML = renderList(overallIn, "No transfer-in trend data", (item) => escapeHtml(item.name), (item) => escapeHtml(item.count));
+        outEl.innerHTML = renderList(overallOut, "No transfer-out trend data", (item) => escapeHtml(item.name), (item) => escapeHtml(item.count));
+        ownershipEl.innerHTML = renderList(
+            ownershipTop,
+            "No ownership data",
+            (item) => `${escapeHtml(item.name)} (${item.holder_count}/${managerCount})`,
+            (item) => `${Number(item.ownership_percent || 0).toFixed(1)}%`
+        );
     },
 
     fdr(data) {
-        const headerRow = document.getElementById('fdr-header-row');
-        const badge = document.getElementById('fdr-week-badge');
-        const body = document.getElementById('fdr-body');
+        const headerRow = document.getElementById("fdr-header-row");
+        const badge = document.getElementById("fdr-week-badge");
+        const body = document.getElementById("fdr-body");
         if (!headerRow || !badge || !body) return;
 
         const weeks = Array.isArray(data?.weeks) ? data.weeks : [];
-        const weekHeaders = weeks.map((week) => `<th>${week}</th>`).join('');
-        headerRow.innerHTML = `<th class="t-name">TEAM</th>${weekHeaders}<th class="avg-col">AVG</th>`;
-        badge.textContent = weeks.length ? `GW ${weeks.join('-')}` : 'Auto GW';
+        headerRow.innerHTML = `<th class="t-name">TEAM</th>${weeks.map((week) => `<th>${week}</th>`).join("")}<th class="avg-col">AVG</th>`;
+        badge.textContent = weeks.length ? `GW ${weeks.join("-")}` : "Auto GW";
         body.innerHTML = data?.html || '<tr><td colspan="5" style="text-align:center;padding:20px;">No FDR data</td></tr>';
         this.leagueAverages(data?.daily_averages);
     },
 
     leagueAverages(data) {
-        const avgToday = document.getElementById('avg-today-count');
-        const avgEffective = document.getElementById('avg-effective-count');
+        const avgToday = document.getElementById("avg-today-count");
+        const avgEffective = document.getElementById("avg-effective-count");
         if (!avgToday || !avgEffective) return;
 
-        avgToday.textContent = Number.isFinite(Number(data?.today_average_count)) ? Number(data.today_average_count).toFixed(2) : '-';
-        avgEffective.textContent = Number.isFinite(Number(data?.effective_average_count)) ? Number(data.effective_average_count).toFixed(2) : '-';
+        avgToday.textContent = Number.isFinite(Number(data?.today_average_count)) ? Number(data.today_average_count).toFixed(2) : "-";
+        avgEffective.textContent = Number.isFinite(Number(data?.effective_average_count)) ? Number(data.effective_average_count).toFixed(2) : "-";
     },
-    
+
     gamesList(games) {
-        const container = document.getElementById('game-list');
+        const container = document.getElementById("game-list");
         if (!container) return;
-        
         if (!games || games.length === 0) {
             container.innerHTML = '<div style="text-align:center;padding:40px;color:#999;">暂无比赛</div>';
             return;
         }
-        
-        const html = games.map(g => {
-            const status = g.status_label || (g.finished ? '已结束' : (g.started ? '进行中' : '未开始'));
-            const homeClass = g.home_score > g.away_score ? 'winning' : (g.home_score < g.away_score ? 'losing' : '');
-            const awayClass = g.away_score > g.home_score ? 'winning' : (g.away_score < g.home_score ? 'losing' : '');
-            
+
+        container.innerHTML = games.map((game) => {
+            const status = game.status_label || (game.finished ? "已结束" : (game.started ? "进行中" : "未开始"));
+            const homeClass = game.home_score > game.away_score ? "winning" : (game.home_score < game.away_score ? "losing" : "");
+            const awayClass = game.away_score > game.home_score ? "winning" : (game.away_score < game.home_score ? "losing" : "");
+
             return `
-                <div class="game-item" onclick="App.showGameDetail(${g.id})">
+                <div class="game-item js-game-item" data-fixture-id="${game.id}">
                     <div class="game-teams">
                         <div class="game-row">
-                            <span class="game-team">${g.home_team}</span>
-                            <span class="game-score ${homeClass}">${g.home_score}</span>
+                            <span class="game-team">${escapeHtml(game.home_team)}</span>
+                            <span class="game-score ${homeClass}">${game.home_score}</span>
                         </div>
                         <div class="game-row">
-                            <span class="game-team">${g.away_team}</span>
-                            <span class="game-score ${awayClass}">${g.away_score}</span>
+                            <span class="game-team">${escapeHtml(game.away_team)}</span>
+                            <span class="game-score ${awayClass}">${game.away_score}</span>
                         </div>
                     </div>
                     <div class="game-meta">
-                        <div class="game-time">${g.kickoff}</div>
-                        <div class="game-status">${status}</div>
+                        <div class="game-time">${escapeHtml(game.kickoff)}</div>
+                        <div class="game-status">${escapeHtml(status)}</div>
                     </div>
                 </div>
             `;
-        }).join('');
-        
-        container.innerHTML = html;
+        }).join("");
     },
-    
+
     h2hList(matches) {
-        const container = document.getElementById('h2h-list');
+        const container = document.getElementById("h2h-list");
         if (!container) return;
-        
-        const html = matches.map(m => {
-            const isT1Win = m.total1 > m.total2;
-            const isDraw = m.total1 === m.total2;
-            const leftClass = isDraw ? '' : (isT1Win ? 'winning' : 'losing');
-            const rightClass = isDraw ? '' : (isT1Win ? 'losing' : 'winning');
-            const s1Class = isDraw ? '' : (isT1Win ? 'winning' : 'losing');
-            const s2Class = isDraw ? '' : (isT1Win ? 'losing' : 'winning');
-            
+        container.innerHTML = matches.map((match) => {
+            const isLeftWin = match.total1 > match.total2;
+            const isDraw = match.total1 === match.total2;
+            const leftClass = isDraw ? "" : (isLeftWin ? "winning" : "losing");
+            const rightClass = isDraw ? "" : (isLeftWin ? "losing" : "winning");
+            const leftMuted = !isDraw && !isLeftWin ? "is-behind" : "";
+            const rightMuted = !isDraw && isLeftWin ? "is-behind" : "";
+            const leftPanelId = `transfers-${match.uid1}-${match.uid2}-left`;
+            const rightPanelId = `transfers-${match.uid1}-${match.uid2}-right`;
+
             return `
-                <div class="match-card" onclick="App.showLineupDual(${m.uid1}, '${m.t1}', ${m.uid2}, '${m.t2}')">
-                    <div class="team-side ${leftClass}">
-                        <div class="team-name">${m.t1}</div>
-                        <div class="score-main ${s1Class}">${m.total1}</div>
-                        <div class="score-sub">今日 ${m.today1}</div>
+                <div class="match-card">
+                    <div class="team-side ${leftClass} ${leftMuted} js-transfer-toggle" data-panel-id="${leftPanelId}" data-uid="${match.uid1}" data-team="${escapeHtml(match.t1)}">
+                        <div class="team-name">${escapeHtml(match.t1)}</div>
+                        <div class="score-main ${leftClass}">${match.total1}</div>
+                        <div class="score-sub">今日 ${match.today1}</div>
                     </div>
-                    <div class="vs-divider">VS</div>
-                    <div class="team-side ${rightClass}">
-                        <div class="team-name">${m.t2}</div>
-                        <div class="score-main ${s2Class}">${m.total2}</div>
-                        <div class="score-sub">今日 ${m.today2}</div>
+                    <div class="vs-divider js-open-lineup" data-uid1="${match.uid1}" data-name1="${escapeHtml(match.t1)}" data-uid2="${match.uid2}" data-name2="${escapeHtml(match.t2)}">
+                        <div>VS</div>
+                        <div class="match-diff">DIFF ${Math.abs(match.diff || 0)}</div>
+                    </div>
+                    <div class="team-side ${rightClass} ${rightMuted} js-transfer-toggle" data-panel-id="${rightPanelId}" data-uid="${match.uid2}" data-team="${escapeHtml(match.t2)}">
+                        <div class="team-name">${escapeHtml(match.t2)}</div>
+                        <div class="score-main ${rightClass}">${match.total2}</div>
+                        <div class="score-sub">今日 ${match.today2}</div>
                     </div>
                 </div>
+                <div class="match-transfer-wrap">
+                    <div id="${leftPanelId}" class="match-transfer-panel"></div>
+                    <div id="${rightPanelId}" class="match-transfer-panel"></div>
+                </div>
             `;
-        }).join('');
-        
-        container.innerHTML = html;
+        }).join("");
     },
-    
+
+    h2hStandings(rows) {
+        const body = document.getElementById("rankings-body");
+        if (!body) return;
+        if (!rows || rows.length === 0) {
+            body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;">No standings data</td></tr>';
+            return;
+        }
+
+        body.innerHTML = rows.map((row) => `
+            <tr class="${row.live_applied ? "live-row" : ""}">
+                <td>${row.rank}</td>
+                <td class="team-cell">${escapeHtml(row.team_name)}</td>
+                <td>${row.points}</td>
+                <td>${row.won}</td>
+                <td>${row.draw}</td>
+                <td>${row.lost}</td>
+                <td>${row.played}</td>
+            </tr>
+        `).join("");
+    },
+
     modalLoading(modalId, bodyId, titleId, title) {
         const modal = document.getElementById(modalId);
         const body = document.getElementById(bodyId);
         const titleEl = titleId ? document.getElementById(titleId) : null;
-        
-        if (modal) modal.classList.add('active');
+        if (modal) modal.classList.add("active");
         if (body) body.innerHTML = '<div class="loading"><div class="spinner"></div>加载中...</div>';
         if (titleEl && title) titleEl.textContent = title;
     },
-    
-    modalError(bodyId, message = '加载失败') {
+
+    modalError(bodyId, message = "加载失败") {
         const body = document.getElementById(bodyId);
-        if (body) body.innerHTML = `<div style="text-align:center;padding:20px;">${message}</div>`;
+        if (body) body.innerHTML = `<div style="text-align:center;padding:20px;">${escapeHtml(message)}</div>`;
     },
-    
+
     gameDetail(data) {
-        const body = document.getElementById('game-body');
-        const title = document.getElementById('game-title');
-        
+        const body = document.getElementById("game-body");
+        const title = document.getElementById("game-title");
         if (!data.home_players) {
-            this.modalError('game-body', '暂无数据');
+            this.modalError("game-body", "暂无数据");
             return;
         }
-        
+
         if (title) title.textContent = `${data.away_team} @ ${data.home_team}`;
-        
-        const createTable = (players, teamName) => {
-            const rows = players.map(p => `
-                <tr>
-                    <td class="player-name">${p.name}</td>
-                    <td>${p.position_name}</td>
-                    <td>${p.points}</td>
-                    <td>${p.rebounds}</td>
-                    <td>${p.assists}</td>
-                    <td>${p.steals}</td>
-                    <td>${p.blocks}</td>
-                    <td class="fantasy-score">${p.fantasy}</td>
-                </tr>
-            `).join('');
-            
-            return `
-                <div class="team-section">
-                    <h3>${teamName}</h3>
-                    <table class="stats-table">
-                        <thead>
+
+        const createTable = (players, teamName) => `
+            <div class="team-section">
+                <h3>${escapeHtml(teamName)}</h3>
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>球员</th>
+                            <th>位置</th>
+                            <th>得分</th>
+                            <th>篮板</th>
+                            <th>助攻</th>
+                            <th>抢断</th>
+                            <th>盖帽</th>
+                            <th>Fantasy</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${(players || []).map((player) => `
                             <tr>
-                                <th>球员</th>
-                                <th>位置</th>
-                                <th>得分</th>
-                                <th>篮板</th>
-                                <th>助攻</th>
-                                <th>抢断</th>
-                                <th>盖帽</th>
-                                <th>Fantasy</th>
+                                <td class="player-name">${escapeHtml(player.name)}</td>
+                                <td>${escapeHtml(player.position_name)}</td>
+                                <td>${player.points}</td>
+                                <td>${player.rebounds}</td>
+                                <td>${player.assists}</td>
+                                <td>${player.steals}</td>
+                                <td>${player.blocks}</td>
+                                <td class="fantasy-score">${player.fantasy}</td>
                             </tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
-                    </table>
-                </div>
-            `;
-        };
-        
+                        `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+
         if (body) {
             body.innerHTML = `
                 <div class="game-detail-container">
@@ -309,310 +365,300 @@ const Render = {
             `;
         }
     },
-    
-    lineup(data, name, isDual = false, dualData = null, dualName = null) {
-        const body = document.getElementById('lineup-body');
-        const title = document.getElementById('lineup-title');
-        
-        if (title) {
-            title.textContent = isDual ? `${name} VS ${dualName}` : `${name} 的阵容`;
-        }
-        
-        if (isDual && dualData) {
-            // 双人对阵视图
-            const createLineupSection = (ldata, teamName) => {
-                if (!ldata.players || ldata.players.length === 0) {
-                    return `<div style="text-align:center;padding:20px;">暂无数据</div>`;
-                }
-                
-                const starters = ldata.players.filter(p => p.lineup_position <= 5);
-                const bench = ldata.players.filter(p => p.lineup_position > 5);
-                
-                const createPlayerCard = (p) => {
-                    const isCaptain = p.is_captain && p.multiplier > 1;
-                    const badge = isCaptain ? '<span class="captain-badge">C</span>' : '';
-                    const posClass = p.position_name === 'BC' ? 'pos-BC' : 'pos-FC';
-                    const effectiveClass = p.is_effective ? 'effective' : 'ineffective';
-                    const injuryBadge = p.injury ? `<span class="injury-badge" title="${p.injury}">🔴 ${p.injury}</span>` : '';
-                    
-                    return `
-                        <div class="player-card ${effectiveClass}">
-                            <div class="pos-badge ${posClass}">${p.position_name}</div>
-                            <div class="player-info">
-                                <div class="player-name-row">
-                                    <div class="player-name">${p.name}</div>
-                                    ${badge}
-                                    ${injuryBadge}
-                                </div>
-                                <div class="player-stats">
-                                    ${p.stats.points}分 ${p.stats.rebounds}板 ${p.stats.assists}助 
-                                    ${p.stats.steals}断 ${p.stats.blocks}帽
-                                </div>
-                            </div>
-                            <div class="player-score">
-                                <div class="score-final">${p.final_points}</div>
-                            </div>
-                        </div>
-                    `;
-                };
 
-                const penaltyLine = ldata.penalty_score > 0
-                    ? `<div class="score-sub" style="color:#ff6b6b;">- ${ldata.penalty_score} Transfer Penalty (${ldata.transfer_count} transfers)</div>`
-                    : '';
-                const wildcardLine = ldata.wildcard_active
-                    ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>'
-                    : '';
-                
-                return `
-                    <div class="dual-lineup-side">
+    lineup(data, name, isDual = false, dualData = null, dualName = null) {
+        const body = document.getElementById("lineup-body");
+        const title = document.getElementById("lineup-title");
+        if (title) title.textContent = isDual ? `${name} VS ${dualName}` : `${name} 的阵容`;
+
+        const createPlayerCard = (player) => {
+            const isCaptain = player.is_captain && player.multiplier > 1;
+            const badge = isCaptain ? '<span class="captain-badge">C</span>' : "";
+            const injuryBadge = player.injury ? `<span class="injury-badge" title="${escapeHtml(player.injury)}">伤 ${escapeHtml(player.injury)}</span>` : "";
+            const effectiveClass = player.is_effective ? "effective" : "ineffective";
+            const posClass = player.position_name === "BC" ? "pos-BC" : "pos-FC";
+            const ownership = formatOwnership(player);
+
+            return `
+                <div class="player-card ${effectiveClass}">
+                    <div class="pos-badge ${posClass}">${escapeHtml(player.position_name)}</div>
+                    <div class="player-info">
+                        <div class="player-name-row">
+                            <div class="player-name">${escapeHtml(player.name)}</div>
+                            ${badge}
+                            ${injuryBadge}
+                        </div>
+                        <div class="player-stats">
+                            ${player.stats.points}分 ${player.stats.rebounds}板 ${player.stats.assists}助 ${player.stats.steals}断 ${player.stats.blocks}帽
+                            ${ownership}
+                        </div>
+                    </div>
+                    <div class="player-score">
+                        <div class="score-final">${player.final_points}</div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const createLineupSection = (lineupData, teamName) => {
+            if (!lineupData.players || lineupData.players.length === 0) {
+                return '<div style="text-align:center;padding:20px;">暂无数据</div>';
+            }
+
+            const starters = lineupData.players.filter((player) => player.lineup_position <= 5);
+            const bench = lineupData.players.filter((player) => player.lineup_position > 5);
+            const penaltyLine = lineupData.penalty_score > 0
+                ? `<div class="score-sub" style="color:#ff6b6b;">- ${lineupData.penalty_score} Transfer Penalty (${lineupData.transfer_count} transfers)</div>`
+                : "";
+            const wildcardLine = lineupData.wildcard_active
+                ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>'
+                : "";
+
+            return `
+                <div class="${isDual ? "dual-lineup-side" : ""}">
+                    ${isDual ? `
                         <div class="dual-lineup-header">
-                            <div class="dual-team-name">${teamName}</div>
-                            <div class="dual-team-score">${ldata.total_live}</div>
-                            <div class="score-sub">总分 ${ldata.event_total || 0}</div>
+                            <div class="dual-team-name">${escapeHtml(teamName)}</div>
+                            <div class="dual-team-score">${lineupData.total_live}</div>
+                            <div class="score-sub">总分 ${lineupData.event_total || 0}</div>
                             ${penaltyLine}
                             ${wildcardLine}
                         </div>
-                        <div class="lineup-container">
-                            <div class="lineup-section starters">
-                                <h4>首发</h4>
-                                ${starters.map(createPlayerCard).join('')}
-                            </div>
-                            <div class="lineup-section bench">
-                                <h4>替补</h4>
-                                ${bench.map(createPlayerCard).join('')}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            };
-            
-            if (body) {
-                body.innerHTML = `
-                    <div class="dual-lineup-container">
-                        ${createLineupSection(data, name)}
-                        ${createLineupSection(dualData, dualName)}
-                    </div>
-                `;
-            }
-        } else {
-            // 单人视图
-            if (!data.players || data.players.length === 0) {
-                this.modalError('lineup-body', '暂无数据');
-                return;
-            }
-            
-            const starters = data.players.filter(p => p.lineup_position <= 5);
-            const bench = data.players.filter(p => p.lineup_position > 5);
-            
-            const createPlayerCard = (p) => {
-                const isCaptain = p.is_captain && p.multiplier > 1;
-                const badge = isCaptain ? '<span class="captain-badge">C</span>' : '';
-                const posClass = p.position_name === 'BC' ? 'pos-BC' : 'pos-FC';
-                const effectiveClass = p.is_effective ? 'effective' : 'ineffective';
-                const injuryBadge = p.injury ? `<span class="injury-badge" title="${p.injury}">🔴 ${p.injury}</span>` : '';
-                
-                return `
-                    <div class="player-card ${effectiveClass}">
-                        <div class="pos-badge ${posClass}">${p.position_name}</div>
-                        <div class="player-info">
-                            <div class="player-name-row">
-                                <div class="player-name">${p.name}</div>
-                                ${badge}
-                                ${injuryBadge}
-                            </div>
-                            <div class="player-stats">
-                                ${p.stats.points}分 ${p.stats.rebounds}板 ${p.stats.assists}助 
-                                ${p.stats.steals}断 ${p.stats.blocks}帽
-                            </div>
-                        </div>
-                        <div class="player-score">
-                            <div class="score-final">${p.final_points}</div>
-                        </div>
-                    </div>
-                `;
-            };
-            
-            if (body) {
-                const penaltyLine = data.penalty_score > 0
-                    ? `<div class="score-sub" style="color:#ff6b6b;">- ${data.penalty_score} Transfer Penalty (${data.transfer_count} transfers)</div>`
-                    : '';
-                const wildcardLine = data.wildcard_active
-                    ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>'
-                    : '';
-                body.innerHTML = `
-                    <div class="formation-info">今日得分: ${data.total_live} | 总分: ${data.event_total || 0}</div>
-                    ${penaltyLine}
-                    ${wildcardLine}
+                    ` : `
+                        <div class="formation-info">今日得分: ${lineupData.total_live} | 总分: ${lineupData.event_total || 0}</div>
+                        ${penaltyLine}
+                        ${wildcardLine}
+                    `}
                     <div class="lineup-container">
                         <div class="lineup-section starters">
                             <h4>首发</h4>
-                            ${starters.map(createPlayerCard).join('')}
+                            ${starters.map(createPlayerCard).join("")}
                         </div>
                         <div class="lineup-section bench">
                             <h4>替补</h4>
-                            ${bench.map(createPlayerCard).join('')}
+                            ${bench.map(createPlayerCard).join("")}
                         </div>
                     </div>
-                `;
-            }
+                </div>
+            `;
+        };
+
+        if (!body) return;
+        if (isDual && dualData) {
+            body.innerHTML = `
+                <div class="dual-lineup-container">
+                    ${createLineupSection(data, name)}
+                    ${createLineupSection(dualData, dualName)}
+                </div>
+            `;
+        } else {
+            body.innerHTML = createLineupSection(data, name);
         }
     },
-    
-    refreshButton(state, text) {
-        const btn = document.getElementById('refresh-btn');
-        if (btn) {
-            btn.disabled = state === 'loading';
-            btn.textContent = text;
-        }
-    }
 };
 
-// ===== App对象：事件绑定和初始化 =====
 const App = {
+    lineupCache: new Map(),
+    currentPage: "home",
+
+    async getLineupCached(uid) {
+        const key = String(uid);
+        if (!this.lineupCache.has(key)) {
+            this.lineupCache.set(key, API.getLineup(uid));
+        }
+        return this.lineupCache.get(key);
+    },
+
     async loadAll() {
         try {
-            await Promise.all([this.loadGames(), this.loadH2H(), this.loadTrends(), this.loadFdr()]);
+            await Promise.all([
+                this.loadGames(),
+                this.loadH2H(),
+                this.loadTrends(),
+                this.loadFdr(),
+                this.loadRankings(),
+            ]);
             Render.updateTime();
-        } catch (e) {
-            console.error('LoadAll error:', e);
+        } catch (error) {
+            console.error("LoadAll error:", error);
         }
     },
-    
+
     async loadGames() {
         try {
-            console.log('[Games] Fetching fixtures...');
             const data = await API.getGames();
-            console.log('[Games] Got data:', data);
-            
             Render.gameCount(data.count || 0);
-            
-            if (data.event_name) {
-                Render.eventInfo(data.event_name);
-                currentEventName = data.event_name;
-            }
-            
-            Render.gamesList(data.games);
-        } catch (e) {
-            console.error('Games error:', e);
-            // 错误已在API层处理，显示banner
+            if (data.event_name) Render.eventInfo(data.event_name);
+            Render.gamesList(data.games || []);
+        } catch (error) {
+            console.error("Games error:", error);
         }
     },
-    
+
     async loadH2H() {
         try {
             const data = await API.getH2H();
-            Render.matchCount(data.length);
-            Render.h2hList(data);
-        } catch (e) {
-            console.error('H2H error:', e);
+            Render.matchCount(data.length || 0);
+            Render.h2hList(data || []);
+        } catch (error) {
+            console.error("H2H error:", error);
         }
     },
 
     async loadTrends() {
         try {
-            const data = await API.getTransferTrends();
-            Render.transferTrends(data);
-        } catch (e) {
-            console.error('Trends error:', e);
+            Render.transferTrends(await API.getTransferTrends());
+        } catch (error) {
+            console.error("Trends error:", error);
         }
     },
 
     async loadFdr() {
         try {
-            const data = await API.getFdr();
-            Render.fdr(data);
-        } catch (e) {
-            console.error('FDR error:', e);
+            Render.fdr(await API.getFdr());
+        } catch (error) {
+            console.error("FDR error:", error);
             Render.fdr({
                 weeks: [],
                 html: '<tr><td colspan="5" style="text-align:center;padding:20px;">Load failed</td></tr>',
-                daily_averages: { today_average_count: 0, effective_average_count: 0 }
+                daily_averages: { today_average_count: 0, effective_average_count: 0 },
             });
         }
     },
-    
+
+    async loadRankings() {
+        try {
+            Render.h2hStandings(await API.getH2HStandings());
+        } catch (error) {
+            console.error("Standings error:", error);
+        }
+    },
+
+    async toggleTransferPanel(event, panelId, uid, teamName) {
+        event?.stopPropagation?.();
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+
+        const isOpen = panel.classList.contains("active");
+        document.querySelectorAll(".match-transfer-panel.active").forEach((item) => item.classList.remove("active"));
+        if (isOpen) return;
+
+        try {
+            const data = await this.getLineupCached(uid);
+            panel.innerHTML = renderTransferRecords(teamName, data.transfer_records || []);
+            panel.classList.add("active");
+        } catch (error) {
+            console.error("Transfer panel error:", error);
+            panel.innerHTML = `<div class="transfer-panel-title">${escapeHtml(teamName)} 本周转会</div><div class="trend-empty">加载失败</div>`;
+            panel.classList.add("active");
+        }
+    },
+
     async showGameDetail(fixtureId) {
-        Render.modalLoading('game-modal', 'game-body', 'game-title');
-        
+        Render.modalLoading("game-modal", "game-body", "game-title");
         try {
-            const data = await API.getGameDetail(fixtureId);
-            Render.gameDetail(data);
-        } catch (e) {
-            Render.modalError('game-body');
+            Render.gameDetail(await API.getGameDetail(fixtureId));
+        } catch (error) {
+            console.error(error);
+            Render.modalError("game-body");
         }
     },
-    
+
     async showLineup(uid, name) {
-        Render.modalLoading('lineup-modal', 'lineup-body', 'lineup-title', name + ' 的阵容');
-        
+        Render.modalLoading("lineup-modal", "lineup-body", "lineup-title", `${name} 的阵容`);
         try {
-            const data = await API.getLineup(uid);
-            Render.lineup(data, name);
-        } catch (e) {
-            Render.modalError('lineup-body');
+            Render.lineup(await this.getLineupCached(uid), name);
+        } catch (error) {
+            console.error(error);
+            Render.modalError("lineup-body");
         }
     },
-    
+
     async showLineupDual(uid1, name1, uid2, name2) {
-        Render.modalLoading('lineup-modal', 'lineup-body', 'lineup-title', name1 + ' VS ' + name2);
-        
+        Render.modalLoading("lineup-modal", "lineup-body", "lineup-title", `${name1} VS ${name2}`);
         try {
-            const [data1, data2] = await Promise.all([
-                API.getLineup(uid1),
-                API.getLineup(uid2)
-            ]);
+            const [data1, data2] = await Promise.all([this.getLineupCached(uid1), this.getLineupCached(uid2)]);
             Render.lineup(data1, name1, true, data2, name2);
-        } catch (e) {
-            Render.modalError('lineup-body');
+        } catch (error) {
+            console.error(error);
+            Render.modalError("lineup-body");
         }
     },
-    
+
     async manualRefresh() {
-        Render.refreshButton('loading', '刷新中...');
-        
+        Render.refreshButton("loading", "刷新中...");
         try {
             const data = await API.refresh();
-            if (data.success) {
-                if (data.current_event_name) {
-                    Render.eventInfo(data.current_event_name);
-                }
-                await this.loadAll();
-            }
-        } catch (e) {
-            console.error(e);
+            if (data.current_event_name) Render.eventInfo(data.current_event_name);
+            this.lineupCache.clear();
+            await this.loadAll();
+        } catch (error) {
+            console.error(error);
         } finally {
-            Render.refreshButton('idle', '刷新数据');
+            Render.refreshButton("idle", "Refresh");
         }
     },
-    
-    init() {
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', () => {
-            this.loadAll();
-            // 自动刷新
-            setInterval(() => this.loadAll(), 60000);
-        });
-        
-        // ESC键关闭弹窗
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') {
-                document.getElementById('lineup-modal')?.classList.remove('active');
-                document.getElementById('game-modal')?.classList.remove('active');
+
+    switchPage(page) {
+        this.currentPage = page;
+        Render.switchPage(page);
+    },
+
+    bindEvents() {
+        document.addEventListener("click", (event) => {
+            const gameItem = event.target.closest(".js-game-item");
+            if (gameItem) {
+                this.showGameDetail(gameItem.dataset.fixtureId);
+                return;
+            }
+
+            const lineupTrigger = event.target.closest(".js-open-lineup");
+            if (lineupTrigger) {
+                this.showLineupDual(
+                    lineupTrigger.dataset.uid1,
+                    lineupTrigger.dataset.name1,
+                    lineupTrigger.dataset.uid2,
+                    lineupTrigger.dataset.name2
+                );
+                return;
+            }
+
+            const transferTrigger = event.target.closest(".js-transfer-toggle");
+            if (transferTrigger) {
+                this.toggleTransferPanel(
+                    event,
+                    transferTrigger.dataset.panelId,
+                    transferTrigger.dataset.uid,
+                    transferTrigger.dataset.team
+                );
             }
         });
-    }
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                document.getElementById("lineup-modal")?.classList.remove("active");
+                document.getElementById("game-modal")?.classList.remove("active");
+            }
+        });
+    },
+
+    init() {
+        document.addEventListener("DOMContentLoaded", () => {
+            this.bindEvents();
+            this.switchPage(this.currentPage);
+            this.loadAll();
+            setInterval(() => this.loadAll(), 60000);
+        });
+    },
 };
 
-// ===== 工具函数（保持兼容） =====
-function closeModal(e, modalId) {
-    if (e && e.target !== e.currentTarget) return;
-    document.getElementById(modalId)?.classList.remove('active');
+function closeModal(event, modalId) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById(modalId)?.classList.remove("active");
 }
 
-// 全局暴露（保持HTML中的onclick兼容）
 window.App = App;
 window.closeModal = closeModal;
 window.manualRefresh = () => App.manualRefresh();
 
-// 启动应用
 App.init();

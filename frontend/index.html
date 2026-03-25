@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NBA Fantasy H2H Dashboard</title>
+    <link rel="icon" type="image/jpeg" href="/LOGO.jpg">
     <link rel="stylesheet" href="/css/style.css">
     <script>
         window.__API_BASE__ = "https://nba-fantasy-api.nbafantasy.workers.dev";
@@ -20,6 +21,10 @@
             </div>
         </div>
         <div class="controls">
+            <div class="nav-tabs">
+                <button class="nav-tab active" id="nav-home" onclick="App.switchPage('home')">主页</button>
+                <button class="nav-tab" id="nav-rankings" onclick="App.switchPage('rankings')">排行榜</button>
+            </div>
             <div class="status">
                 <span class="pulse"></span>
                 <span id="update-time">Loading...</span>
@@ -29,7 +34,7 @@
     </div>
 
     <!-- Main Container -->
-    <div class="container">
+    <div class="container page-view active" id="page-home">
         <!-- Column 1: Games + Trends -->
         <div class="column">
             <div class="col-header">
@@ -44,6 +49,8 @@
                 <div id="trend-overall-in" class="trend-list"></div>
                 <div class="trend-title">Overall Transfer Out</div>
                 <div id="trend-overall-out" class="trend-list"></div>
+                <div class="trend-title">Ownership Top 20</div>
+                <div id="ownership-top" class="trend-list"></div>
             </div>
         </div>
 
@@ -85,6 +92,31 @@
                     <div class="metric-value" id="avg-effective-count">-</div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="container page-view" id="page-rankings">
+        <div class="column rankings-column">
+            <div class="col-header">
+                <div class="col-title">Live H2H Standings</div>
+                <span class="col-badge" id="standings-badge">实时</span>
+            </div>
+            <table class="rankings-table">
+                <thead>
+                    <tr>
+                        <th>RANK</th>
+                        <th class="team-col">TEAM</th>
+                        <th>PTS</th>
+                        <th>W</th>
+                        <th>D</th>
+                        <th>L</th>
+                        <th>P</th>
+                    </tr>
+                </thead>
+                <tbody id="rankings-body">
+                    <tr><td colspan="7" style="text-align:center;padding:20px;">Loading...</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 
