@@ -34,6 +34,9 @@ const UID_LIST = [
 const DEBUG_UIDS = new Set(["5095", "6412", "8580", "16447", "5467", "5410", "6441", "6562", "22761", "5101", "4319", "11", "23", "42"]);
 const FDR_TOTAL_WEIGHT = 0.7;
 const FDR_H2H_WEIGHT = 0.3;
+const WIN_PROB_FT_BONUS = 50;
+const WIN_PROB_CAPTAIN_BONUS = 65;
+const WIN_PROB_LOGISTIC_SCALE = 90;
 const FDR_H2H_RANK_BY_UID = {
   "2": 1,
   "15": 2,
@@ -220,6 +223,16 @@ function debugUid(stage, uid, payload) {
     serialized = String(payload);
   }
   console.log(`[uid-debug][${normalizeUid(uid)}][${stage}] ${serialized}`);
+}
+
+function isBeijingRefreshWindow(value = Date.now()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const bjHour = Number(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    hour: "2-digit",
+    hour12: false,
+  }).format(date));
+  return bjHour >= 7 && bjHour < 14;
 }
 
 function buildPreviousPicksByUid(previousState) {
@@ -1069,7 +1082,18 @@ function getProjectedPlayerScore(player) {
   const formValue = Number(player?.form || 0) / 10;
   const ppgValue = Number(player?.points_per_game || 0) / 10;
   const nextValue = Number(player?.ep_next || 0) / 10;
-  const projected = formValue > 0 ? formValue : (ppgValue > 0 ? ppgValue : nextValue);
+  let projected = 0;
+  if (formValue > 0 && ppgValue > 0 && nextValue > 0) {
+    projected = formValue * 0.6 + ppgValue * 0.25 + nextValue * 0.15;
+  } else if (formValue > 0 && ppgValue > 0) {
+    projected = formValue * 0.7 + ppgValue * 0.3;
+  } else if (formValue > 0) {
+    projected = formValue;
+  } else if (ppgValue > 0 && nextValue > 0) {
+    projected = ppgValue * 0.75 + nextValue * 0.25;
+  } else {
+    projected = ppgValue > 0 ? ppgValue : nextValue;
+  }
   return Number(projected.toFixed(1));
 }
 
@@ -1135,10 +1159,10 @@ function buildManagerProjectionSummary(payload, futureTeamsByEvent) {
   const futureSummary = calculateProjectedFutureScore(projectedPlayers, futureTeamsByEvent);
   const captainUsed = payload?.captain_used || {};
   const captainBonus = !captainUsed.used && futureSummary.best_captain_candidate > 0
-    ? futureSummary.best_captain_candidate
+    ? WIN_PROB_CAPTAIN_BONUS
     : 0;
   const remainingFt = Math.max(0, 2 - Number(payload?.penalty_transfer_count || 0));
-  const ftBonus = Number((remainingFt * 4).toFixed(1));
+  const ftBonus = Number((remainingFt * WIN_PROB_FT_BONUS).toFixed(1));
   const expectedTotal = Number((
     Number(payload?.event_total || 0) +
     Number(futureSummary.projected_future_score || 0) +
@@ -1159,9 +1183,8 @@ function buildManagerProjectionSummary(payload, futureTeamsByEvent) {
 
 function buildWinProbabilitySummary(left, right) {
   const diff = Number(left.expected_total || 0) - Number(right.expected_total || 0);
-  const scale = 18;
-  const leftProb = 1 / (1 + Math.exp(-diff / scale));
-  const leftPct = Math.max(1, Math.min(99, Math.round(leftProb * 100)));
+  const leftProb = 1 / (1 + Math.exp(-diff / WIN_PROB_LOGISTIC_SCALE));
+  const leftPct = Math.max(5, Math.min(95, Math.round(leftProb * 100)));
   const rightPct = 100 - leftPct;
   return {
     left: leftPct,
@@ -1191,19 +1214,55 @@ function buildOwnershipSummary(picksByUid) {
     }
   }
 
-  const top20 = Object.values(holderMap)
+  const top10 = Object.values(holderMap)
     .map((item) => ({
       ...item,
       ownership_percent: Number(((item.holder_count / Math.max(1, managerCount)) * 100).toFixed(1)),
     }))
     .sort((a, b) => b.ownership_percent - a.ownership_percent || b.holder_count - a.holder_count || a.name.localeCompare(b.name))
-    .slice(0, 20);
+    .slice(0, 10);
 
   return {
     by_element: holderMap,
-    top20,
+    top10,
     manager_count: managerCount,
   };
+}
+
+function buildTodayValueLeaders(picksByUid, teamsPlayingToday) {
+  const byElement = {};
+
+  for (const uid of UID_LIST) {
+    const players = Array.isArray(picksByUid?.[uid]?.players) ? picksByUid[uid].players : [];
+    for (const player of players) {
+      const elementId = Number(player?.element_id || 0);
+      const teamId = Number(player?.team_id || 0);
+      const nowCost = Number(player?.now_cost || 0) / 10;
+      if (!elementId || !teamId || !teamsPlayingToday.has(teamId) || nowCost <= 0) continue;
+
+      const finalPoints = Number(player?.final_points || 0);
+      const value = finalPoints / nowCost;
+      const current = byElement[elementId];
+      if (!current || finalPoints > Number(current.points || 0)) {
+        byElement[elementId] = {
+          element_id: elementId,
+          name: player?.name || `#${elementId}`,
+          price: Number(nowCost.toFixed(1)),
+          points: finalPoints,
+          value: Number(value.toFixed(1)),
+        };
+      }
+    }
+  }
+
+  return Object.values(byElement)
+    .sort((a, b) =>
+      Number(b.value || 0) - Number(a.value || 0) ||
+      Number(b.points || 0) - Number(a.points || 0) ||
+      Number(a.price || 0) - Number(b.price || 0) ||
+      String(a.name || "").localeCompare(String(b.name || ""))
+    )
+    .slice(0, 10);
 }
 
 function buildClassicRankingsPayload(overallRows, weeklyRows, currentWeek, weeklyPhase) {
@@ -1844,8 +1903,9 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
         elements,
       })
     : previousState?.transfer_trends || { league: {}, global: {}, overall: {} };
-  transferTrends.ownership_top = ownershipSummary.top20;
+  transferTrends.ownership_top = ownershipSummary.top10;
   transferTrends.ownership_manager_count = ownershipSummary.manager_count;
+  transferTrends.today_value_top = buildTodayValueLeaders(picksByUid, teamsPlayingToday);
   const fdr = buildFdrPayload({
     standingsByUid,
     currentWeek,
@@ -1941,7 +2001,7 @@ export default {
 
     let state = await getState(env);
     if (!state) {
-      state = await refreshState(env, { full: false });
+      state = await refreshState(env, { full: true });
     }
 
     if (path === "/api/state") return jsonResponse(state);
@@ -1958,9 +2018,8 @@ export default {
       let payload = state.picks_by_uid[uid] || {};
       const forceFresh = url.searchParams.get("fresh") === "1";
       if (forceFresh || !payload.players || payload.players.length === 0) {
-        state = await buildState(state, [uid]);
-        await env.NBA_CACHE.put(CACHE_KEY, JSON.stringify(state));
-        payload = state.picks_by_uid[uid] || {};
+        const freshState = await buildState(state, [uid]);
+        payload = freshState.picks_by_uid[uid] || {};
       }
       debugUid("api_response", uid, {
         total_live: payload.total_live || 0,
@@ -2001,6 +2060,7 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
+    if (!isBeijingRefreshWindow(event?.scheduledTime || Date.now())) return;
     ctx.waitUntil(refreshState(env));
   },
 };

@@ -1,9 +1,9 @@
-﻿name = "nba-fantasy-api"
+name = "nba-fantasy-api"
 main = "src/index.js"
 compatibility_date = "2026-03-22"
 
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/5 23,0,1,2,3,4,5,6 * * *"]
 
 [[kv_namespaces]]
 binding = "NBA_CACHE"

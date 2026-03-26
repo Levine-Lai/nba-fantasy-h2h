@@ -3,12 +3,12 @@
 // export dynamically through wrangler, or we can potentially let users directly
 // add them as a sort of "plugin" system.
 
-import ENTRY, { __INTERNAL_WRANGLER_MIDDLEWARE__ } from "F:\\NBA\\.wrangler\\tmp\\bundle-Nb0YFL\\middleware-insertion-facade.js";
+import ENTRY, { __INTERNAL_WRANGLER_MIDDLEWARE__ } from "F:\\NBA\\.wrangler\\tmp\\bundle-roTzYP\\middleware-insertion-facade.js";
 import { __facade_invoke__, __facade_register__, Dispatcher } from "F:\\Node.js环境\\node_global\\node_modules\\wrangler\\templates\\middleware\\common.ts";
-import type { WorkerEntrypointConstructor } from "F:\\NBA\\.wrangler\\tmp\\bundle-Nb0YFL\\middleware-insertion-facade.js";
+import type { WorkerEntrypointConstructor } from "F:\\NBA\\.wrangler\\tmp\\bundle-roTzYP\\middleware-insertion-facade.js";
 
 // Preserve all the exports from the worker
-export * from "F:\\NBA\\.wrangler\\tmp\\bundle-Nb0YFL\\middleware-insertion-facade.js";
+export * from "F:\\NBA\\.wrangler\\tmp\\bundle-roTzYP\\middleware-insertion-facade.js";
 
 class __Facade_ScheduledController__ implements ScheduledController {
 	readonly #noRetry: ScheduledController["noRetry"];
