@@ -90,25 +90,28 @@ function formatOwnership(player) {
     return `<span class="ownership-badge">${percent.toFixed(1)}%</span>`;
 }
 
-function renderTransferRecords(teamName, transferRecords, side = "left") {
-    if (!transferRecords || transferRecords.length === 0) {
-        return `
-            <div class="transfer-panel-title">${escapeHtml(teamName)} This Week</div>
-            <div class="trend-empty">No transfers this week</div>
-        `;
-    }
-
-    const rows = transferRecords.map((record) => `
+function renderTransferRecords(teamName, transferRecords, side = "left", captainUsed = null) {
+    const rows = (transferRecords || []).map((record) => `
         <div class="transfer-record ${side === "right" ? "align-right" : ""}">
             <div class="transfer-day">${escapeHtml(record.day_label || "DAY?")}</div>
             <div class="transfer-move">${escapeHtml(record.move || "")}</div>
-            <div class="transfer-cost ${record.is_free ? "" : "penalty"} ${record.is_wildcard ? "wildcard" : ""}">${escapeHtml(record.cost_type || "")}</div>
+            <div class="transfer-cost ${record.is_free ? "" : "penalty"} ${record.is_wildcard ? "wildcard" : ""} ${record.is_rich ? "rich" : ""}">
+                ${escapeHtml(record.cost_type || "")}
+            </div>
         </div>
     `).join("");
 
+    const captainLabel = captainUsed?.used
+        ? `${captainUsed?.day ? `DAY${captainUsed.day}` : "DAY?"} ${captainUsed?.captain_name || "None"} ${Number(captainUsed?.captain_points || 0)}`
+        : "None";
+
     return `
         <div class="transfer-panel-title">${escapeHtml(teamName)} This Week</div>
-        ${rows}
+        ${rows || '<div class="trend-empty">No transfers this week</div>'}
+        <div class="transfer-captain ${side === "right" ? "align-right" : ""}">
+            <span class="transfer-captain-label">Captain Used:</span>
+            <span class="transfer-captain-value">${escapeHtml(captainLabel)}</span>
+        </div>
     `;
 }
 
@@ -130,12 +133,12 @@ const Render = {
 
     gameCount(count) {
         const element = document.getElementById("game-count");
-        if (element) element.textContent = `${count}场`;
+        if (element) element.textContent = `${count}`;
     },
 
     matchCount(count) {
         const element = document.getElementById("match-count");
-        if (element) element.textContent = `${count}场`;
+        if (element) element.textContent = `${count}`;
     },
 
     refreshButton(state, text) {
@@ -227,12 +230,12 @@ const Render = {
                 <div class="game-item js-game-item" data-fixture-id="${game.id}">
                     <div class="game-teams">
                         <div class="game-row">
-                            <span class="game-team">${escapeHtml(game.home_team)}</span>
-                            <span class="game-score ${homeClass}">${game.home_score}</span>
-                        </div>
-                        <div class="game-row">
                             <span class="game-team">${escapeHtml(game.away_team)}</span>
                             <span class="game-score ${awayClass}">${game.away_score}</span>
+                        </div>
+                        <div class="game-row">
+                            <span class="game-team">${escapeHtml(game.home_team)}</span>
+                            <span class="game-score ${homeClass}">${game.home_score}</span>
                         </div>
                     </div>
                     <div class="game-meta">
@@ -249,8 +252,10 @@ const Render = {
         if (!container) return;
 
         container.innerHTML = matches.map((match) => {
-            const isLeftWin = Number(match.total1 || 0) > Number(match.total2 || 0);
-            const isDraw = Number(match.total1 || 0) === Number(match.total2 || 0);
+            const leftScore = Number(match.total1 || 0);
+            const rightScore = Number(match.total2 || 0);
+            const isLeftWin = leftScore > rightScore;
+            const isDraw = leftScore === rightScore;
             const leftClass = isDraw ? "" : (isLeftWin ? "winning" : "losing");
             const rightClass = isDraw ? "" : (isLeftWin ? "losing" : "winning");
             const leftMuted = !isDraw && !isLeftWin ? "is-behind" : "";
@@ -263,8 +268,9 @@ const Render = {
                     <div class="match-card">
                         <div class="team-side ${leftClass} ${leftMuted} js-transfer-toggle" data-panel-id="${leftPanelId}" data-uid="${match.uid1}" data-team="${escapeHtml(match.t1)}" data-side="left">
                             <div class="team-name">${escapeHtml(match.t1)}</div>
-                            <div class="score-main ${leftClass}">${match.total1}</div>
+                            <div class="score-main ${leftClass}">${leftScore}</div>
                             <div class="score-sub">Today ${match.today1}</div>
+                            <div class="score-prob">Win ${Number(match.win_prob1 || 50)}%</div>
                         </div>
                         <div class="vs-divider js-open-lineup" data-uid1="${match.uid1}" data-name1="${escapeHtml(match.t1)}" data-uid2="${match.uid2}" data-name2="${escapeHtml(match.t2)}">
                             <div class="vs-text">VS</div>
@@ -272,8 +278,9 @@ const Render = {
                         </div>
                         <div class="team-side ${rightClass} ${rightMuted} js-transfer-toggle" data-panel-id="${rightPanelId}" data-uid="${match.uid2}" data-team="${escapeHtml(match.t2)}" data-side="right">
                             <div class="team-name">${escapeHtml(match.t2)}</div>
-                            <div class="score-main ${rightClass}">${match.total2}</div>
+                            <div class="score-main ${rightClass}">${rightScore}</div>
                             <div class="score-sub">Today ${match.today2}</div>
+                            <div class="score-prob">Win ${Number(match.win_prob2 || 50)}%</div>
                         </div>
                     </div>
                     <div class="match-transfer-wrap">
@@ -299,34 +306,50 @@ const Render = {
                 <td>${row.rank}</td>
                 <td class="team-cell">${escapeHtml(row.team_name)}</td>
                 <td>${row.played}</td>
-                <td class="points-cell">${row.points}</td>
                 <td>${row.won}</td>
                 <td>${row.draw}</td>
                 <td>${row.lost}</td>
+                <td class="points-cell">${row.points}</td>
             </tr>
         `).join("");
     },
 
     classicRankings(rows) {
-        const body = document.getElementById("classic-rankings-body");
-        const badge = document.getElementById("classic-rankings-badge");
-        if (!body) return;
+        const overallBody = document.getElementById("overall-rankings-body");
+        const weeklyBody = document.getElementById("weekly-rankings-body");
+        const overallBadge = document.getElementById("overall-rankings-badge");
+        const weeklyBadge = document.getElementById("weekly-rankings-badge");
+        if (!overallBody || !weeklyBody) return;
 
-        if (badge && rows && rows.length > 0) {
+        if (overallBadge) overallBadge.textContent = "League";
+        if (weeklyBadge && rows && rows.length > 0) {
             const week = rows[0]?.current_week;
-            badge.textContent = week ? `GW${week}` : "League";
+            weeklyBadge.textContent = week ? `GW${week}` : "GW";
         }
 
         if (!rows || rows.length === 0) {
-            body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">No ranking data</td></tr>';
+            overallBody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;">No ranking data</td></tr>';
+            weeklyBody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;">No ranking data</td></tr>';
             return;
         }
 
-        body.innerHTML = rows.map((row) => `
+        overallBody.innerHTML = rows.map((row) => `
             <tr>
                 <td class="team-cell">${escapeHtml(row.team_name)}</td>
                 <td>${row.overall_rank ?? "-"}</td>
                 <td>${row.overall_score ?? "-"}</td>
+            </tr>
+        `).join("");
+
+        const weeklyRows = [...rows].sort((a, b) => {
+            const aRank = Number.isFinite(Number(a?.weekly_rank)) && Number(a.weekly_rank) > 0 ? Number(a.weekly_rank) : Number.MAX_SAFE_INTEGER;
+            const bRank = Number.isFinite(Number(b?.weekly_rank)) && Number(b.weekly_rank) > 0 ? Number(b.weekly_rank) : Number.MAX_SAFE_INTEGER;
+            return aRank - bRank || String(a.team_name || "").localeCompare(String(b.team_name || ""));
+        });
+
+        weeklyBody.innerHTML = weeklyRows.map((row) => `
+            <tr>
+                <td class="team-cell">${escapeHtml(row.team_name)}</td>
                 <td>${row.weekly_rank ?? "-"}</td>
                 <td>${row.weekly_score ?? "-"}</td>
             </tr>
@@ -414,18 +437,26 @@ const Render = {
             const effectiveClass = player.is_effective ? "effective" : "ineffective";
             const posClass = player.position_name === "BC" ? "pos-BC" : "pos-FC";
             const ownership = formatOwnership(player);
+            const price = Number(player?.now_cost || 0) / 10;
+            const value = price > 0 ? Number(player?.final_points || 0) / price : 0;
 
             return `
                 <div class="player-card ${effectiveClass}">
                     <div class="pos-badge ${posClass}">${escapeHtml(player.position_name)}</div>
                     <div class="player-info">
                         <div class="player-name-row">
-                            <div class="player-name">${escapeHtml(player.name)}</div>
+                            <div class="player-name">${escapeHtml(player.name)} (${price > 0 ? `$${price.toFixed(1)}` : "$0.0"})</div>
                             ${badge}
                             ${injuryBadge}
                         </div>
                         <div class="player-stats">
-                            ${Number(player?.stats?.points || 0)}分 ${Number(player?.stats?.rebounds || 0)}板 ${Number(player?.stats?.assists || 0)}助 ${Number(player?.stats?.steals || 0)}断 ${Number(player?.stats?.blocks || 0)}帽 ${ownership}
+                            ${Number(player?.stats?.points || 0)}分
+                            ${Number(player?.stats?.rebounds || 0)}板
+                            ${Number(player?.stats?.assists || 0)}助
+                            ${Number(player?.stats?.steals || 0)}断
+                            ${Number(player?.stats?.blocks || 0)}帽
+                            ${value.toFixed(1)}value
+                            ${ownership}
                         </div>
                     </div>
                     <div class="player-score">
@@ -443,12 +474,20 @@ const Render = {
 
             const starters = players.filter((player) => Number(player.lineup_position) <= 5);
             const bench = players.filter((player) => Number(player.lineup_position) > 5);
-            const penaltyLine = Number(lineupData.penalty_score || 0) > 0
-                ? `<div class="score-sub" style="color:#ff6b6b;">- ${lineupData.penalty_score} Transfer Penalty (${lineupData.penalty_transfer_count || lineupData.transfer_count || 0} non-WC moves)</div>`
-                : "";
             const wildcardLine = lineupData.wildcard_day
                 ? `<div class="score-sub" style="color:#4ade80;">WC Day ${lineupData.wildcard_day}</div>`
                 : (lineupData.wildcard_active ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>' : "");
+            const richLine = lineupData.rich_day
+                ? `<div class="score-sub" style="color:#38bdf8;">All-Star Day ${lineupData.rich_day}</div>`
+                : "";
+            const economy = lineupData.lineup_economy || {};
+            const economyPanel = `
+                <div class="lineup-economy">
+                    <div class="economy-row"><span>今日球员总价</span><strong>${Number(economy.effective_total_cost || 0).toFixed(1)}</strong></div>
+                    <div class="economy-row"><span>回本线</span><strong>${Number(economy.breakeven_line || 0).toFixed(1)}</strong></div>
+                    <div class="economy-row"><span>状态</span><strong>${escapeHtml(economy.status || "-")}</strong></div>
+                </div>
+            `;
 
             return `
                 <div class="${isDual ? "dual-lineup-side" : ""}">
@@ -456,25 +495,26 @@ const Render = {
                         <div class="dual-lineup-header">
                             <div class="dual-team-name">${escapeHtml(teamName)}</div>
                             <div class="dual-team-score">${lineupData.total_live}</div>
-                            <div class="score-sub">总分 ${lineupData.event_total || 0}</div>
-                            ${penaltyLine}
+                            <div class="score-sub">Week ${lineupData.event_total || 0}</div>
                             ${wildcardLine}
+                            ${richLine}
                         </div>
                     ` : `
-                        <div class="formation-info">今日得分: ${lineupData.total_live} | 总分: ${lineupData.event_total || 0}</div>
-                        ${penaltyLine}
+                        <div class="formation-info">Today: ${lineupData.total_live} | Week: ${lineupData.event_total || 0}</div>
                         ${wildcardLine}
+                        ${richLine}
                     `}
                     <div class="lineup-container">
                         <div class="lineup-section starters">
-                            <h4>首发</h4>
+                            <h4>Starters</h4>
                             ${starters.map(createPlayerCard).join("")}
                         </div>
                         <div class="lineup-section bench">
-                            <h4>替补</h4>
+                            <h4>Bench</h4>
                             ${bench.map(createPlayerCard).join("")}
                         </div>
                     </div>
+                    ${economyPanel}
                 </div>
             `;
         };
@@ -503,6 +543,53 @@ const App = {
             this.lineupCache.set(key, API.getLineup(uid));
         }
         return this.lineupCache.get(key);
+    },
+
+    async hydrateH2HMatches(matches) {
+        const safeMatches = Array.isArray(matches) ? matches.map((match) => ({ ...match })) : [];
+        const uidSet = new Set();
+        for (const match of safeMatches) {
+            if (match?.uid1) uidSet.add(String(match.uid1));
+            if (match?.uid2) uidSet.add(String(match.uid2));
+        }
+
+        const uidList = [...uidSet];
+        const lineupByUid = {};
+        const batchSize = 4;
+
+        for (let index = 0; index < uidList.length; index += batchSize) {
+            const batch = uidList.slice(index, index + batchSize);
+            const batchResults = await Promise.all(batch.map(async (uid) => {
+                try {
+                    const payload = await API.getLineup(uid);
+                    this.lineupCache.set(String(uid), Promise.resolve(payload));
+                    return [uid, payload];
+                } catch {
+                    return [uid, null];
+                }
+            }));
+
+            for (const [uid, payload] of batchResults) {
+                if (payload) lineupByUid[String(uid)] = payload;
+            }
+        }
+
+        return safeMatches.map((match) => {
+            const left = lineupByUid[String(match.uid1)];
+            const right = lineupByUid[String(match.uid2)];
+            const total1 = Number(left?.event_total ?? match.total1 ?? 0);
+            const total2 = Number(right?.event_total ?? match.total2 ?? 0);
+            const today1 = Number(left?.total_live ?? match.today1 ?? 0);
+            const today2 = Number(right?.total_live ?? match.today2 ?? 0);
+            return {
+                ...match,
+                total1,
+                total2,
+                today1,
+                today2,
+                diff: Math.abs(total1 - total2),
+            };
+        });
     },
 
     async loadAll() {
@@ -534,8 +621,9 @@ const App = {
     async loadH2H() {
         try {
             const data = await API.getH2H();
-            Render.matchCount(data.length || 0);
-            Render.h2hList(data || []);
+            const hydrated = await this.hydrateH2HMatches(data || []);
+            Render.matchCount(hydrated.length || 0);
+            Render.h2hList(hydrated || []);
         } catch (error) {
             console.error("H2H error:", error);
         }
@@ -586,7 +674,7 @@ const App = {
 
         try {
             const data = await this.getLineupCached(uid);
-            panel.innerHTML = renderTransferRecords(teamName, data.transfer_records || [], side);
+            panel.innerHTML = renderTransferRecords(teamName, data.transfer_records || [], side, data.captain_used || null);
             panel.classList.add("active");
         } catch (error) {
             console.error("Transfer panel error:", error);

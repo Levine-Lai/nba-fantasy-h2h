@@ -140,3 +140,14 @@ Invoke-WebRequest -Method POST "https://<your-worker-domain>/api/refresh?token=<
 - 首页仅保留 `Today's Fixtures` 与 `Live H2H` 两个主模块，`league averages` 移到 H2H 模块下。
 - `排行榜` 页面整合三块内容：实时 H2H 排行榜、Classic Rankings、FDR。
 - 前端查看单个经理阵容时会请求 `/api/picks/{uid}?fresh=1`，确保转会记录和阵容是该 UID 的最新版本，而不是仅依赖 chunk 缓存。
+
+## 2026-03-26 补充
+
+- `Classic Rankings` 已拆分为两个表：`Overall Ranking` 与 `Weekly Ranking`。
+- `Live H2H Standings` 的 `积分` 列在最右侧展示。
+- `rich`（All-Star）芯片已接入转会豁免逻辑：当日可自由换人、不扣分、也不消耗普通 FT 额度。
+- `/api/picks/{uid}` 新增阵容经济字段 `lineup_economy`，用于前端展示：
+  - `effective_total_cost`
+  - `breakeven_line`
+  - `effective_total_points`
+  - `status`

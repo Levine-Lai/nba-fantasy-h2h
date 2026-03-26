@@ -88,10 +88,10 @@
                         <th>RANK</th>
                         <th class="team-col">TEAM</th>
                         <th>GW</th>
-                        <th class="points-col">积分</th>
                         <th>W</th>
                         <th>D</th>
                         <th>L</th>
+                        <th class="points-col">积分</th>
                     </tr>
                 </thead>
                 <tbody id="rankings-body">
@@ -102,8 +102,8 @@
 
         <div class="column rankings-column">
             <div class="col-header">
-                <div class="col-title">Classic Rankings</div>
-                <span class="col-badge" id="classic-rankings-badge">League</span>
+                <div class="col-title">Overall Ranking</div>
+                <span class="col-badge" id="overall-rankings-badge">League</span>
             </div>
             <table class="rankings-table classic-rankings-table">
                 <thead>
@@ -111,12 +111,29 @@
                         <th class="team-col">TEAM</th>
                         <th>总排</th>
                         <th>总分</th>
+                    </tr>
+                </thead>
+                <tbody id="overall-rankings-body">
+                    <tr><td colspan="3" style="text-align:center;padding:20px;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="column rankings-column">
+            <div class="col-header">
+                <div class="col-title">Weekly Ranking</div>
+                <span class="col-badge" id="weekly-rankings-badge">GW</span>
+            </div>
+            <table class="rankings-table classic-rankings-table">
+                <thead>
+                    <tr>
+                        <th class="team-col">TEAM</th>
                         <th>周排</th>
                         <th>周分</th>
                     </tr>
                 </thead>
-                <tbody id="classic-rankings-body">
-                    <tr><td colspan="5" style="text-align:center;padding:20px;">Loading...</td></tr>
+                <tbody id="weekly-rankings-body">
+                    <tr><td colspan="3" style="text-align:center;padding:20px;">Loading...</td></tr>
                 </tbody>
             </table>
         </div>
