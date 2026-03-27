@@ -2037,8 +2037,11 @@ export default {
         });
         return jsonResponse(payload);
       }
-      if (path === "/api/trends/transfers")
-        return jsonResponse(state.transfer_trends || { league: {}, global: {}, ownership_top: [], ownership_manager_count: UID_LIST.length });
+      if (path === "/api/trends/transfers") {
+        return jsonResponse(
+          state.transfer_trends || { league: {}, global: {}, ownership_top: [], ownership_manager_count: UID_LIST.length }
+        );
+      }
       if (path === "/api/fdr") {
         return jsonResponse(
           state.fdr || {
