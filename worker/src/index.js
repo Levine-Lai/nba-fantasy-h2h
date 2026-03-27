@@ -536,6 +536,41 @@ async function fetchJsonSafe(path, retries = 3) {
   }
 }
 
+async function fetchTextUrl(url, retries = 2) {
+  let lastError = null;
+  for (let i = 0; i <= retries; i += 1) {
+    try {
+      const res = await fetch(url, {
+        headers: { "user-agent": "Mozilla/5.0" },
+      });
+      if (!res.ok) throw new Error(`fetch failed ${url}: ${res.status}`);
+      return await res.text();
+    } catch (error) {
+      lastError = error;
+      if (i < retries) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * (i + 1)));
+      }
+    }
+  }
+  throw lastError || new Error(`fetch failed ${url}`);
+}
+
+function decodeHtmlEntities(text) {
+  return String(text || "")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code || 0)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code || "0", 16)))
+    .replace(/&quot;/g, "\"")
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ");
+}
+
+function stripHtml(text) {
+  return decodeHtmlEntities(String(text || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+}
+
 async function fetchAllStandings(phase) {
   const rows = [];
   const seenEntries = new Set();
@@ -1004,6 +1039,10 @@ async function buildFreshHomepageState(baseState) {
     fetchJson("/bootstrap-static/", 1),
     fetchJson(`/event/${currentEvent}/live/`, 1),
   ]);
+  const events = bootstrap.events || [];
+  const eventMetaById = buildEventMetaById(events);
+  const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(baseState?.current_event_name || "");
+  const currentWeek = currentMeta.gw || extractGwNumber(baseState?.current_event_name) || extractGwNumber(currentEvent) || 22;
   const elements = buildElementsMap(bootstrap);
   const liveElements = buildLiveElementsMap(liveRaw);
   const teamsPlayingToday = buildTeamsPlayingToday(baseState?.fixtures?.games || []);
@@ -1023,8 +1062,25 @@ async function buildFreshHomepageState(baseState) {
     const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements);
     const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
     const freshToday = Number(effectiveScore || 0);
+    let summary = previous?.week_total_summary || null;
+    if (!summary) {
+      const historyRes = await fetchJsonSafe(`/entry/${uid}/history/`, 1);
+      if (historyRes.ok) {
+        const historyWeek = calculateWeekScoresFromHistory(
+          historyRes.data,
+          currentWeek,
+          currentEvent,
+          eventMetaById
+        );
+        summary = buildWeekTotalSummary(
+          historyWeek,
+          currentEvent,
+          Number(previous?.gd1_missing_penalty || 0)
+        );
+      }
+    }
     const freshWeek =
-      computeWeekTotalFromSummary(previous?.week_total_summary, freshToday) ??
+      computeWeekTotalFromSummary(summary, freshToday) ??
       Math.max(
         0,
         Number(previous?.event_total || 0) - Number(previous?.total_live || 0) + freshToday
@@ -1033,6 +1089,7 @@ async function buildFreshHomepageState(baseState) {
     freshScoresByUid[uid] = {
       total_live: freshToday,
       event_total: freshWeek,
+      week_total_summary: summary || null,
     };
   });
 
@@ -1045,6 +1102,7 @@ async function buildFreshHomepageState(baseState) {
       ...nextPicksByUid[uid],
       total_live: Number(fresh.total_live || 0),
       event_total: Number(fresh.event_total || 0),
+      week_total_summary: fresh.week_total_summary || nextPicksByUid[uid].week_total_summary || null,
     };
   }
 
@@ -1276,6 +1334,159 @@ function buildWeekEventIds(events, currentWeek, currentEvent) {
     .map((event) => Number(event.id))
     .filter((eventId) => eventId > Number(currentEvent || 0))
     .sort((a, b) => a - b);
+}
+
+function getNextEventInfo(events, currentEvent) {
+  const currentId = Number(currentEvent || 0);
+  const candidates = (events || [])
+    .map((event) => ({
+      id: Number(event?.id || 0),
+      name: event?.name || "",
+      meta: parseEventMetaFromName(event?.name || ""),
+      deadline: event?.deadline_time || null,
+    }))
+    .filter((event) => event.id > currentId)
+    .sort((a, b) => a.id - b.id);
+  return candidates[0] || null;
+}
+
+function normalizeTeamName(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  const aliasMap = {
+    "la clippers": "los angeles clippers",
+    "los angeles clippers": "los angeles clippers",
+    "la lakers": "los angeles lakers",
+    "los angeles lakers": "los angeles lakers",
+    "ny knicks": "new york knicks",
+    "new york knicks": "new york knicks",
+    "gs warriors": "golden state warriors",
+    "golden state warriors": "golden state warriors",
+    "no pelicans": "new orleans pelicans",
+    "new orleans pelicans": "new orleans pelicans",
+    "okc thunder": "oklahoma city thunder",
+    "oklahoma city thunder": "oklahoma city thunder",
+    "sa spurs": "san antonio spurs",
+    "san antonio spurs": "san antonio spurs",
+    "utah jazz": "utah jazz",
+    "portland trail blazers": "portland trail blazers",
+    "phoenix suns": "phoenix suns",
+  };
+  const base = aliasMap[raw] || raw;
+  return base.replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function parseEspnInjuryPage(html) {
+  const blocks = [];
+  const blockRegex = /<span class="injuries__teamName[^"]*">([\s\S]*?)<\/span>[\s\S]*?<tbody class="Table__TBODY">([\s\S]*?)<\/tbody>/g;
+  let blockMatch;
+  while ((blockMatch = blockRegex.exec(html))) {
+    const teamName = stripHtml(blockMatch[1]);
+    const tbody = blockMatch[2];
+    const injuries = [];
+    const rowRegex = /<tr class="Table__TR[\s\S]*?<\/tr>/g;
+    let rowMatch;
+    while ((rowMatch = rowRegex.exec(tbody))) {
+      const row = rowMatch[0];
+      const cells = [...row.matchAll(/<td class="[^"]*Table__TD[^"]*">([\s\S]*?)<\/td>/g)].map((match) => stripHtml(match[1]));
+      if (cells.length < 5) continue;
+      injuries.push({
+        player_name: cells[0],
+        position: cells[1],
+        est_return_date: cells[2],
+        status: cells[3],
+        comment: cells[4],
+      });
+    }
+    blocks.push({
+      team_name: teamName,
+      team_key: normalizeTeamName(teamName),
+      injuries,
+    });
+  }
+  return blocks;
+}
+
+async function fetchNextDayInjuriesPayload() {
+  const bootstrap = await fetchJson("/bootstrap-static/");
+  const events = bootstrap.events || [];
+  const [currentEvent, currentEventName] = getCurrentEvent(events);
+  const nextEvent = getNextEventInfo(events, currentEvent);
+  if (!nextEvent?.id) {
+    return {
+      current_event: currentEvent,
+      current_event_name: currentEventName,
+      next_event: null,
+      next_event_name: null,
+      target_date: null,
+      games_count: 0,
+      teams: [],
+    };
+  }
+
+  const fixtures = await fetchJson(`/fixtures/?event=${nextEvent.id}`);
+  const teamsById = {};
+  for (const team of bootstrap.teams || []) {
+    teamsById[Number(team?.id || 0)] = team?.name || `Team #${team?.id}`;
+  }
+
+  const games = (fixtures || []).map((fixture) => ({
+    id: Number(fixture?.id || 0),
+    home_team: teamsById[Number(fixture?.team_h || 0)] || `Team #${fixture?.team_h}`,
+    away_team: teamsById[Number(fixture?.team_a || 0)] || `Team #${fixture?.team_a}`,
+    kickoff_time: fixture?.kickoff_time || null,
+  }));
+
+  const teamOpponents = {};
+  let targetDate = null;
+  for (const game of games) {
+    if (!targetDate && game.kickoff_time) {
+      targetDate = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Shanghai",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(game.kickoff_time));
+    }
+    teamOpponents[normalizeTeamName(game.home_team)] = {
+      team_name: game.home_team,
+      opponent: game.away_team,
+      kickoff_time: game.kickoff_time,
+      home_away: "home",
+    };
+    teamOpponents[normalizeTeamName(game.away_team)] = {
+      team_name: game.away_team,
+      opponent: game.home_team,
+      kickoff_time: game.kickoff_time,
+      home_away: "away",
+    };
+  }
+
+  const espnHtml = await fetchTextUrl("https://www.espn.com/nba/injuries", 1);
+  const espnTeams = parseEspnInjuryPage(espnHtml);
+
+  const teams = Object.entries(teamOpponents)
+    .map(([teamKey, info]) => {
+      const matched = espnTeams.find((team) => team.team_key === teamKey);
+      return {
+        team_name: info.team_name,
+        opponent: info.opponent,
+        home_away: info.home_away,
+        kickoff_time: info.kickoff_time,
+        injury_count: Array.isArray(matched?.injuries) ? matched.injuries.length : 0,
+        injuries: Array.isArray(matched?.injuries) ? matched.injuries : [],
+      };
+    })
+    .sort((a, b) => a.team_name.localeCompare(b.team_name));
+
+  return {
+    current_event: currentEvent,
+    current_event_name: currentEventName,
+    next_event: nextEvent.id,
+    next_event_name: nextEvent.name || `Event ${nextEvent.id}`,
+    target_date: targetDate,
+    games_count: games.length,
+    teams,
+  };
 }
 
 function getProjectedPlayerScore(player) {
@@ -2223,6 +2434,9 @@ export default {
       }
       if (path === "/api/fixtures") return jsonResponse(state.fixtures);
       if (path === "/api/h2h") return jsonResponse(state.h2h);
+      if (path === "/api/injuries") {
+        return jsonResponse(await fetchNextDayInjuriesPayload());
+      }
       if (path === "/api/h2h-standings") return jsonResponse(state.h2h_standings || []);
       if (path === "/api/classic-rankings") return jsonResponse(state.classic_rankings || []);
       if (path.startsWith("/api/fixture/")) {

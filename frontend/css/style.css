@@ -155,6 +155,10 @@ body {
     grid-template-columns: 1.22fr 0.78fr;
 }
 
+.injury-layout {
+    grid-template-columns: 1fr;
+}
+
 .rankings-layout {
     grid-template-columns: 1.1fr 0.9fr 0.9fr 1fr;
 }
@@ -173,6 +177,10 @@ body {
 }
 
 .side-column {
+    min-height: 700px;
+}
+
+.injury-column {
     min-height: 700px;
 }
 
@@ -1015,6 +1023,7 @@ body {
     }
 
     .home-layout,
+    .injury-layout,
     .rankings-layout {
         grid-template-columns: 1fr;
     }
@@ -1098,6 +1107,10 @@ body {
         justify-content: flex-start;
     }
 
+    .injury-list {
+        grid-template-columns: 1fr;
+    }
+
     .modal {
         width: 94%;
         max-height: 88vh;
@@ -1134,6 +1147,90 @@ body {
     margin-top: 16px;
     border-top: 1px solid #f0f0f0;
     padding-top: 12px;
+}
+
+.injury-subtitle {
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 14px;
+}
+
+.injury-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.injury-card {
+    border: 1px solid #e6edf5;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    padding: 16px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.injury-card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.injury-team {
+    font-size: 18px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.injury-meta {
+    margin-top: 4px;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.injury-count {
+    font-size: 12px;
+    font-weight: 800;
+    color: #52606d;
+    background: #eef4fa;
+    border-radius: 999px;
+    padding: 6px 10px;
+    white-space: nowrap;
+}
+
+.injury-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.injury-row {
+    border-top: 1px dashed #dbe4ee;
+    padding-top: 10px;
+}
+
+.injury-player {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.injury-status,
+.injury-return {
+    display: inline-block;
+    margin-top: 4px;
+    margin-right: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #52606d;
+}
+
+.injury-comment {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #475569;
+    line-height: 1.55;
 }
 
 .trend-title {

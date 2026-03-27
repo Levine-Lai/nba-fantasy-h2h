@@ -21,6 +21,10 @@
             </div>
         </div>
         <div class="controls">
+            <div class="nav-tabs" id="nav-tabs">
+                <button class="nav-tab active" data-page="home">主页</button>
+                <button class="nav-tab" data-page="injuries">伤病信息</button>
+            </div>
             <div class="status">
                 <span class="pulse"></span>
                 <span id="update-time">Loading...</span>
@@ -75,6 +79,19 @@
                 </tbody>
             </table>
             <div class="fdr-note">✳️按照联赛排名和头碰头排名7:3计算FDR，仅供娱乐</div>
+        </div>
+    </div>
+
+    <div class="container page-view injury-layout" id="page-injuries">
+        <div class="column injury-column">
+            <div class="col-header">
+                <div class="col-title">明日伤病信息</div>
+                <span class="col-badge" id="injury-date-badge">-</span>
+            </div>
+            <div class="injury-subtitle" id="injury-subtitle">点击导航后加载</div>
+            <div class="injury-list" id="injury-list">
+                <div class="loading"><div class="spinner"></div>Loading...</div>
+            </div>
         </div>
     </div>
 

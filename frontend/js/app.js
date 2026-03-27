@@ -29,6 +29,10 @@ const API = {
         return (await this.fetch(`/api/picks/${uid}?fresh=1`)).json();
     },
 
+    async getInjuries() {
+        return (await this.fetch("/api/injuries")).json();
+    },
+
     async refresh() {
         return (await this.fetch("/api/refresh", { method: "POST" })).json();
     },
@@ -184,6 +188,46 @@ const Render = {
         headerRow.innerHTML = `<th class="t-name">TEAM</th>${weeks.map((week) => `<th>${week}</th>`).join("")}<th class="avg-col">AVG</th>`;
         badge.textContent = weeks.length ? `GW ${weeks.join("-")}` : "Auto GW";
         body.innerHTML = data?.html || '<tr><td colspan="5" style="text-align:center;padding:20px;">No FDR data</td></tr>';
+    },
+
+    injuries(data) {
+        const badge = document.getElementById("injury-date-badge");
+        const subtitle = document.getElementById("injury-subtitle");
+        const container = document.getElementById("injury-list");
+        if (!badge || !subtitle || !container) return;
+
+        badge.textContent = data?.target_date || "No Date";
+        subtitle.textContent = data?.next_event_name
+            ? `${data.next_event_name} · ${Number(data?.games_count || 0)} 场比赛`
+            : "暂无下一日赛程";
+
+        const teams = Array.isArray(data?.teams) ? data.teams : [];
+        if (!teams.length) {
+            container.innerHTML = '<div class="trend-empty">No injury data for the next fantasy day</div>';
+            return;
+        }
+
+        container.innerHTML = teams.map((team) => `
+            <div class="injury-card">
+                <div class="injury-card-head">
+                    <div>
+                        <div class="injury-team">${escapeHtml(team.team_name)}</div>
+                        <div class="injury-meta">${team.home_away === "home" ? "vs" : "@"} ${escapeHtml(team.opponent || "-")}</div>
+                    </div>
+                    <div class="injury-count">${Number(team.injury_count || 0)} 人</div>
+                </div>
+                ${Array.isArray(team.injuries) && team.injuries.length
+                    ? `<div class="injury-rows">${team.injuries.map((item) => `
+                        <div class="injury-row">
+                            <div class="injury-player">${escapeHtml(item.player_name)}</div>
+                            <div class="injury-status">${escapeHtml(item.status || "-")}</div>
+                            <div class="injury-return">${escapeHtml(item.est_return_date || "-")}</div>
+                            <div class="injury-comment">${escapeHtml(item.comment || "")}</div>
+                        </div>
+                    `).join("")}</div>`
+                    : '<div class="trend-empty">No listed injuries</div>'}
+            </div>
+        `).join("");
     },
 
     gamesList(games) {
@@ -446,6 +490,7 @@ const Render = {
 const App = {
     lineupCache: new Map(),
     refreshTimer: null,
+    injuriesLoaded: false,
 
     async getLineupCached(uid) {
         const key = String(uid);
@@ -549,8 +594,45 @@ const App = {
         }
     },
 
+    showPage(page) {
+        document.querySelectorAll(".nav-tab").forEach((button) => {
+            button.classList.toggle("active", button.dataset.page === page);
+        });
+        document.querySelectorAll(".page-view").forEach((view) => {
+            view.classList.toggle("active", view.id === `page-${page}`);
+        });
+    },
+
+    async loadInjuries(force = false) {
+        if (this.injuriesLoaded && !force) return;
+        const container = document.getElementById("injury-list");
+        if (container) {
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        }
+        try {
+            const data = await API.getInjuries();
+            Render.injuries(data);
+            this.injuriesLoaded = true;
+        } catch (error) {
+            console.error("Injuries load error:", error);
+            if (container) {
+                container.innerHTML = '<div class="trend-empty">Load failed</div>';
+            }
+        }
+    },
+
     bindEvents() {
         document.addEventListener("click", (event) => {
+            const navButton = event.target.closest(".nav-tab");
+            if (navButton) {
+                const page = navButton.dataset.page || "home";
+                this.showPage(page);
+                if (page === "injuries") {
+                    this.loadInjuries();
+                }
+                return;
+            }
+
             const gameItem = event.target.closest(".js-game-item");
             if (gameItem) {
                 this.showGameDetail(gameItem.dataset.fixtureId);
