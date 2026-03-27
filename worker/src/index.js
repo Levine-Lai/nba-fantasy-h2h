@@ -1427,11 +1427,11 @@ function formatInjuryStatus(status) {
 
 function sortInjuriesByPriority(injuries) {
   const order = {
+    available: 0,
     probable: 1,
     questionable: 2,
     doubtful: 3,
     out: 4,
-    available: 5,
   };
   return [...(injuries || [])].sort((a, b) => {
     const left = Number(a?.status_order ?? order[String(a?.status_short || "").toLowerCase()] ?? 99);
@@ -1566,11 +1566,11 @@ async function fetchNextDayInjuriesPayload() {
               const short = extractAvailabilityFromComment(injury.comment, injury.status);
               const normalizedShort = String(short || "").trim().toLowerCase();
               const order = {
+                available: 0,
                 probable: 1,
                 questionable: 2,
                 doubtful: 3,
                 out: 4,
-                available: 5,
               };
               return {
                 ...injury,
@@ -2518,6 +2518,63 @@ async function getInjuriesPayload(env, options = {}) {
   return payload;
 }
 
+async function fetchPlayerHighScoresPayload(playerQuery = "nikola-jokic") {
+  const bootstrap = await fetchJson("/bootstrap-static/");
+  const normalizedQuery = String(playerQuery || "").trim().toLowerCase();
+  const players = Array.isArray(bootstrap?.elements) ? bootstrap.elements : [];
+  const teamsById = {};
+  for (const team of bootstrap?.teams || []) {
+    teamsById[Number(team?.id || 0)] = team?.name || `Team #${team?.id}`;
+  }
+
+  let player = null;
+  if (normalizedQuery === "nikola-jokic" || normalizedQuery === "jokic") {
+    player = players.find((item) => {
+      const first = String(item?.first_name || "").toLowerCase();
+      const last = String(item?.second_name || "").toLowerCase();
+      return first === "nikola" && last === "jokic";
+    });
+  }
+  if (!player) {
+    player = players.find((item) => String(item?.web_name || "").toLowerCase() === normalizedQuery) || null;
+  }
+  if (!player) {
+    return {
+      player_key: normalizedQuery,
+      player_name: "Unknown",
+      games: [],
+    };
+  }
+
+  const summary = await fetchJson(`/element-summary/${player.id}/`);
+  const history = Array.isArray(summary?.history) ? summary.history : [];
+  const topGames = history
+    .map((game) => ({
+      fantasy_points: Number((Number(game?.total_points || 0) / 10).toFixed(1)),
+      opponent_team: teamsById[Number(game?.opponent_team || 0)] || `Team #${game?.opponent_team}`,
+      was_home: !!game?.was_home,
+      kickoff_time: game?.kickoff_time || null,
+      event_round: Number(game?.round || 0),
+      points_scored: Number(game?.points_scored || 0),
+      rebounds: Number(game?.rebounds || 0),
+      assists: Number(game?.assists || 0),
+      steals: Number(game?.steals || 0),
+      blocks: Number(game?.blocks || 0),
+      minutes: Number(game?.minutes || 0),
+    }))
+    .sort((a, b) => b.fantasy_points - a.fantasy_points || b.points_scored - a.points_scored)
+    .slice(0, 10);
+
+  return {
+    player_key: normalizedQuery,
+    player_name: `${player.first_name || ""} ${player.second_name || ""}`.trim() || player.web_name || "Unknown",
+    web_name: player.web_name || "",
+    team_name: teamsById[Number(player?.team || 0)] || `Team #${player?.team}`,
+    season_label: "2025-26",
+    games: topGames,
+  };
+}
+
 export default {
   async fetch(request, env, ctx) {
     try {
@@ -2566,6 +2623,10 @@ export default {
         return jsonResponse(await getInjuriesPayload(env, {
           force: url.searchParams.get("fresh") === "1",
         }));
+      }
+      if (path === "/api/player-high-scores") {
+        const player = url.searchParams.get("player") || "nikola-jokic";
+        return jsonResponse(await fetchPlayerHighScoresPayload(player));
       }
       if (path === "/api/h2h-standings") return jsonResponse(state.h2h_standings || []);
       if (path === "/api/classic-rankings") return jsonResponse(state.classic_rankings || []);

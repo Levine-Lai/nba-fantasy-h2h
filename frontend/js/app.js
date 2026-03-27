@@ -33,6 +33,10 @@ const API = {
         return (await this.fetch("/api/injuries")).json();
     },
 
+    async getPlayerHighScores(player = "nikola-jokic") {
+        return (await this.fetch(`/api/player-high-scores?player=${encodeURIComponent(player)}`)).json();
+    },
+
     async refresh() {
         return (await this.fetch("/api/refresh", { method: "POST" })).json();
     },
@@ -229,6 +233,37 @@ const Render = {
                         </div>
                     `).join("")}</div>`
                     : '<div class="injury-healthy">全员健康</div>'}
+            </div>
+        `).join("");
+    },
+
+    playerHighScores(data) {
+        const badge = document.getElementById("player-high-scores-badge");
+        const subtitle = document.getElementById("player-high-scores-subtitle");
+        const container = document.getElementById("player-high-scores-list");
+        if (!badge || !subtitle || !container) return;
+
+        badge.textContent = data?.web_name || "Player";
+        subtitle.textContent = data?.player_name
+            ? `${data.player_name} · ${data.season_label || ""} Fantasy Top 10`
+            : "暂无数据";
+
+        const games = Array.isArray(data?.games) ? data.games : [];
+        if (!games.length) {
+            container.innerHTML = '<div class="trend-empty">No high-score data</div>';
+            return;
+        }
+
+        container.innerHTML = games.map((game, index) => `
+            <div class="high-score-card">
+                <div class="high-score-rank">#${index + 1}</div>
+                <div class="high-score-main">
+                    <div class="high-score-points">${Number(game.fantasy_points || 0).toFixed(1)}</div>
+                    <div class="high-score-meta">${game.was_home ? "vs" : "@"} ${escapeHtml(game.opponent_team || "-")}</div>
+                </div>
+                <div class="high-score-stats">
+                    ${Number(game.points_scored || 0)}分 ${Number(game.rebounds || 0)}板 ${Number(game.assists || 0)}助 ${Number(game.steals || 0)}断 ${Number(game.blocks || 0)}帽
+                </div>
             </div>
         `).join("");
     },
@@ -494,6 +529,7 @@ const App = {
     lineupCache: new Map(),
     refreshTimer: null,
     injuriesLoaded: false,
+    highScoresLoaded: false,
 
     async getLineupCached(uid) {
         const key = String(uid);
@@ -624,6 +660,24 @@ const App = {
         }
     },
 
+    async loadPlayerHighScores(force = false) {
+        if (this.highScoresLoaded && !force) return;
+        const container = document.getElementById("player-high-scores-list");
+        if (container) {
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        }
+        try {
+            const data = await API.getPlayerHighScores("nikola-jokic");
+            Render.playerHighScores(data);
+            this.highScoresLoaded = true;
+        } catch (error) {
+            console.error("Player high scores load error:", error);
+            if (container) {
+                container.innerHTML = '<div class="trend-empty">Load failed</div>';
+            }
+        }
+    },
+
     bindEvents() {
         document.addEventListener("click", (event) => {
             const navButton = event.target.closest(".nav-tab");
@@ -632,6 +686,8 @@ const App = {
                 this.showPage(page);
                 if (page === "injuries") {
                     this.loadInjuries();
+                } else if (page === "high-scores") {
+                    this.loadPlayerHighScores();
                 }
                 return;
             }

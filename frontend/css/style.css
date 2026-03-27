@@ -1274,9 +1274,71 @@ body {
     padding: 14px 0 10px;
 }
 
+.high-score-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.high-score-card {
+    display: grid;
+    grid-template-columns: 52px 1fr;
+    gap: 10px;
+    align-items: center;
+    padding: 16px;
+    border: 1px solid #e6edf5;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.high-score-rank {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0f172a;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.high-score-main {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.high-score-points {
+    font-size: 30px;
+    line-height: 1;
+    font-weight: 900;
+    color: #00b44b;
+}
+
+.high-score-meta {
+    font-size: 13px;
+    font-weight: 700;
+    color: #64748b;
+    text-align: right;
+}
+
+.high-score-stats {
+    grid-column: 2;
+    font-size: 13px;
+    color: #334155;
+}
+
 @media (max-width: 1380px) {
     .injury-list {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .high-score-list {
+        grid-template-columns: 1fr;
     }
 }
 

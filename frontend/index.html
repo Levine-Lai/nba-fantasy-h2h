@@ -24,6 +24,7 @@
             <div class="nav-tabs" id="nav-tabs">
                 <button class="nav-tab active" data-page="home">主页</button>
                 <button class="nav-tab" data-page="injuries">伤病信息</button>
+                <button class="nav-tab" data-page="high-scores">球员高分榜</button>
             </div>
             <div class="status">
                 <span class="pulse"></span>
@@ -90,6 +91,19 @@
             </div>
             <div class="injury-subtitle" id="injury-subtitle">点击导航后加载</div>
             <div class="injury-list" id="injury-list">
+                <div class="loading"><div class="spinner"></div>Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container page-view injury-layout" id="page-high-scores">
+        <div class="column injury-column">
+            <div class="col-header">
+                <div class="col-title">球员高分榜</div>
+                <span class="col-badge" id="player-high-scores-badge">Jokic</span>
+            </div>
+            <div class="injury-subtitle" id="player-high-scores-subtitle">点击导航后加载</div>
+            <div class="high-score-list" id="player-high-scores-list">
                 <div class="loading"><div class="spinner"></div>Loading...</div>
             </div>
         </div>

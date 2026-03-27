@@ -25,6 +25,16 @@
    - logo 从本地 `frontend/nba-team-logos/` 加载，并带默认回退图
    - 卡片表头使用球队代表色作为背景，只展示 `logo + 球队名`
    - `Available` 使用深绿色状态标签
+## 2026-03-27 球员高分榜
+1. 顶部导航新增 `球员高分榜` 子页面。
+2. 当前先接入 `Nikola Jokic` 作为示例。
+3. 数据来源为官方 NBA Fantasy API：
+   - `bootstrap-static` 用于定位球员和球队
+   - `element-summary/{id}` 用于读取该球员本赛季逐场 `history`
+4. 当前页面展示：
+   - 本赛季 Fantasy 单场得分 Top 10
+   - 对手
+   - 基础数据行（分 / 板 / 助 / 断 / 帽）
 ## 2026-03-27 首页面板显示修正
 1. 首页 `Live H2H` 现在通过 `/api/state?fresh_h2h=1` 返回数据：
    - 仍然只走一次首页主请求
