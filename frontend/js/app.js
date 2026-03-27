@@ -53,6 +53,10 @@ function formatOwnership(player) {
     return `<span class="ownership-badge">${percent.toFixed(1)}%</span>`;
 }
 
+function normalizeStatusClass(status) {
+    return String(status || "").trim().toLowerCase().replace(/[^a-z]+/g, "-");
+}
+
 function renderTransferRecords(teamName, transferRecords, side = "left", captainUsed = null) {
     const rows = (transferRecords || []).map((record) => `
         <div class="transfer-record ${side === "right" ? "align-right" : ""}">
@@ -211,7 +215,7 @@ const Render = {
             <div class="injury-card" style="--team-color:${escapeHtml(team.team_color || "#334155")}">
                 <div class="injury-card-head">
                     <div class="injury-team-wrap">
-                        <img class="injury-team-logo" src="${escapeHtml(team.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" decoding="async">
+                        <img class="injury-team-logo" src="${escapeHtml(team.logo_url || "./nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='./nba-team-logos/_.png';">
                         <div>
                             <div class="injury-team">${escapeHtml(team.team_name)}</div>
                             <div class="injury-meta">${team.home_away === "home" ? "vs" : "@"} ${escapeHtml(team.opponent || "-")}</div>
@@ -224,12 +228,11 @@ const Render = {
                         <div class="injury-row">
                             <div class="injury-line">
                                 <span class="injury-player">${escapeHtml(item.player_name)}</span>
-                                <span class="injury-status">${escapeHtml(item.status_short || item.status || "-")}</span>
+                                <span class="injury-status ${normalizeStatusClass(item.status_short || item.status || "")}">${escapeHtml(item.status_short || item.status || "-")}</span>
                             </div>
-                            <div class="injury-detail">${escapeHtml(item.injury_area || item.est_return_date || "-")}</div>
                         </div>
                     `).join("")}</div>`
-                    : '<div class="trend-empty">No listed injuries</div>'}
+                    : '<div class="injury-healthy">全员健康</div>'}
             </div>
         `).join("");
     },

@@ -1410,29 +1410,33 @@ function parseEspnInjuryPage(html) {
 
 function extractAvailabilityFromComment(comment, fallbackStatus = "") {
   const text = String(comment || "").toLowerCase();
-  const fallback = String(fallbackStatus || "").trim();
+  const fallback = String(fallbackStatus || "").trim().toLowerCase();
   const tags = ["questionable", "probable", "doubtful", "out", "available"];
   for (const tag of tags) {
     if (text.includes(tag)) return tag;
   }
+  if (fallback === "day-to-day" || fallback === "day to day") return "questionable";
   return fallback || "unknown";
 }
 
-function extractInjuryArea(comment) {
-  const text = String(comment || "");
-  const lower = text.toLowerCase();
-  const directional = lower.match(/\b(left|right)\s+(?:lower\s+|upper\s+)?[a-z]+(?:\s+[a-z]+)?\b/);
-  if (directional) return directional[0];
+function formatInjuryStatus(status) {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (!normalized) return "Unknown";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
 
-  const bodyParts = [
-    "ankle", "calf", "knee", "hamstring", "groin", "thigh", "wrist", "shoulder",
-    "elbow", "back", "foot", "toe", "hand", "thumb", "finger", "hip", "pelvis",
-    "rib", "abdomen", "neck", "illness", "rest", "concussion", "personal"
-  ];
-  for (const part of bodyParts) {
-    if (lower.includes(part)) return part;
-  }
-  return "";
+function sortInjuriesByPriority(injuries) {
+  const order = {
+    probable: 1,
+    questionable: 2,
+    doubtful: 3,
+    out: 4,
+  };
+  return [...(injuries || [])].sort((a, b) => {
+    const left = order[String(a?.status_short || "").toLowerCase()] || 99;
+    const right = order[String(b?.status_short || "").toLowerCase()] || 99;
+    return left - right || String(a?.player_name || "").localeCompare(String(b?.player_name || ""));
+  });
 }
 
 function getTeamVisualMeta(teamName) {
@@ -1557,10 +1561,12 @@ async function fetchNextDayInjuriesPayload() {
         logo_url: visual.logo_url,
         injury_count: Array.isArray(matched?.injuries) ? matched.injuries.length : 0,
         injuries: Array.isArray(matched?.injuries)
-          ? matched.injuries.map((injury) => ({
-              ...injury,
-              status_short: extractAvailabilityFromComment(injury.comment, injury.status),
-              injury_area: extractInjuryArea(injury.comment),
+          ? sortInjuriesByPriority(matched.injuries.map((injury) => {
+              const short = extractAvailabilityFromComment(injury.comment, injury.status);
+              return {
+                ...injury,
+                status_short: formatInjuryStatus(short),
+              };
             }))
           : [],
       };
