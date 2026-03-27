@@ -1118,6 +1118,14 @@ body {
         grid-template-columns: 1fr;
     }
 
+    .reference-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .reference-btn {
+        width: 100%;
+    }
+
     .modal {
         width: 94%;
         max-height: 88vh;
@@ -1287,6 +1295,41 @@ body {
     gap: 14px;
 }
 
+.reference-toolbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.reference-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.reference-label {
+    font-size: 12px;
+    font-weight: 800;
+    color: #475569;
+}
+
+.reference-select {
+    width: 100%;
+    border: 1px solid #d7e4f2;
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #fff;
+    font-size: 13px;
+    color: #0f172a;
+}
+
+.reference-btn {
+    align-self: end;
+    height: 42px;
+    border-radius: 10px;
+}
+
 .reference-card {
     border: 1px solid #e6edf5;
     border-radius: 16px;
@@ -1335,6 +1378,7 @@ body {
 .reference-game-row {
     border-top: 1px dashed #dbe4ee;
     padding-top: 8px;
+    min-height: 56px;
 }
 
 .reference-game-row:first-child {
@@ -1365,6 +1409,40 @@ body {
     margin-top: 4px;
     font-size: 12px;
     color: #334155;
+}
+
+.reference-placeholder .reference-game-date,
+.reference-placeholder .reference-game-score,
+.reference-placeholder .reference-game-meta {
+    color: #cbd5e1;
+}
+
+.reference-average-row {
+    border-top: 1px solid #d7e4f2;
+    margin-top: 4px;
+    padding-top: 10px;
+    display: grid;
+    grid-template-columns: 42px 52px 1fr;
+    gap: 10px;
+    align-items: start;
+}
+
+.reference-average-label {
+    font-size: 12px;
+    font-weight: 900;
+    color: #475569;
+}
+
+.reference-average-score {
+    font-size: 14px;
+    font-weight: 900;
+    color: #0f172a;
+}
+
+.reference-average-meta {
+    font-size: 12px;
+    color: #334155;
+    line-height: 1.5;
 }
 
 .reference-empty {

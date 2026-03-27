@@ -37,6 +37,10 @@ const API = {
         return (await this.fetch(`/api/player-reference?player=${encodeURIComponent(player)}`)).json();
     },
 
+    async getPlayerOptions() {
+        return (await this.fetch("/api/player-options")).json();
+    },
+
     async refresh() {
         return (await this.fetch("/api/refresh", { method: "POST" })).json();
     },
@@ -52,6 +56,7 @@ function escapeHtml(value) {
 }
 
 function formatEo(player) {
+    if (player?.today_has_game === false) return "--";
     const direct = Number(player?.eo_percent);
     if (Number.isFinite(direct)) return `${direct.toFixed(1)}%`;
     const ownership = Number(player?.ownership_percent);
@@ -266,17 +271,52 @@ const Render = {
                     </div>
                 </div>
                 <div class="reference-games">
-                    ${Array.isArray(item.games) && item.games.length
-                        ? item.games.map((game) => `
+                    ${(Array.isArray(item.games) ? item.games : []).map((game) => game
+                        ? `
                             <div class="reference-game-row">
                                 <div class="reference-game-top">
-                                    <span class="reference-game-date">${escapeHtml(game.date_label || "-")}</span>
-                                    <span class="reference-game-score">${Number(game.fantasy_points || 0).toFixed(1)}分</span>
+                                    <span class="reference-game-date">${escapeHtml(game.date_label || "-")} ${escapeHtml(game.venue_label || "")}</span>
+                                    <span class="reference-game-score">${Math.round(Number(game.fantasy_points || 0))}分</span>
                                 </div>
-                                <div class="reference-game-meta">${escapeHtml(game.detail_label || "")}</div>
+                                <div class="reference-game-meta">
+                                    ${Math.round(Number(game.points_scored || 0))}分
+                                    ${Math.round(Number(game.rebounds || 0))}板
+                                    ${Math.round(Number(game.assists || 0))}助
+                                    ${Math.round(Number(game.steals || 0))}断
+                                    ${Math.round(Number(game.blocks || 0))}帽
+                                    ${Number(game.minutes || 0) > 0 ? `${Math.round(Number(game.minutes || 0))}分钟` : ""}
+                                </div>
                             </div>
-                        `).join("")
-                        : '<div class="reference-empty">本赛季暂无交手</div>'}
+                        `
+                        : `
+                            <div class="reference-game-row reference-placeholder">
+                                <div class="reference-game-top">
+                                    <span class="reference-game-date">--</span>
+                                    <span class="reference-game-score">--</span>
+                                </div>
+                                <div class="reference-game-meta">--</div>
+                            </div>
+                        `).join("")}
+                    <div class="reference-average-row">
+                        ${item.averages
+                            ? `
+                                <span class="reference-average-label">场均</span>
+                                <span class="reference-average-score">${Math.round(Number(item.averages.fantasy_points || 0))}分</span>
+                                <span class="reference-average-meta">
+                                    ${Math.round(Number(item.averages.points_scored || 0))}分
+                                    ${Math.round(Number(item.averages.rebounds || 0))}板
+                                    ${Math.round(Number(item.averages.assists || 0))}助
+                                    ${Math.round(Number(item.averages.steals || 0))}断
+                                    ${Math.round(Number(item.averages.blocks || 0))}帽
+                                    ${Number(item.averages.minutes || 0) > 0 ? `${Math.round(Number(item.averages.minutes || 0))}分钟` : ""}
+                                </span>
+                            `
+                            : `
+                                <span class="reference-average-label">场均</span>
+                                <span class="reference-average-score">--</span>
+                                <span class="reference-average-meta">暂无数据</span>
+                            `}
+                    </div>
                 </div>
             </div>
         `).join("");
@@ -539,6 +579,8 @@ const App = {
     refreshTimer: null,
     injuriesLoaded: false,
     playerReferenceLoaded: false,
+    playerOptionsLoaded: false,
+    playerOptions: [],
 
     async getLineupCached(uid) {
         const key = String(uid);
@@ -687,6 +729,60 @@ const App = {
         }
     },
 
+    populateReferencePlayers(teamId, preferredPlayer = "") {
+        const playerSelect = document.getElementById("reference-player-select");
+        if (!playerSelect) return;
+        const team = this.playerOptions.find((item) => String(item.id) === String(teamId));
+        const players = Array.isArray(team?.players) ? team.players : [];
+        playerSelect.innerHTML = players.map((player) => `
+            <option value="${escapeHtml(player.slug || "")}">${escapeHtml(player.name || player.web_name || "-")}</option>
+        `).join("");
+        if (preferredPlayer && players.some((player) => String(player.slug) === String(preferredPlayer))) {
+            playerSelect.value = preferredPlayer;
+        }
+    },
+
+    async loadPlayerOptions(force = false) {
+        if (this.playerOptionsLoaded && !force) return;
+        const teamSelect = document.getElementById("reference-team-select");
+        if (!teamSelect) return;
+        try {
+            const data = await API.getPlayerOptions();
+            this.playerOptions = Array.isArray(data?.teams) ? data.teams : [];
+            teamSelect.innerHTML = this.playerOptions.map((team) => `
+                <option value="${escapeHtml(team.id)}">${escapeHtml(team.name || "-")}</option>
+            `).join("");
+            const defaultTeam = this.playerOptions.find((team) => /denver nuggets/i.test(String(team.name || ""))) || this.playerOptions[0];
+            if (defaultTeam) {
+                teamSelect.value = String(defaultTeam.id);
+                const defaultPlayer = (defaultTeam.players || []).find((player) => /nikola jokic/i.test(String(player.name || "")));
+                this.populateReferencePlayers(defaultTeam.id, defaultPlayer?.slug || "");
+            }
+            this.playerOptionsLoaded = true;
+        } catch (error) {
+            console.error("Player options load error:", error);
+        }
+    },
+
+    async searchPlayerReference() {
+        const playerSelect = document.getElementById("reference-player-select");
+        const container = document.getElementById("player-reference-list");
+        if (!playerSelect || !playerSelect.value) return;
+        if (container) {
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        }
+        try {
+            const data = await API.getPlayerReference(playerSelect.value);
+            Render.playerReference(data);
+            this.playerReferenceLoaded = true;
+        } catch (error) {
+            console.error("Player reference search error:", error);
+            if (container) {
+                container.innerHTML = '<div class="trend-empty">Load failed</div>';
+            }
+        }
+    },
+
     bindEvents() {
         document.addEventListener("click", (event) => {
             const navButton = event.target.closest(".nav-tab");
@@ -696,8 +792,14 @@ const App = {
                 if (page === "injuries") {
                     this.loadInjuries();
                 } else if (page === "reference") {
+                    this.loadPlayerOptions();
                     this.loadPlayerReference();
                 }
+                return;
+            }
+
+            if (event.target.closest("#reference-search-btn")) {
+                this.searchPlayerReference();
                 return;
             }
 
@@ -727,6 +829,12 @@ const App = {
                     transferTrigger.dataset.team,
                     transferTrigger.dataset.side || "left"
                 );
+            }
+        });
+
+        document.addEventListener("change", (event) => {
+            if (event.target?.id === "reference-team-select") {
+                this.populateReferencePlayers(event.target.value);
             }
         });
 

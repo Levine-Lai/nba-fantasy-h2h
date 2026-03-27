@@ -2404,9 +2404,13 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       const ownership = ownershipSummary.by_element[Number(player?.element_id || 0)];
       const ownershipCount = Number(ownership?.holder_count || 0);
       const ownershipPercent = Number(((ownershipCount / Math.max(1, ownershipSummary.manager_count)) * 100).toFixed(1));
+      const todayHasGame = teamsPlayingToday.has(Number(player?.team_id || 0));
       player.ownership_count = ownershipCount;
       player.ownership_percent = ownershipPercent;
-      player.eo_percent = Number((player?.is_effective ? 100 - ownershipPercent : -ownershipPercent).toFixed(1));
+      player.today_has_game = todayHasGame;
+      player.eo_percent = todayHasGame
+        ? Number((player?.is_effective ? 100 - ownershipPercent : -ownershipPercent).toFixed(1))
+        : null;
     }
   }
 
@@ -2572,6 +2576,12 @@ async function fetchPlayerReferencePayload(playerQuery = "nikola-jokic") {
   if (!player) {
     player = players.find((item) => String(item?.web_name || "").toLowerCase() === normalizedQuery) || null;
   }
+  if (!player && normalizedQuery) {
+    player = players.find((item) => {
+      const fullName = `${item?.first_name || ""} ${item?.second_name || ""}`.trim().toLowerCase();
+      return fullName === normalizedQuery;
+    }) || null;
+  }
   if (!player) {
     return {
       player_key: normalizedQuery,
@@ -2593,7 +2603,7 @@ async function fetchPlayerReferencePayload(playerQuery = "nikola-jokic") {
       groupedByOpponent[opponentTeam] = [];
     }
     groupedByOpponent[opponentTeam].push({
-      fantasy_points: Number((Number(game?.total_points || 0) / 10).toFixed(1)),
+      fantasy_points: Math.round(Number(game?.total_points || 0) / 10),
       was_home: !!game?.was_home,
       kickoff_time: game?.kickoff_time || null,
       event_round: Number(game?.round || 0),
@@ -2614,30 +2624,41 @@ async function fetchPlayerReferencePayload(playerQuery = "nikola-jokic") {
   }
 
   const opponents = (bootstrap?.teams || [])
-    .filter((team) => Number(team?.id || 0) !== Number(player?.team || 0))
     .map((team) => {
       const teamName = team?.name || `Team #${team?.id}`;
       const visual = getTeamVisualMeta(teamName);
-      const games = (groupedByOpponent[teamName] || [])
+      const sourceGames = (groupedByOpponent[teamName] || [])
         .sort((a, b) => b.fantasy_points - a.fantasy_points || b.points_scored - a.points_scored)
-        .slice(0, 4)
-        .map((item) => ({
-          ...item,
-          line_label: `${item.date_label}  ${item.was_home ? "vs" : "@"}  ${item.fantasy_points.toFixed(1)}分`,
-          detail_label: `${item.points_scored}分 ${item.rebounds}板 ${item.assists}助`,
-        }));
-      const bestFantasyPoints = games.length ? Number(games[0].fantasy_points || 0) : -1;
+        .slice(0, 4);
+      const averages = sourceGames.length ? {
+        fantasy_points: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.fantasy_points || 0), 0) / sourceGames.length),
+        points_scored: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.points_scored || 0), 0) / sourceGames.length),
+        rebounds: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.rebounds || 0), 0) / sourceGames.length),
+        assists: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.assists || 0), 0) / sourceGames.length),
+        steals: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.steals || 0), 0) / sourceGames.length),
+        blocks: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.blocks || 0), 0) / sourceGames.length),
+        minutes: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.minutes || 0), 0) / sourceGames.length),
+      } : null;
+      const games = sourceGames.map((item) => ({
+        ...item,
+        venue_label: item.was_home ? "vs" : "@",
+      }));
+      while (games.length < 4) {
+        games.push(null);
+      }
+      const avgFantasyPoints = averages ? Number(averages.fantasy_points || 0) : -1;
       return {
         opponent_team: teamName,
         team_color: visual.color,
         logo_url: visual.logo_url,
-        best_fantasy_points: bestFantasyPoints,
-        games_played: games.length,
+        avg_fantasy_points: avgFantasyPoints,
+        games_played: sourceGames.length,
         games,
+        averages,
       };
     })
     .sort((a, b) =>
-      Number(b.best_fantasy_points || -1) - Number(a.best_fantasy_points || -1) ||
+      Number(b.avg_fantasy_points || -1) - Number(a.avg_fantasy_points || -1) ||
       String(a.opponent_team || "").localeCompare(String(b.opponent_team || ""))
     );
 
@@ -2652,8 +2673,56 @@ async function fetchPlayerReferencePayload(playerQuery = "nikola-jokic") {
   };
 }
 
+async function fetchPlayerOptionsPayload() {
+  const bootstrap = await fetchJson("/bootstrap-static/");
+  const teams = Array.isArray(bootstrap?.teams) ? bootstrap.teams : [];
+  const elements = Array.isArray(bootstrap?.elements) ? bootstrap.elements : [];
+  const teamsById = {};
+  for (const team of teams) {
+    const teamId = Number(team?.id || 0);
+    if (!teamId) continue;
+    const visual = getTeamVisualMeta(team?.name || "");
+    teamsById[teamId] = {
+      id: teamId,
+      name: team?.name || `Team #${teamId}`,
+      logo_url: visual.logo_url,
+      team_color: visual.color,
+      players: [],
+    };
+  }
+
+  for (const player of elements) {
+    const teamId = Number(player?.team || 0);
+    if (!teamsById[teamId]) continue;
+    teamsById[teamId].players.push({
+      id: Number(player?.id || 0),
+      slug: `${player?.first_name || ""}-${player?.second_name || ""}`.trim().toLowerCase().replace(/\s+/g, "-"),
+      name: `${player?.first_name || ""} ${player?.second_name || ""}`.trim() || player?.web_name || `#${player?.id}`,
+      web_name: player?.web_name || "",
+    });
+  }
+
+  const teamsList = Object.values(teamsById)
+    .map((team) => ({
+      ...team,
+      players: team.players.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
+    }))
+    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+
+  return {
+    teams: teamsList,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 async function getPlayerReferencePayload(env, options = {}) {
   const force = !!options.force;
+  const playerQuery = options.player || "nikola-jokic";
+  const normalizedPlayer = String(playerQuery || "").trim().toLowerCase();
+  const useDailyCache = normalizedPlayer === "nikola-jokic" || normalizedPlayer === "jokic";
+  if (!useDailyCache) {
+    return fetchPlayerReferencePayload(playerQuery);
+  }
   const cached = await getPlayerReferenceCache(env);
   const now = Date.now();
   const bjHour = getBeijingHour(now);
@@ -2666,7 +2735,7 @@ async function getPlayerReferencePayload(env, options = {}) {
     }
   }
 
-  const fresh = await fetchPlayerReferencePayload(options.player || "nikola-jokic");
+  const fresh = await fetchPlayerReferencePayload(playerQuery);
   const payload = {
     ...fresh,
     updated_at: new Date().toISOString(),
@@ -2736,6 +2805,9 @@ export default {
           force: url.searchParams.get("fresh") === "1",
           player,
         }));
+      }
+      if (path === "/api/player-options") {
+        return jsonResponse(await fetchPlayerOptionsPayload());
       }
       if (path === "/api/h2h-standings") return jsonResponse(state.h2h_standings || []);
       if (path === "/api/classic-rankings") return jsonResponse(state.classic_rankings || []);
