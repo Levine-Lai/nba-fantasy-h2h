@@ -2634,14 +2634,15 @@ async function fetchPlayerReferencePayload(playerQuery = "nikola-jokic") {
       const sourceGames = (groupedByOpponent[teamName] || [])
         .sort((a, b) => b.fantasy_points - a.fantasy_points || b.points_scored - a.points_scored)
         .slice(0, 4);
-      const averages = sourceGames.length ? {
-        fantasy_points: Number((sourceGames.reduce((sum, game) => sum + Number(game.fantasy_points || 0), 0) / sourceGames.length).toFixed(1)),
-        points_scored: Number((sourceGames.reduce((sum, game) => sum + Number(game.points_scored || 0), 0) / sourceGames.length).toFixed(1)),
-        rebounds: Number((sourceGames.reduce((sum, game) => sum + Number(game.rebounds || 0), 0) / sourceGames.length).toFixed(1)),
-        assists: Number((sourceGames.reduce((sum, game) => sum + Number(game.assists || 0), 0) / sourceGames.length).toFixed(1)),
-        steals: Number((sourceGames.reduce((sum, game) => sum + Number(game.steals || 0), 0) / sourceGames.length).toFixed(1)),
-        blocks: Number((sourceGames.reduce((sum, game) => sum + Number(game.blocks || 0), 0) / sourceGames.length).toFixed(1)),
-        minutes: Number((sourceGames.reduce((sum, game) => sum + Number(game.minutes || 0), 0) / sourceGames.length).toFixed(1)),
+      const averageGames = sourceGames.filter((game) => Number(game?.fantasy_points || 0) > 0);
+      const averages = averageGames.length ? {
+        fantasy_points: Number((averageGames.reduce((sum, game) => sum + Number(game.fantasy_points || 0), 0) / averageGames.length).toFixed(1)),
+        points_scored: Number((averageGames.reduce((sum, game) => sum + Number(game.points_scored || 0), 0) / averageGames.length).toFixed(1)),
+        rebounds: Number((averageGames.reduce((sum, game) => sum + Number(game.rebounds || 0), 0) / averageGames.length).toFixed(1)),
+        assists: Number((averageGames.reduce((sum, game) => sum + Number(game.assists || 0), 0) / averageGames.length).toFixed(1)),
+        steals: Number((averageGames.reduce((sum, game) => sum + Number(game.steals || 0), 0) / averageGames.length).toFixed(1)),
+        blocks: Number((averageGames.reduce((sum, game) => sum + Number(game.blocks || 0), 0) / averageGames.length).toFixed(1)),
+        minutes: Number((averageGames.reduce((sum, game) => sum + Number(game.minutes || 0), 0) / averageGames.length).toFixed(1)),
       } : null;
       const games = sourceGames.map((item) => ({
         ...item,
