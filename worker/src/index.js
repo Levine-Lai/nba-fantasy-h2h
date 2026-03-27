@@ -2559,6 +2559,7 @@ async function getPlayerReferenceCache(env) {
 async function fetchPlayerReferencePayload(playerQuery = "nikola-jokic") {
   const bootstrap = await fetchJson("/bootstrap-static/");
   const normalizedQuery = String(playerQuery || "").trim().toLowerCase();
+  const numericQuery = Number(playerQuery || 0);
   const players = Array.isArray(bootstrap?.elements) ? bootstrap.elements : [];
   const teamsById = {};
   for (const team of bootstrap?.teams || []) {
@@ -2566,6 +2567,9 @@ async function fetchPlayerReferencePayload(playerQuery = "nikola-jokic") {
   }
 
   let player = null;
+  if (Number.isFinite(numericQuery) && numericQuery > 0) {
+    player = players.find((item) => Number(item?.id || 0) === numericQuery) || null;
+  }
   if (normalizedQuery === "nikola-jokic" || normalizedQuery === "jokic") {
     player = players.find((item) => {
       const first = String(item?.first_name || "").toLowerCase();
@@ -2696,7 +2700,6 @@ async function fetchPlayerOptionsPayload() {
     if (!teamsById[teamId]) continue;
     teamsById[teamId].players.push({
       id: Number(player?.id || 0),
-      slug: `${player?.first_name || ""}-${player?.second_name || ""}`.trim().toLowerCase().replace(/\s+/g, "-"),
       name: `${player?.first_name || ""} ${player?.second_name || ""}`.trim() || player?.web_name || `#${player?.id}`,
       web_name: player?.web_name || "",
     });
@@ -2716,38 +2719,8 @@ async function fetchPlayerOptionsPayload() {
 }
 
 async function getPlayerReferencePayload(env, options = {}) {
-  const force = !!options.force;
   const playerQuery = options.player || "nikola-jokic";
-  const normalizedPlayer = String(playerQuery || "").trim().toLowerCase();
-  const useDailyCache = normalizedPlayer === "nikola-jokic" || normalizedPlayer === "jokic";
-  if (!useDailyCache) {
-    return fetchPlayerReferencePayload(playerQuery);
-  }
-  const cached = await getPlayerReferenceCache(env);
-  const now = Date.now();
-  const bjHour = getBeijingHour(now);
-  const todayKey = getBeijingDateKey(now);
-  const cachedKey = String(cached?.refresh_date_key || "");
-
-  if (!force && cached) {
-    if (bjHour < 16 || cachedKey === todayKey) {
-      return cached;
-    }
-  }
-
-  const fresh = await fetchPlayerReferencePayload(playerQuery);
-  const payload = {
-    ...fresh,
-    updated_at: new Date().toISOString(),
-    refresh_date_key: todayKey,
-    refresh_rule: "daily_16_bjt",
-  };
-  try {
-    await env.NBA_CACHE.put(PLAYER_REFERENCE_CACHE_KEY, JSON.stringify(payload));
-  } catch {
-    return payload;
-  }
-  return payload;
+  return fetchPlayerReferencePayload(playerQuery);
 }
 
 export default {

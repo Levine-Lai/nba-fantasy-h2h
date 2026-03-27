@@ -212,6 +212,7 @@ const Render = {
         const container = document.getElementById("injury-list");
         if (!badge || !subtitle || !container) return;
 
+        subtitle.style.display = "block";
         badge.textContent = data?.target_date || "No Date";
         subtitle.textContent = data?.next_event_name
             ? `${data.next_event_name} · 更新 ${data?.updated_at ? new Date(data.updated_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }) : "--:--"}`
@@ -252,9 +253,8 @@ const Render = {
         if (!badge || !subtitle || !container) return;
 
         badge.textContent = data?.web_name || "Player";
-        subtitle.textContent = data?.player_name
-            ? `${data.player_name} · ${data.season_label || ""} 对阵参考`
-            : "暂无数据";
+        subtitle.style.display = "none";
+        subtitle.textContent = "";
 
         const opponents = Array.isArray(data?.opponents) ? data.opponents : [];
         if (!opponents.length) {
@@ -279,12 +279,12 @@ const Render = {
                                     <span class="reference-game-score">${Math.round(Number(game.fantasy_points || 0))}分</span>
                                 </div>
                                 <div class="reference-game-meta">
+                                    ${Number(game.minutes || 0) > 0 ? `${Math.round(Number(game.minutes || 0))}分钟 ` : ""}
                                     ${Math.round(Number(game.points_scored || 0))}分
                                     ${Math.round(Number(game.rebounds || 0))}板
                                     ${Math.round(Number(game.assists || 0))}助
                                     ${Math.round(Number(game.steals || 0))}断
                                     ${Math.round(Number(game.blocks || 0))}帽
-                                    ${Number(game.minutes || 0) > 0 ? `${Math.round(Number(game.minutes || 0))}分钟` : ""}
                                 </div>
                             </div>
                         `
@@ -303,12 +303,12 @@ const Render = {
                                 <span class="reference-average-label">场均</span>
                                 <span class="reference-average-score">${Math.round(Number(item.averages.fantasy_points || 0))}分</span>
                                 <span class="reference-average-meta">
+                                    ${Number(item.averages.minutes || 0) > 0 ? `${Math.round(Number(item.averages.minutes || 0))}分钟 ` : ""}
                                     ${Math.round(Number(item.averages.points_scored || 0))}分
                                     ${Math.round(Number(item.averages.rebounds || 0))}板
                                     ${Math.round(Number(item.averages.assists || 0))}助
                                     ${Math.round(Number(item.averages.steals || 0))}断
                                     ${Math.round(Number(item.averages.blocks || 0))}帽
-                                    ${Number(item.averages.minutes || 0) > 0 ? `${Math.round(Number(item.averages.minutes || 0))}分钟` : ""}
                                 </span>
                             `
                             : `
@@ -735,9 +735,9 @@ const App = {
         const team = this.playerOptions.find((item) => String(item.id) === String(teamId));
         const players = Array.isArray(team?.players) ? team.players : [];
         playerSelect.innerHTML = players.map((player) => `
-            <option value="${escapeHtml(player.slug || "")}">${escapeHtml(player.name || player.web_name || "-")}</option>
+            <option value="${escapeHtml(player.id)}">${escapeHtml(player.name || player.web_name || "-")}</option>
         `).join("");
-        if (preferredPlayer && players.some((player) => String(player.slug) === String(preferredPlayer))) {
+        if (preferredPlayer && players.some((player) => String(player.id) === String(preferredPlayer))) {
             playerSelect.value = preferredPlayer;
         }
     },
@@ -756,7 +756,7 @@ const App = {
             if (defaultTeam) {
                 teamSelect.value = String(defaultTeam.id);
                 const defaultPlayer = (defaultTeam.players || []).find((player) => /nikola jokic/i.test(String(player.name || "")));
-                this.populateReferencePlayers(defaultTeam.id, defaultPlayer?.slug || "");
+                this.populateReferencePlayers(defaultTeam.id, defaultPlayer?.id || "");
             }
             this.playerOptionsLoaded = true;
         } catch (error) {

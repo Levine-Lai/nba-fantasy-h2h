@@ -1119,10 +1119,15 @@ body {
     }
 
     .reference-toolbar {
+        display: grid;
         grid-template-columns: 1fr;
     }
 
     .reference-btn {
+        width: 100%;
+    }
+
+    .reference-select {
         width: 100%;
     }
 
@@ -1296,9 +1301,10 @@ body {
 }
 
 .reference-toolbar {
-    display: grid;
-    grid-template-columns: 1fr 1fr auto;
-    gap: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 14px;
     margin-bottom: 14px;
 }
 
@@ -1315,19 +1321,20 @@ body {
 }
 
 .reference-select {
-    width: 100%;
+    width: 240px;
     border: 1px solid #d7e4f2;
     border-radius: 10px;
-    padding: 10px 12px;
+    padding: 12px 14px;
     background: #fff;
-    font-size: 13px;
+    font-size: 14px;
     color: #0f172a;
 }
 
 .reference-btn {
     align-self: end;
-    height: 42px;
+    height: 46px;
     border-radius: 10px;
+    padding: 0 18px;
 }
 
 .reference-card {
@@ -1377,8 +1384,8 @@ body {
 
 .reference-game-row {
     border-top: 1px dashed #dbe4ee;
-    padding-top: 8px;
-    min-height: 56px;
+    padding-top: 10px;
+    min-height: 62px;
 }
 
 .reference-game-row:first-child {
@@ -1422,8 +1429,8 @@ body {
     margin-top: 4px;
     padding-top: 10px;
     display: grid;
-    grid-template-columns: 42px 52px 1fr;
-    gap: 10px;
+    grid-template-columns: 42px 60px 1fr;
+    gap: 12px;
     align-items: start;
 }
 
