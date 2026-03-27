@@ -23,6 +23,8 @@
    - 状态按 `Probable -> Questionable -> Doubtful -> Out` 排序
    - 没有伤病条目的球队显示 `全员健康`
    - logo 从本地 `frontend/nba-team-logos/` 加载，并带默认回退图
+   - 卡片表头使用球队代表色作为背景，只展示 `logo + 球队名`
+   - `Available` 使用深绿色状态标签
 ## 2026-03-27 首页面板显示修正
 1. 首页 `Live H2H` 现在通过 `/api/state?fresh_h2h=1` 返回数据：
    - 仍然只走一次首页主请求

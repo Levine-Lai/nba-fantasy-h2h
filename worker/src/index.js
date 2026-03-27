@@ -1431,10 +1431,11 @@ function sortInjuriesByPriority(injuries) {
     questionable: 2,
     doubtful: 3,
     out: 4,
+    available: 5,
   };
   return [...(injuries || [])].sort((a, b) => {
-    const left = order[String(a?.status_short || "").toLowerCase()] || 99;
-    const right = order[String(b?.status_short || "").toLowerCase()] || 99;
+    const left = Number(a?.status_order ?? order[String(a?.status_short || "").toLowerCase()] ?? 99);
+    const right = Number(b?.status_order ?? order[String(b?.status_short || "").toLowerCase()] ?? 99);
     return left - right || String(a?.player_name || "").localeCompare(String(b?.player_name || ""));
   });
 }
@@ -1563,9 +1564,18 @@ async function fetchNextDayInjuriesPayload() {
         injuries: Array.isArray(matched?.injuries)
           ? sortInjuriesByPriority(matched.injuries.map((injury) => {
               const short = extractAvailabilityFromComment(injury.comment, injury.status);
+              const normalizedShort = String(short || "").trim().toLowerCase();
+              const order = {
+                probable: 1,
+                questionable: 2,
+                doubtful: 3,
+                out: 4,
+                available: 5,
+              };
               return {
                 ...injury,
-                status_short: formatInjuryStatus(short),
+                status_short: formatInjuryStatus(normalizedShort),
+                status_order: Number(order[normalizedShort] || 99),
               };
             }))
           : [],

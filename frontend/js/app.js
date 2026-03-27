@@ -215,13 +215,9 @@ const Render = {
             <div class="injury-card" style="--team-color:${escapeHtml(team.team_color || "#334155")}">
                 <div class="injury-card-head">
                     <div class="injury-team-wrap">
-                        <img class="injury-team-logo" src="${escapeHtml(team.logo_url || "./nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='./nba-team-logos/_.png';">
-                        <div>
-                            <div class="injury-team">${escapeHtml(team.team_name)}</div>
-                            <div class="injury-meta">${team.home_away === "home" ? "vs" : "@"} ${escapeHtml(team.opponent || "-")}</div>
-                        </div>
+                        <img class="injury-team-logo" src="${escapeHtml(team.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" decoding="async" width="34" height="34" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
+                        <div class="injury-team">${escapeHtml(team.team_name)}</div>
                     </div>
-                    <div class="injury-count">${Number(team.injury_count || 0)} 人</div>
                 </div>
                 ${Array.isArray(team.injuries) && team.injuries.length
                     ? `<div class="injury-rows">${team.injuries.map((item) => `
