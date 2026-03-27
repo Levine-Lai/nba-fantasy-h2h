@@ -1,4 +1,4 @@
-const API_BASE = (window.__API_BASE__ || "").trim().replace(/\/+$/, "");
+﻿const API_BASE = (window.__API_BASE__ || "").trim().replace(/\/+$/, "");
 
 const API = {
     async fetch(url, options = {}) {
@@ -33,8 +33,8 @@ const API = {
         return (await this.fetch("/api/injuries")).json();
     },
 
-    async getPlayerHighScores(player = "nikola-jokic") {
-        return (await this.fetch(`/api/player-high-scores?player=${encodeURIComponent(player)}`)).json();
+    async getPlayerReference(player = "nikola-jokic") {
+        return (await this.fetch(`/api/player-reference?player=${encodeURIComponent(player)}`)).json();
     },
 
     async refresh() {
@@ -51,10 +51,13 @@ function escapeHtml(value) {
         .replace(/'/g, "&#39;");
 }
 
-function formatOwnership(player) {
-    const percent = Number(player?.ownership_percent);
-    if (!Number.isFinite(percent)) return "";
-    return `<span class="ownership-badge">${percent.toFixed(1)}%</span>`;
+function formatEo(player) {
+    const direct = Number(player?.eo_percent);
+    if (Number.isFinite(direct)) return `${direct.toFixed(1)}%`;
+    const ownership = Number(player?.ownership_percent);
+    if (!Number.isFinite(ownership)) return "--";
+    const eo = player?.is_effective ? 100 - ownership : -ownership;
+    return `${eo.toFixed(1)}%`;
 }
 
 function normalizeStatusClass(status) {
@@ -206,8 +209,8 @@ const Render = {
 
         badge.textContent = data?.target_date || "No Date";
         subtitle.textContent = data?.next_event_name
-            ? `${data.next_event_name} · ${Number(data?.games_count || 0)} 场比赛 · 更新 ${data?.updated_at ? new Date(data.updated_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }) : "--:--"}`
-            : "暂无下一日赛程";
+            ? `${data.next_event_name} · 更新 ${data?.updated_at ? new Date(data.updated_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }) : "--:--"}`
+            : "暂无下一日伤病数据";
 
         const teams = Array.isArray(data?.teams) ? data.teams : [];
         if (!teams.length) {
@@ -219,7 +222,7 @@ const Render = {
             <div class="injury-card" style="--team-color:${escapeHtml(team.team_color || "#334155")}">
                 <div class="injury-card-head">
                     <div class="injury-team-wrap">
-                        <img class="injury-team-logo" src="${escapeHtml(team.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" decoding="async" width="34" height="34" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
+                        <img class="injury-team-logo" src="${escapeHtml(team.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" decoding="async" width="34" height="34" loading="lazy" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
                         <div class="injury-team">${escapeHtml(team.team_name)}</div>
                     </div>
                 </div>
@@ -237,32 +240,43 @@ const Render = {
         `).join("");
     },
 
-    playerHighScores(data) {
-        const badge = document.getElementById("player-high-scores-badge");
-        const subtitle = document.getElementById("player-high-scores-subtitle");
-        const container = document.getElementById("player-high-scores-list");
+    playerReference(data) {
+        const badge = document.getElementById("player-reference-badge");
+        const subtitle = document.getElementById("player-reference-subtitle");
+        const container = document.getElementById("player-reference-list");
         if (!badge || !subtitle || !container) return;
 
         badge.textContent = data?.web_name || "Player";
         subtitle.textContent = data?.player_name
-            ? `${data.player_name} · ${data.season_label || ""} Fantasy Top 10`
+            ? `${data.player_name} · ${data.season_label || ""} 对阵参考`
             : "暂无数据";
 
-        const games = Array.isArray(data?.games) ? data.games : [];
-        if (!games.length) {
-            container.innerHTML = '<div class="trend-empty">No high-score data</div>';
+        const opponents = Array.isArray(data?.opponents) ? data.opponents : [];
+        if (!opponents.length) {
+            container.innerHTML = '<div class="trend-empty">No matchup reference data</div>';
             return;
         }
 
-        container.innerHTML = games.map((game, index) => `
-            <div class="high-score-card">
-                <div class="high-score-rank">#${index + 1}</div>
-                <div class="high-score-main">
-                    <div class="high-score-points">${Number(game.fantasy_points || 0).toFixed(1)}</div>
-                    <div class="high-score-meta">${game.was_home ? "vs" : "@"} ${escapeHtml(game.opponent_team || "-")}</div>
+        container.innerHTML = opponents.map((item) => `
+            <div class="reference-card" style="--team-color:${escapeHtml(item.team_color || "#334155")}">
+                <div class="reference-card-head">
+                    <div class="reference-team-wrap">
+                        <img class="reference-team-logo" src="${escapeHtml(item.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(item.opponent_team || "-")} logo" decoding="async" width="34" height="34" loading="lazy" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
+                        <div class="reference-team">${escapeHtml(item.opponent_team || "-")}</div>
+                    </div>
                 </div>
-                <div class="high-score-stats">
-                    ${Number(game.points_scored || 0)}分 ${Number(game.rebounds || 0)}板 ${Number(game.assists || 0)}助 ${Number(game.steals || 0)}断 ${Number(game.blocks || 0)}帽
+                <div class="reference-games">
+                    ${Array.isArray(item.games) && item.games.length
+                        ? item.games.map((game) => `
+                            <div class="reference-game-row">
+                                <div class="reference-game-top">
+                                    <span class="reference-game-date">${escapeHtml(game.date_label || "-")}</span>
+                                    <span class="reference-game-score">${Number(game.fantasy_points || 0).toFixed(1)}分</span>
+                                </div>
+                                <div class="reference-game-meta">${escapeHtml(game.detail_label || "")}</div>
+                            </div>
+                        `).join("")
+                        : '<div class="reference-empty">本赛季暂无交手</div>'}
                 </div>
             </div>
         `).join("");
@@ -428,7 +442,7 @@ const Render = {
             const injuryBadge = player.injury ? `<span class="injury-badge" title="${escapeHtml(player.injury)}">INJ ${escapeHtml(player.injury)}</span>` : "";
             const effectiveClass = player.is_effective ? "effective" : "ineffective";
             const posClass = player.position_name === "BC" ? "pos-BC" : "pos-FC";
-            const ownership = formatOwnership(player);
+            const eo = formatEo(player);
             const price = Number(player?.now_cost || 0) / 10;
             const value = price > 0 ? Number(player?.final_points || 0) / price : 0;
 
@@ -442,13 +456,8 @@ const Render = {
                             ${injuryBadge}
                         </div>
                         <div class="player-stats">
-                            ${Number(player?.stats?.points || 0)}分
-                            ${Number(player?.stats?.rebounds || 0)}板
-                            ${Number(player?.stats?.assists || 0)}助
-                            ${Number(player?.stats?.steals || 0)}断
-                            ${Number(player?.stats?.blocks || 0)}帽
-                            ${value.toFixed(1)}value
-                            ${ownership}
+                            <span>Value ${value.toFixed(1)}</span>
+                            <span>EO ${escapeHtml(eo)}</span>
                         </div>
                     </div>
                     <div class="player-score">
@@ -475,9 +484,9 @@ const Render = {
             const economy = lineupData.lineup_economy || {};
             const economyPanel = `
                 <div class="lineup-economy">
-                    <div class="economy-row"><span>今日球员总价</span><strong>${Number(economy.effective_total_cost || 0).toFixed(1)}</strong></div>
-                    <div class="economy-row"><span>回本线</span><strong>${Number(economy.breakeven_line || 0).toFixed(1)}</strong></div>
-                    <div class="economy-row"><span>状态</span><strong>${escapeHtml(economy.status || "-")}</strong></div>
+                    <div class="economy-row"><span>浠婃棩鐞冨憳鎬讳环</span><strong>${Number(economy.effective_total_cost || 0).toFixed(1)}</strong></div>
+                    <div class="economy-row"><span>鍥炴湰绾?/span><strong>${Number(economy.breakeven_line || 0).toFixed(1)}</strong></div>
+                    <div class="economy-row"><span>鐘舵€?/span><strong>${escapeHtml(economy.status || "-")}</strong></div>
                 </div>
             `;
 
@@ -529,7 +538,7 @@ const App = {
     lineupCache: new Map(),
     refreshTimer: null,
     injuriesLoaded: false,
-    highScoresLoaded: false,
+    playerReferenceLoaded: false,
 
     async getLineupCached(uid) {
         const key = String(uid);
@@ -660,18 +669,18 @@ const App = {
         }
     },
 
-    async loadPlayerHighScores(force = false) {
-        if (this.highScoresLoaded && !force) return;
-        const container = document.getElementById("player-high-scores-list");
+    async loadPlayerReference(force = false) {
+        if (this.playerReferenceLoaded && !force) return;
+        const container = document.getElementById("player-reference-list");
         if (container) {
             container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
         }
         try {
-            const data = await API.getPlayerHighScores("nikola-jokic");
-            Render.playerHighScores(data);
-            this.highScoresLoaded = true;
+            const data = await API.getPlayerReference("nikola-jokic");
+            Render.playerReference(data);
+            this.playerReferenceLoaded = true;
         } catch (error) {
-            console.error("Player high scores load error:", error);
+            console.error("Player reference load error:", error);
             if (container) {
                 container.innerHTML = '<div class="trend-empty">Load failed</div>';
             }
@@ -686,8 +695,8 @@ const App = {
                 this.showPage(page);
                 if (page === "injuries") {
                     this.loadInjuries();
-                } else if (page === "high-scores") {
-                    this.loadPlayerHighScores();
+                } else if (page === "reference") {
+                    this.loadPlayerReference();
                 }
                 return;
             }
@@ -747,3 +756,4 @@ window.closeModal = closeModal;
 window.manualRefresh = () => App.manualRefresh();
 
 App.init();
+

@@ -3,6 +3,7 @@ const LEAGUE_ID = 1653;
 const CACHE_KEY = "latest_state";
 const CACHE_CURSOR_KEY = "refresh_cursor";
 const INJURY_CACHE_KEY = "injury_state";
+const PLAYER_REFERENCE_CACHE_KEY = "player_reference_state";
 const INJURY_CACHE_TTL_MS = 60 * 60 * 1000;
 const UID_CHUNK_SIZE = 6;
 const UID_LIST = [
@@ -989,6 +990,25 @@ function buildLivePicksFromPicksData(picksData, elements, liveElements) {
   });
 }
 
+function getBeijingDateKey(value = Date.now()) {
+  const date = value instanceof Date ? value : new Date(value);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function getBeijingHour(value = Date.now()) {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    hour: "2-digit",
+    hour12: false,
+  }).format(date));
+}
+
 function buildWeekTotalSummary(historyWeek, currentEvent, gd1MissingPenalty) {
   if (!historyWeek?.has_week_rows) return null;
   const currentEventId = Number(currentEvent || 0);
@@ -1411,6 +1431,7 @@ function parseEspnInjuryPage(html) {
 function extractAvailabilityFromComment(comment, fallbackStatus = "") {
   const text = String(comment || "").toLowerCase();
   const fallback = String(fallbackStatus || "").trim().toLowerCase();
+  if (text.includes("day-to-day") || text.includes("day to day")) return "questionable";
   const tags = ["questionable", "probable", "doubtful", "out", "available"];
   for (const tag of tags) {
     if (text.includes(tag)) return tag;
@@ -2381,8 +2402,11 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     const players = Array.isArray(picksByUid[uid]?.players) ? picksByUid[uid].players : [];
     for (const player of players) {
       const ownership = ownershipSummary.by_element[Number(player?.element_id || 0)];
-      player.ownership_count = Number(ownership?.holder_count || 0);
-      player.ownership_percent = Number((((ownership?.holder_count || 0) / Math.max(1, ownershipSummary.manager_count)) * 100).toFixed(1));
+      const ownershipCount = Number(ownership?.holder_count || 0);
+      const ownershipPercent = Number(((ownershipCount / Math.max(1, ownershipSummary.manager_count)) * 100).toFixed(1));
+      player.ownership_count = ownershipCount;
+      player.ownership_percent = ownershipPercent;
+      player.eo_percent = Number((player?.is_effective ? 100 - ownershipPercent : -ownershipPercent).toFixed(1));
     }
   }
 
@@ -2518,7 +2542,17 @@ async function getInjuriesPayload(env, options = {}) {
   return payload;
 }
 
-async function fetchPlayerHighScoresPayload(playerQuery = "nikola-jokic") {
+async function getPlayerReferenceCache(env) {
+  const raw = await env.NBA_CACHE.get(PLAYER_REFERENCE_CACHE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchPlayerReferencePayload(playerQuery = "nikola-jokic") {
   const bootstrap = await fetchJson("/bootstrap-static/");
   const normalizedQuery = String(playerQuery || "").trim().toLowerCase();
   const players = Array.isArray(bootstrap?.elements) ? bootstrap.elements : [];
@@ -2542,16 +2576,24 @@ async function fetchPlayerHighScoresPayload(playerQuery = "nikola-jokic") {
     return {
       player_key: normalizedQuery,
       player_name: "Unknown",
-      games: [],
+      web_name: "",
+      team_name: "",
+      season_label: "2025-26",
+      opponents: [],
     };
   }
 
   const summary = await fetchJson(`/element-summary/${player.id}/`);
   const history = Array.isArray(summary?.history) ? summary.history : [];
-  const topGames = history
-    .map((game) => ({
+  const groupedByOpponent = {};
+  for (const game of history) {
+    const opponentTeamId = Number(game?.opponent_team || 0);
+    const opponentTeam = teamsById[opponentTeamId] || `Team #${opponentTeamId}`;
+    if (!groupedByOpponent[opponentTeam]) {
+      groupedByOpponent[opponentTeam] = [];
+    }
+    groupedByOpponent[opponentTeam].push({
       fantasy_points: Number((Number(game?.total_points || 0) / 10).toFixed(1)),
-      opponent_team: teamsById[Number(game?.opponent_team || 0)] || `Team #${game?.opponent_team}`,
       was_home: !!game?.was_home,
       kickoff_time: game?.kickoff_time || null,
       event_round: Number(game?.round || 0),
@@ -2561,9 +2603,43 @@ async function fetchPlayerHighScoresPayload(playerQuery = "nikola-jokic") {
       steals: Number(game?.steals || 0),
       blocks: Number(game?.blocks || 0),
       minutes: Number(game?.minutes || 0),
-    }))
-    .sort((a, b) => b.fantasy_points - a.fantasy_points || b.points_scored - a.points_scored)
-    .slice(0, 10);
+      date_label: game?.kickoff_time
+        ? new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Shanghai",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(new Date(game.kickoff_time))
+        : `GW${Number(game?.round || 0) || "?"}`,
+    });
+  }
+
+  const opponents = (bootstrap?.teams || [])
+    .filter((team) => Number(team?.id || 0) !== Number(player?.team || 0))
+    .map((team) => {
+      const teamName = team?.name || `Team #${team?.id}`;
+      const visual = getTeamVisualMeta(teamName);
+      const games = (groupedByOpponent[teamName] || [])
+        .sort((a, b) => b.fantasy_points - a.fantasy_points || b.points_scored - a.points_scored)
+        .slice(0, 4)
+        .map((item) => ({
+          ...item,
+          line_label: `${item.date_label}  ${item.was_home ? "vs" : "@"}  ${item.fantasy_points.toFixed(1)}分`,
+          detail_label: `${item.points_scored}分 ${item.rebounds}板 ${item.assists}助`,
+        }));
+      const bestFantasyPoints = games.length ? Number(games[0].fantasy_points || 0) : -1;
+      return {
+        opponent_team: teamName,
+        team_color: visual.color,
+        logo_url: visual.logo_url,
+        best_fantasy_points: bestFantasyPoints,
+        games_played: games.length,
+        games,
+      };
+    })
+    .sort((a, b) =>
+      Number(b.best_fantasy_points || -1) - Number(a.best_fantasy_points || -1) ||
+      String(a.opponent_team || "").localeCompare(String(b.opponent_team || ""))
+    );
 
   return {
     player_key: normalizedQuery,
@@ -2571,8 +2647,38 @@ async function fetchPlayerHighScoresPayload(playerQuery = "nikola-jokic") {
     web_name: player.web_name || "",
     team_name: teamsById[Number(player?.team || 0)] || `Team #${player?.team}`,
     season_label: "2025-26",
-    games: topGames,
+    opponents,
+    updated_at: new Date().toISOString(),
   };
+}
+
+async function getPlayerReferencePayload(env, options = {}) {
+  const force = !!options.force;
+  const cached = await getPlayerReferenceCache(env);
+  const now = Date.now();
+  const bjHour = getBeijingHour(now);
+  const todayKey = getBeijingDateKey(now);
+  const cachedKey = String(cached?.refresh_date_key || "");
+
+  if (!force && cached) {
+    if (bjHour < 16 || cachedKey === todayKey) {
+      return cached;
+    }
+  }
+
+  const fresh = await fetchPlayerReferencePayload(options.player || "nikola-jokic");
+  const payload = {
+    ...fresh,
+    updated_at: new Date().toISOString(),
+    refresh_date_key: todayKey,
+    refresh_rule: "daily_16_bjt",
+  };
+  try {
+    await env.NBA_CACHE.put(PLAYER_REFERENCE_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    return payload;
+  }
+  return payload;
 }
 
 export default {
@@ -2624,9 +2730,12 @@ export default {
           force: url.searchParams.get("fresh") === "1",
         }));
       }
-      if (path === "/api/player-high-scores") {
+      if (path === "/api/player-reference" || path === "/api/player-high-scores") {
         const player = url.searchParams.get("player") || "nikola-jokic";
-        return jsonResponse(await fetchPlayerHighScoresPayload(player));
+        return jsonResponse(await getPlayerReferencePayload(env, {
+          force: url.searchParams.get("fresh") === "1",
+          player,
+        }));
       }
       if (path === "/api/h2h-standings") return jsonResponse(state.h2h_standings || []);
       if (path === "/api/classic-rankings") return jsonResponse(state.classic_rankings || []);
@@ -2697,9 +2806,13 @@ export default {
       minute: "2-digit",
       hour12: false,
     }).format(date));
+    const bjHour = getBeijingHour(scheduledAt);
 
     if (utcMinute === 0) {
       ctx.waitUntil(getInjuriesPayload(env, { force: true }));
+      if (bjHour === 16) {
+        ctx.waitUntil(getPlayerReferencePayload(env, { force: true, player: "nikola-jokic" }));
+      }
     }
     if (!isBeijingRefreshWindow(scheduledAt)) return;
     ctx.waitUntil(refreshState(env));
