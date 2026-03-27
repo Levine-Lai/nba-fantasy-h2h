@@ -952,6 +952,44 @@ function buildLivePicksFromPicksData(picksData, elements, liveElements) {
   });
 }
 
+function buildWeekTotalSummary(historyWeek, currentEvent, gd1MissingPenalty) {
+  if (!historyWeek?.has_week_rows) return null;
+  const currentEventId = Number(currentEvent || 0);
+  const currentEventPoints = Number(historyWeek.points_by_event?.[currentEventId] || 0);
+  const settledPoints = Number(historyWeek.weekly_points || 0) - currentEventPoints;
+
+  let settledTransferCost = 0;
+  for (const [rawEventId, rawCost] of Object.entries(historyWeek.transfer_cost_by_event || {})) {
+    const eventId = Number(rawEventId || 0);
+    if (!eventId || eventId === currentEventId) continue;
+    settledTransferCost += Number(rawCost || 0);
+  }
+
+  const todayTransferCost = Number(
+    historyWeek.current_event_transfer_cost || historyWeek.transfer_cost_by_event?.[currentEventId] || 0
+  );
+  const recordedDay1Cost = Number(historyWeek.transfer_cost_by_day?.[1] || 0);
+  const manualDay1Penalty = recordedDay1Cost > 0 ? 0 : Number(gd1MissingPenalty || 0);
+
+  return {
+    settled_points: Number(settledPoints || 0),
+    settled_transfer_cost: Number(settledTransferCost || 0),
+    current_event_transfer_cost: Number(todayTransferCost || 0),
+    manual_day1_penalty: Number(manualDay1Penalty || 0),
+  };
+}
+
+function computeWeekTotalFromSummary(summary, todayScore) {
+  if (!summary) return null;
+  const total =
+    Number(summary.settled_points || 0) +
+    Number(todayScore || 0) -
+    Number(summary.settled_transfer_cost || 0) -
+    Number(summary.current_event_transfer_cost || 0) -
+    Number(summary.manual_day1_penalty || 0);
+  return Math.max(0, Math.round(total));
+}
+
 async function buildFreshHomepageState(baseState) {
   const matches = Array.isArray(baseState?.h2h) ? baseState.h2h : [];
   const currentEvent = Number(baseState?.current_event || 0);
@@ -985,9 +1023,12 @@ async function buildFreshHomepageState(baseState) {
     const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements);
     const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
     const freshToday = Number(effectiveScore || 0);
-    const cachedToday = Number(previous?.total_live || 0);
-    const cachedWeek = Number(previous?.event_total || 0);
-    const freshWeek = Math.max(0, cachedWeek - cachedToday + freshToday);
+    const freshWeek =
+      computeWeekTotalFromSummary(previous?.week_total_summary, freshToday) ??
+      Math.max(
+        0,
+        Number(previous?.event_total || 0) - Number(previous?.total_live || 0) + freshToday
+      );
 
     freshScoresByUid[uid] = {
       total_live: freshToday,
@@ -1685,6 +1726,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       wildcard_day: Number(previous.wildcard_day || 0) || null,
       rich_day: Number(previous.rich_day || 0) || null,
       transfer_records: Array.isArray(previous.transfer_records) ? previous.transfer_records : [],
+      week_total_summary: previous.week_total_summary || null,
       lineup_economy: previous.lineup_economy || null,
       picks: Array.isArray(previous.players) ? previous.players : [],
     };
@@ -1784,6 +1826,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     standingsByUid[uid].rich_day = richDay ? Number(richDay) : null;
     standingsByUid[uid].transfer_records = transferSummary.records;
     standingsByUid[uid].captain_used = captainUsed;
+    standingsByUid[uid].week_total_summary = buildWeekTotalSummary(historyWeek, currentEvent, gd1MissingPenalty);
     if (historyWeek.has_week_rows) {
       const previewTodayScore = historyWeek.today_points !== null
         ? Number(historyWeek.today_points || 0)
@@ -1996,6 +2039,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       classic_week_rank: s.classic_week_rank || 0,
       classic_week_total: s.classic_week_total || 0,
       transfer_records: Array.isArray(s.transfer_records) ? s.transfer_records : [],
+      week_total_summary: s.week_total_summary || null,
       captain_used: s.captain_used || {
         used: false,
         label: "None",

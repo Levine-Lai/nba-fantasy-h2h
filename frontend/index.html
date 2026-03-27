@@ -31,8 +31,19 @@
 
     <!-- Main Container -->
     <div class="container page-view home-layout active" id="page-home">
-        <!-- Column 1: Games + Trends -->
-        <div class="column">
+        <!-- Column 1: H2H -->
+        <div class="column h2h-column">
+            <div class="col-header">
+                <div class="col-title">Live H2H</div>
+                <span class="col-badge" id="match-count">-</span>
+            </div>
+            <div class="h2h-list" id="h2h-list">
+                <div class="loading"><div class="spinner"></div>Loading...</div>
+            </div>
+        </div>
+
+        <!-- Column 2: Games + Trends + FDR -->
+        <div class="column side-column">
             <div class="col-header">
                 <div class="col-title">Today's Fixtures</div>
                 <span class="col-badge" id="game-count">-</span>
@@ -48,21 +59,6 @@
                 <div class="trend-title">Ownership Top 10</div>
                 <div id="ownership-top" class="trend-list"></div>
             </div>
-        </div>
-
-        <!-- Column 2: H2H -->
-        <div class="column">
-            <div class="col-header">
-                <div class="col-title">Live H2H</div>
-                <span class="col-badge" id="match-count">-</span>
-            </div>
-        <div class="h2h-list" id="h2h-list">
-            <div class="loading"><div class="spinner"></div>Loading...</div>
-        </div>
-    </div>
-
-        <!-- Column 3: FDR -->
-        <div class="column rankings-column">
             <div class="col-header">
                 <div class="col-title">FDR Ranking</div>
                 <span class="col-badge" id="fdr-week-badge">Auto GW</span>

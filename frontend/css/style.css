@@ -144,7 +144,7 @@ body {
 /* ===== Layout ===== */
 .container {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1.2fr 0.8fr;
     gap: 24px;
     padding: 24px 32px;
     max-width: 1400px;
@@ -152,7 +152,7 @@ body {
 }
 
 .home-layout {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1.22fr 0.78fr;
 }
 
 .rankings-layout {
@@ -166,6 +166,14 @@ body {
     padding: 20px;
     min-height: 700px;
     box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
+}
+
+.h2h-column {
+    min-height: 700px;
+}
+
+.side-column {
+    min-height: 700px;
 }
 
 .page-view {
@@ -468,8 +476,8 @@ body {
     font-weight: 600;
     min-width: 0;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
+    text-overflow: clip;
     display: flex;
     align-items: center;
     gap: 6px;
