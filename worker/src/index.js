@@ -1978,85 +1978,100 @@ async function getState(env) {
 
 export default {
   async fetch(request, env, ctx) {
-    if (request.method === "OPTIONS") return jsonResponse({ ok: true });
-
-    const url = new URL(request.url);
-    const path = url.pathname;
-
-    if (path === "/api/refresh" && request.method === "POST") {
-      const auth = env.REFRESH_TOKEN;
-      if (auth) {
-        const token = url.searchParams.get("token");
-        if (token !== auth) return jsonResponse({ success: false, error: "unauthorized" }, 401);
+    try {
+      if (!env?.NBA_CACHE || typeof env.NBA_CACHE.get !== "function" || typeof env.NBA_CACHE.put !== "function") {
+        return jsonResponse({
+          success: false,
+          error: "NBA_CACHE binding missing or invalid",
+          hint: "Bind NBA_CACHE in the current Pages/Worker environment.",
+        }, 500);
       }
-      const mode = String(url.searchParams.get("mode") || "chunk").toLowerCase();
-      const state = await refreshState(env, { full: mode === "full" });
-      return jsonResponse({
-        success: true,
-        mode: mode === "full" ? "full" : "chunk",
-        current_event_name: state.current_event_name,
-        refresh_meta: state.refresh_meta,
-      });
-    }
 
-    let state = await getState(env);
-    if (!state) {
-      state = await refreshState(env, { full: true });
-    }
+      if (request.method === "OPTIONS") return jsonResponse({ ok: true });
 
-    if (path === "/api/state") return jsonResponse(state);
-    if (path === "/api/fixtures") return jsonResponse(state.fixtures);
-    if (path === "/api/h2h") return jsonResponse(state.h2h);
-    if (path === "/api/h2h-standings") return jsonResponse(state.h2h_standings || []);
-    if (path === "/api/classic-rankings") return jsonResponse(state.classic_rankings || []);
-    if (path.startsWith("/api/fixture/")) {
-      const id = Number(path.split("/").pop());
-      return jsonResponse(state.fixture_details[String(id)] || state.fixture_details[id] || {});
-    }
-    if (path.startsWith("/api/picks/")) {
-      const uid = normalizeUid(Number(path.split("/").pop()));
-      let payload = state.picks_by_uid[uid] || {};
-      const forceFresh = url.searchParams.get("fresh") === "1";
-      if (forceFresh || !payload.players || payload.players.length === 0) {
-        const freshState = await buildState(state, [uid]);
-        payload = freshState.picks_by_uid[uid] || {};
-      }
-      debugUid("api_response", uid, {
-        total_live: payload.total_live || 0,
-        event_total: payload.event_total || 0,
-        players: summarizePlayersForDebug(payload.players || []),
-      });
-      return jsonResponse(payload);
-    }
-    if (path === "/api/trends/transfers")
-      return jsonResponse(state.transfer_trends || { league: {}, global: {}, ownership_top: [], ownership_manager_count: UID_LIST.length });
-    if (path === "/api/fdr") {
-      return jsonResponse(
-        state.fdr || {
-          weeks: [],
-          html: state.fdr_html || "",
-          uses_h2h: false,
-          ranking_source: "entry_league_rank",
-          weights: { total: FDR_TOTAL_WEIGHT, h2h: FDR_H2H_WEIGHT },
-          daily_averages: state.league_daily_averages || {
-            manager_count: 0,
-            today_average_count: 0,
-            effective_average_count: 0,
-          },
+      const url = new URL(request.url);
+      const path = url.pathname;
+
+      if (path === "/api/refresh" && request.method === "POST") {
+        const auth = env.REFRESH_TOKEN;
+        if (auth) {
+          const token = url.searchParams.get("token");
+          if (token !== auth) return jsonResponse({ success: false, error: "unauthorized" }, 401);
         }
-      );
-    }
-    if (path === "/api/health") {
-      return jsonResponse({
-        status: "ok",
-        last_update: state.generated_at,
-        current_event: state.current_event,
-        current_event_name: state.current_event_name,
-        refresh_meta: state.refresh_meta || null,
-      });
-    }
+        const mode = String(url.searchParams.get("mode") || "chunk").toLowerCase();
+        const state = await refreshState(env, { full: mode === "full" });
+        return jsonResponse({
+          success: true,
+          mode: mode === "full" ? "full" : "chunk",
+          current_event_name: state.current_event_name,
+          refresh_meta: state.refresh_meta,
+        });
+      }
 
-    return jsonResponse({ error: "not found" }, 404);
+      let state = await getState(env);
+      if (!state) {
+        state = await refreshState(env, { full: true });
+      }
+
+      if (path === "/api/state") return jsonResponse(state);
+      if (path === "/api/fixtures") return jsonResponse(state.fixtures);
+      if (path === "/api/h2h") return jsonResponse(state.h2h);
+      if (path === "/api/h2h-standings") return jsonResponse(state.h2h_standings || []);
+      if (path === "/api/classic-rankings") return jsonResponse(state.classic_rankings || []);
+      if (path.startsWith("/api/fixture/")) {
+        const id = Number(path.split("/").pop());
+        return jsonResponse(state.fixture_details[String(id)] || state.fixture_details[id] || {});
+      }
+      if (path.startsWith("/api/picks/")) {
+        const uid = normalizeUid(Number(path.split("/").pop()));
+        let payload = state.picks_by_uid[uid] || {};
+        const forceFresh = url.searchParams.get("fresh") === "1";
+        if (forceFresh || !payload.players || payload.players.length === 0) {
+          const freshState = await buildState(state, [uid]);
+          payload = freshState.picks_by_uid[uid] || {};
+        }
+        debugUid("api_response", uid, {
+          total_live: payload.total_live || 0,
+          event_total: payload.event_total || 0,
+          players: summarizePlayersForDebug(payload.players || []),
+        });
+        return jsonResponse(payload);
+      }
+      if (path === "/api/trends/transfers")
+        return jsonResponse(state.transfer_trends || { league: {}, global: {}, ownership_top: [], ownership_manager_count: UID_LIST.length });
+      if (path === "/api/fdr") {
+        return jsonResponse(
+          state.fdr || {
+            weeks: [],
+            html: state.fdr_html || "",
+            uses_h2h: false,
+            ranking_source: "entry_league_rank",
+            weights: { total: FDR_TOTAL_WEIGHT, h2h: FDR_H2H_WEIGHT },
+            daily_averages: state.league_daily_averages || {
+              manager_count: 0,
+              today_average_count: 0,
+              effective_average_count: 0,
+            },
+          }
+        );
+      }
+      if (path === "/api/health") {
+        return jsonResponse({
+          status: "ok",
+          last_update: state.generated_at,
+          current_event: state.current_event,
+          current_event_name: state.current_event_name,
+          refresh_meta: state.refresh_meta || null,
+        });
+      }
+
+      return jsonResponse({ error: "not found" }, 404);
+    } catch (error) {
+      return jsonResponse({
+        success: false,
+        error: String(error?.message || error || "Unknown worker error"),
+      }, 500);
+    }
   },
 
   async scheduled(event, env, ctx) {
