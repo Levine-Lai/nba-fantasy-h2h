@@ -2635,13 +2635,13 @@ async function fetchPlayerReferencePayload(playerQuery = "nikola-jokic") {
         .sort((a, b) => b.fantasy_points - a.fantasy_points || b.points_scored - a.points_scored)
         .slice(0, 4);
       const averages = sourceGames.length ? {
-        fantasy_points: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.fantasy_points || 0), 0) / sourceGames.length),
-        points_scored: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.points_scored || 0), 0) / sourceGames.length),
-        rebounds: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.rebounds || 0), 0) / sourceGames.length),
-        assists: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.assists || 0), 0) / sourceGames.length),
-        steals: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.steals || 0), 0) / sourceGames.length),
-        blocks: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.blocks || 0), 0) / sourceGames.length),
-        minutes: Math.round(sourceGames.reduce((sum, game) => sum + Number(game.minutes || 0), 0) / sourceGames.length),
+        fantasy_points: Number((sourceGames.reduce((sum, game) => sum + Number(game.fantasy_points || 0), 0) / sourceGames.length).toFixed(1)),
+        points_scored: Number((sourceGames.reduce((sum, game) => sum + Number(game.points_scored || 0), 0) / sourceGames.length).toFixed(1)),
+        rebounds: Number((sourceGames.reduce((sum, game) => sum + Number(game.rebounds || 0), 0) / sourceGames.length).toFixed(1)),
+        assists: Number((sourceGames.reduce((sum, game) => sum + Number(game.assists || 0), 0) / sourceGames.length).toFixed(1)),
+        steals: Number((sourceGames.reduce((sum, game) => sum + Number(game.steals || 0), 0) / sourceGames.length).toFixed(1)),
+        blocks: Number((sourceGames.reduce((sum, game) => sum + Number(game.blocks || 0), 0) / sourceGames.length).toFixed(1)),
+        minutes: Number((sourceGames.reduce((sum, game) => sum + Number(game.minutes || 0), 0) / sourceGames.length).toFixed(1)),
       } : null;
       const games = sourceGames.map((item) => ({
         ...item,

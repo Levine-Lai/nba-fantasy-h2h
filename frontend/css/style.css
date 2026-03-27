@@ -1428,10 +1428,16 @@ body {
     border-top: 1px solid #d7e4f2;
     margin-top: 4px;
     padding-top: 10px;
-    display: grid;
-    grid-template-columns: 42px 60px 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.reference-average-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     gap: 12px;
-    align-items: start;
 }
 
 .reference-average-label {

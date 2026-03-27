@@ -300,21 +300,25 @@ const Render = {
                     <div class="reference-average-row">
                         ${item.averages
                             ? `
-                                <span class="reference-average-label">场均</span>
-                                <span class="reference-average-score">${Math.round(Number(item.averages.fantasy_points || 0))}分</span>
-                                <span class="reference-average-meta">
-                                    ${Number(item.averages.minutes || 0) > 0 ? `${Math.round(Number(item.averages.minutes || 0))}分钟 ` : ""}
-                                    ${Math.round(Number(item.averages.points_scored || 0))}分
-                                    ${Math.round(Number(item.averages.rebounds || 0))}板
-                                    ${Math.round(Number(item.averages.assists || 0))}助
-                                    ${Math.round(Number(item.averages.steals || 0))}断
-                                    ${Math.round(Number(item.averages.blocks || 0))}帽
-                                </span>
+                                <div class="reference-average-top">
+                                    <span class="reference-average-label">场均</span>
+                                    <span class="reference-average-score">${Number(item.averages.fantasy_points || 0).toFixed(1)}分</span>
+                                </div>
+                                <div class="reference-average-meta">
+                                    ${Number(item.averages.minutes || 0) > 0 ? `${Number(item.averages.minutes || 0).toFixed(1)}分钟 ` : ""}
+                                    ${Number(item.averages.points_scored || 0).toFixed(1)}分
+                                    ${Number(item.averages.rebounds || 0).toFixed(1)}板
+                                    ${Number(item.averages.assists || 0).toFixed(1)}助
+                                    ${Number(item.averages.steals || 0).toFixed(1)}断
+                                    ${Number(item.averages.blocks || 0).toFixed(1)}帽
+                                </div>
                             `
                             : `
-                                <span class="reference-average-label">场均</span>
-                                <span class="reference-average-score">--</span>
-                                <span class="reference-average-meta">暂无数据</span>
+                                <div class="reference-average-top">
+                                    <span class="reference-average-label">场均</span>
+                                    <span class="reference-average-score">--</span>
+                                </div>
+                                <div class="reference-average-meta">暂无数据</div>
                             `}
                     </div>
                 </div>
