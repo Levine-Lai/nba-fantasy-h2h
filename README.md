@@ -9,6 +9,17 @@
    - 只有点击 `伤病信息` 导航时才请求
    - 不并入首页 `/api/state`
    - 不增加首页 KV 读写压力
+5. 伤病数据当前采用“每小时缓存一次”的策略：
+   - `/api/injuries` 默认优先读 KV 缓存
+   - 缓存有效期为 `60` 分钟
+   - Worker 额外增加整点 cron 任务，每小时强制刷新一次伤病缓存
+6. 伤病页球队卡片当前使用本地静态 logo：
+   - 资源目录为 `frontend/nba-team-logos/`
+   - 前端直接加载本地 png，避免外链 logo 导致慢加载
+7. 伤病页当前展示会优先精简为：
+   - 球员名
+   - 状态（优先从评论里提取 `questionable/probable/out/doubtful`）
+   - 受伤部位（如 `left calf`）
 ## 2026-03-27 首页面板显示修正
 1. 首页 `Live H2H` 现在通过 `/api/state?fresh_h2h=1` 返回数据：
    - 仍然只走一次首页主请求

@@ -198,7 +198,7 @@ const Render = {
 
         badge.textContent = data?.target_date || "No Date";
         subtitle.textContent = data?.next_event_name
-            ? `${data.next_event_name} · ${Number(data?.games_count || 0)} 场比赛`
+            ? `${data.next_event_name} · ${Number(data?.games_count || 0)} 场比赛 · 更新 ${data?.updated_at ? new Date(data.updated_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }) : "--:--"}`
             : "暂无下一日赛程";
 
         const teams = Array.isArray(data?.teams) ? data.teams : [];
@@ -208,21 +208,25 @@ const Render = {
         }
 
         container.innerHTML = teams.map((team) => `
-            <div class="injury-card">
+            <div class="injury-card" style="--team-color:${escapeHtml(team.team_color || "#334155")}">
                 <div class="injury-card-head">
-                    <div>
-                        <div class="injury-team">${escapeHtml(team.team_name)}</div>
-                        <div class="injury-meta">${team.home_away === "home" ? "vs" : "@"} ${escapeHtml(team.opponent || "-")}</div>
+                    <div class="injury-team-wrap">
+                        <img class="injury-team-logo" src="${escapeHtml(team.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" decoding="async">
+                        <div>
+                            <div class="injury-team">${escapeHtml(team.team_name)}</div>
+                            <div class="injury-meta">${team.home_away === "home" ? "vs" : "@"} ${escapeHtml(team.opponent || "-")}</div>
+                        </div>
                     </div>
                     <div class="injury-count">${Number(team.injury_count || 0)} 人</div>
                 </div>
                 ${Array.isArray(team.injuries) && team.injuries.length
                     ? `<div class="injury-rows">${team.injuries.map((item) => `
                         <div class="injury-row">
-                            <div class="injury-player">${escapeHtml(item.player_name)}</div>
-                            <div class="injury-status">${escapeHtml(item.status || "-")}</div>
-                            <div class="injury-return">${escapeHtml(item.est_return_date || "-")}</div>
-                            <div class="injury-comment">${escapeHtml(item.comment || "")}</div>
+                            <div class="injury-line">
+                                <span class="injury-player">${escapeHtml(item.player_name)}</span>
+                                <span class="injury-status">${escapeHtml(item.status_short || item.status || "-")}</span>
+                            </div>
+                            <div class="injury-detail">${escapeHtml(item.injury_area || item.est_return_date || "-")}</div>
                         </div>
                     `).join("")}</div>`
                     : '<div class="trend-empty">No listed injuries</div>'}

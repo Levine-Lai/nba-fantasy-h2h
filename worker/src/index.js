@@ -2,6 +2,8 @@
 const LEAGUE_ID = 1653;
 const CACHE_KEY = "latest_state";
 const CACHE_CURSOR_KEY = "refresh_cursor";
+const INJURY_CACHE_KEY = "injury_state";
+const INJURY_CACHE_TTL_MS = 60 * 60 * 1000;
 const UID_CHUNK_SIZE = 6;
 const UID_LIST = [
   "5410",
@@ -1406,6 +1408,84 @@ function parseEspnInjuryPage(html) {
   return blocks;
 }
 
+function extractAvailabilityFromComment(comment, fallbackStatus = "") {
+  const text = String(comment || "").toLowerCase();
+  const fallback = String(fallbackStatus || "").trim();
+  const tags = ["questionable", "probable", "doubtful", "out", "available"];
+  for (const tag of tags) {
+    if (text.includes(tag)) return tag;
+  }
+  return fallback || "unknown";
+}
+
+function extractInjuryArea(comment) {
+  const text = String(comment || "");
+  const lower = text.toLowerCase();
+  const directional = lower.match(/\b(left|right)\s+(?:lower\s+|upper\s+)?[a-z]+(?:\s+[a-z]+)?\b/);
+  if (directional) return directional[0];
+
+  const bodyParts = [
+    "ankle", "calf", "knee", "hamstring", "groin", "thigh", "wrist", "shoulder",
+    "elbow", "back", "foot", "toe", "hand", "thumb", "finger", "hip", "pelvis",
+    "rib", "abdomen", "neck", "illness", "rest", "concussion", "personal"
+  ];
+  for (const part of bodyParts) {
+    if (lower.includes(part)) return part;
+  }
+  return "";
+}
+
+function getTeamVisualMeta(teamName) {
+  const key = normalizeTeamName(teamName);
+  const visualMap = {
+    "atlanta hawks": { logo: "hawks.png", color: "#E03A3E" },
+    "boston celtics": { logo: "celtics.png", color: "#007A33" },
+    "brooklyn nets": { logo: "nets.png", color: "#111111" },
+    "charlotte hornets": { logo: "hornets.png", color: "#1D1160" },
+    "chicago bulls": { logo: "bulls.png", color: "#CE1141" },
+    "cleveland cavaliers": { logo: "cavaliers.png", color: "#6F263D" },
+    "dallas mavericks": { logo: "mavericks.png", color: "#00538C" },
+    "denver nuggets": { logo: "nuggets.png", color: "#0E2240" },
+    "detroit pistons": { logo: "pistons.png", color: "#C8102E" },
+    "golden state warriors": { logo: "warriors.png", color: "#1D428A" },
+    "houston rockets": { logo: "rockets.png", color: "#CE1141" },
+    "indiana pacers": { logo: "pacers.png", color: "#002D62" },
+    "los angeles clippers": { logo: "clippers.png", color: "#C8102E" },
+    "los angeles lakers": { logo: "lakers.png", color: "#552583" },
+    "memphis grizzlies": { logo: "grizzlies.png", color: "#5D76A9" },
+    "miami heat": { logo: "heat.png", color: "#98002E" },
+    "milwaukee bucks": { logo: "bucks.png", color: "#00471B" },
+    "minnesota timberwolves": { logo: "timberwolves.png", color: "#0C2340" },
+    "new orleans pelicans": { logo: "pelicans.png", color: "#0C2340" },
+    "new york knicks": { logo: "knicks.png", color: "#006BB6" },
+    "oklahoma city thunder": { logo: "thunder.png", color: "#007AC1" },
+    "orlando magic": { logo: "magic.png", color: "#0077C0" },
+    "philadelphia 76ers": { logo: "sixers.png", color: "#006BB6" },
+    "phoenix suns": { logo: "suns.png", color: "#1D1160" },
+    "portland trail blazers": { logo: "blazers.png", color: "#E03A3E" },
+    "sacramento kings": { logo: "kings.png", color: "#5A2D81" },
+    "san antonio spurs": { logo: "spurs.png", color: "#111111" },
+    "toronto raptors": { logo: "raptors.png", color: "#CE1141" },
+    "utah jazz": { logo: "jazz.png", color: "#002B5C" },
+    "washington wizards": { logo: "wizards.png", color: "#002B5C" },
+  };
+  const visual = visualMap[key] || { logo: "_.png", color: "#334155" };
+  return {
+    ...visual,
+    logo_url: `/nba-team-logos/${visual.logo}`,
+  };
+}
+
+async function getInjuryCache(env) {
+  const raw = await env.NBA_CACHE.get(INJURY_CACHE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 async function fetchNextDayInjuriesPayload() {
   const bootstrap = await fetchJson("/bootstrap-static/");
   const events = bootstrap.events || [];
@@ -1467,13 +1547,22 @@ async function fetchNextDayInjuriesPayload() {
   const teams = Object.entries(teamOpponents)
     .map(([teamKey, info]) => {
       const matched = espnTeams.find((team) => team.team_key === teamKey);
+      const visual = getTeamVisualMeta(info.team_name);
       return {
         team_name: info.team_name,
         opponent: info.opponent,
         home_away: info.home_away,
         kickoff_time: info.kickoff_time,
+        team_color: visual.color,
+        logo_url: visual.logo_url,
         injury_count: Array.isArray(matched?.injuries) ? matched.injuries.length : 0,
-        injuries: Array.isArray(matched?.injuries) ? matched.injuries : [],
+        injuries: Array.isArray(matched?.injuries)
+          ? matched.injuries.map((injury) => ({
+              ...injury,
+              status_short: extractAvailabilityFromComment(injury.comment, injury.status),
+              injury_area: extractInjuryArea(injury.comment),
+            }))
+          : [],
       };
     })
     .sort((a, b) => a.team_name.localeCompare(b.team_name));
@@ -2390,6 +2479,29 @@ async function getState(env) {
   }
 }
 
+async function getInjuriesPayload(env, options = {}) {
+  const force = !!options.force;
+  const cached = await getInjuryCache(env);
+  const now = Date.now();
+  const cachedAt = Date.parse(cached?.updated_at || "") || 0;
+  if (!force && cached && cachedAt && now - cachedAt < INJURY_CACHE_TTL_MS) {
+    return cached;
+  }
+
+  const fresh = await fetchNextDayInjuriesPayload();
+  const payload = {
+    ...fresh,
+    updated_at: new Date().toISOString(),
+    cache_ttl_minutes: 60,
+  };
+  try {
+    await env.NBA_CACHE.put(INJURY_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    return payload;
+  }
+  return payload;
+}
+
 export default {
   async fetch(request, env, ctx) {
     try {
@@ -2435,7 +2547,9 @@ export default {
       if (path === "/api/fixtures") return jsonResponse(state.fixtures);
       if (path === "/api/h2h") return jsonResponse(state.h2h);
       if (path === "/api/injuries") {
-        return jsonResponse(await fetchNextDayInjuriesPayload());
+        return jsonResponse(await getInjuriesPayload(env, {
+          force: url.searchParams.get("fresh") === "1",
+        }));
       }
       if (path === "/api/h2h-standings") return jsonResponse(state.h2h_standings || []);
       if (path === "/api/classic-rankings") return jsonResponse(state.classic_rankings || []);
@@ -2499,7 +2613,18 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    if (!isBeijingRefreshWindow(event?.scheduledTime || Date.now())) return;
+    const scheduledAt = event?.scheduledTime || Date.now();
+    const date = new Date(scheduledAt);
+    const utcMinute = Number(new Intl.DateTimeFormat("en-GB", {
+      timeZone: "UTC",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date));
+
+    if (utcMinute === 0) {
+      ctx.waitUntil(getInjuriesPayload(env, { force: true }));
+    }
+    if (!isBeijingRefreshWindow(scheduledAt)) return;
     ctx.waitUntil(refreshState(env));
   },
 };
