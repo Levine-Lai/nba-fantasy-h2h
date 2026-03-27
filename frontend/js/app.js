@@ -1,24 +1,5 @@
 const API_BASE = (window.__API_BASE__ || "").trim().replace(/\/+$/, "");
 
-const ErrorBanner = {
-    show(message) {
-        let banner = document.getElementById("error-banner");
-        if (!banner) {
-            banner = document.createElement("div");
-            banner.id = "error-banner";
-            banner.style.cssText = "display:none;background:#dc3545;color:#fff;padding:10px;text-align:center;position:fixed;top:0;left:0;right:0;z-index:10000;";
-            document.body.insertBefore(banner, document.body.firstChild);
-        }
-        banner.textContent = message;
-        banner.style.display = "block";
-    },
-
-    hide() {
-        const banner = document.getElementById("error-banner");
-        if (banner) banner.style.display = "none";
-    },
-};
-
 const API = {
     async fetch(url, options = {}) {
         const target = /^https?:\/\//.test(url) ? url : `${API_BASE}${url}`;
@@ -29,29 +10,15 @@ const API = {
                 if (response.status === 500) throw new Error("Server error");
                 throw new Error(`Request failed: ${response.status}`);
             }
-            ErrorBanner.hide();
             return response;
         } catch (error) {
             console.error(`[API Error] ${url}`, error);
-            ErrorBanner.show("Data load failed. Please refresh and try again.");
             throw error;
         }
     },
 
-    async getGames() {
-        return (await this.fetch("/api/fixtures")).json();
-    },
-
-    async getH2H() {
-        return (await this.fetch("/api/h2h")).json();
-    },
-
-    async getH2HStandings() {
-        return (await this.fetch("/api/h2h-standings")).json();
-    },
-
-    async getClassicRankings() {
-        return (await this.fetch("/api/classic-rankings")).json();
+    async getState() {
+        return (await this.fetch("/api/state")).json();
     },
 
     async getGameDetail(fixtureId) {
@@ -60,14 +27,6 @@ const API = {
 
     async getLineup(uid) {
         return (await this.fetch(`/api/picks/${uid}?fresh=1`)).json();
-    },
-
-    async getTransferTrends() {
-        return (await this.fetch("/api/trends/transfers")).json();
-    },
-
-    async getFdr() {
-        return (await this.fetch("/api/fdr")).json();
     },
 
     async refresh() {
@@ -115,6 +74,36 @@ function renderTransferRecords(teamName, transferRecords, side = "left", captain
     `;
 }
 
+function getBeijingHour(date = new Date()) {
+    return Number(new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Shanghai",
+        hour: "2-digit",
+        hour12: false,
+    }).format(date));
+}
+
+function getNextRefreshDelay(fixtures) {
+    const games = Array.isArray(fixtures?.games) ? fixtures.games : [];
+    if (!games.length) return null;
+
+    const bjHour = getBeijingHour(new Date());
+    const inRefreshWindow = bjHour >= 7 && bjHour < 14;
+    const hasUnfinishedGames = games.some((game) => !game?.finished);
+    if (!inRefreshWindow || !hasUnfinishedGames) return null;
+
+    const kickoffTimes = games
+        .map((game) => (game?.kickoff_time ? Date.parse(game.kickoff_time) : NaN))
+        .filter((value) => Number.isFinite(value));
+    const earliestKickoff = kickoffTimes.length ? Math.min(...kickoffTimes) : null;
+    const now = Date.now();
+
+    if (earliestKickoff && now < earliestKickoff) {
+        return Math.max(30000, earliestKickoff - now);
+    }
+
+    return 120000;
+}
+
 const Render = {
     updateTime() {
         const element = document.getElementById("update-time");
@@ -146,13 +135,6 @@ const Render = {
         if (!button) return;
         button.disabled = state === "loading";
         button.textContent = text;
-    },
-
-    switchPage(page) {
-        document.getElementById("page-home")?.classList.toggle("active", page === "home");
-        document.getElementById("page-rankings")?.classList.toggle("active", page === "rankings");
-        document.getElementById("nav-home")?.classList.toggle("active", page === "home");
-        document.getElementById("nav-rankings")?.classList.toggle("active", page === "rankings");
     },
 
     transferTrends(data) {
@@ -251,7 +233,7 @@ const Render = {
         const container = document.getElementById("h2h-list");
         if (!container) return;
 
-        container.innerHTML = matches.map((match) => {
+        container.innerHTML = (matches || []).map((match) => {
             const leftScore = Number(match.total1 || 0);
             const rightScore = Number(match.total2 || 0);
             const isLeftWin = leftScore > rightScore;
@@ -290,70 +272,6 @@ const Render = {
                 </div>
             `;
         }).join("");
-    },
-
-    h2hStandings(rows) {
-        const body = document.getElementById("rankings-body");
-        if (!body) return;
-
-        if (!rows || rows.length === 0) {
-            body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;">No standings data</td></tr>';
-            return;
-        }
-
-        body.innerHTML = rows.map((row) => `
-            <tr class="${row.live_applied ? "live-row" : ""}">
-                <td>${row.rank}</td>
-                <td class="team-cell">${escapeHtml(row.team_name)}</td>
-                <td>${row.played}</td>
-                <td>${row.won}</td>
-                <td>${row.draw}</td>
-                <td>${row.lost}</td>
-                <td class="points-cell">${row.points}</td>
-            </tr>
-        `).join("");
-    },
-
-    classicRankings(rows) {
-        const overallBody = document.getElementById("overall-rankings-body");
-        const weeklyBody = document.getElementById("weekly-rankings-body");
-        const overallBadge = document.getElementById("overall-rankings-badge");
-        const weeklyBadge = document.getElementById("weekly-rankings-badge");
-        if (!overallBody || !weeklyBody) return;
-
-        if (overallBadge) overallBadge.textContent = "League";
-        if (weeklyBadge && rows && rows.length > 0) {
-            const week = rows[0]?.current_week;
-            weeklyBadge.textContent = week ? `GW${week}` : "GW";
-        }
-
-        if (!rows || rows.length === 0) {
-            overallBody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;">No ranking data</td></tr>';
-            weeklyBody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;">No ranking data</td></tr>';
-            return;
-        }
-
-        overallBody.innerHTML = rows.map((row) => `
-            <tr>
-                <td class="team-cell">${escapeHtml(row.team_name)}</td>
-                <td>${row.overall_rank ?? "-"}</td>
-                <td>${row.overall_score ?? "-"}</td>
-            </tr>
-        `).join("");
-
-        const weeklyRows = [...rows].sort((a, b) => {
-            const aRank = Number.isFinite(Number(a?.weekly_rank)) && Number(a.weekly_rank) > 0 ? Number(a.weekly_rank) : Number.MAX_SAFE_INTEGER;
-            const bRank = Number.isFinite(Number(b?.weekly_rank)) && Number(b.weekly_rank) > 0 ? Number(b.weekly_rank) : Number.MAX_SAFE_INTEGER;
-            return aRank - bRank || String(a.team_name || "").localeCompare(String(b.team_name || ""));
-        });
-
-        weeklyBody.innerHTML = weeklyRows.map((row) => `
-            <tr>
-                <td class="team-cell">${escapeHtml(row.team_name)}</td>
-                <td>${row.weekly_rank ?? "-"}</td>
-                <td>${row.weekly_score ?? "-"}</td>
-            </tr>
-        `).join("");
     },
 
     modalLoading(modalId, bodyId, titleId, title) {
@@ -535,7 +453,7 @@ const Render = {
 
 const App = {
     lineupCache: new Map(),
-    currentPage: "home",
+    refreshTimer: null,
 
     async getLineupCached(uid) {
         const key = String(uid);
@@ -545,121 +463,42 @@ const App = {
         return this.lineupCache.get(key);
     },
 
-    async hydrateH2HMatches(matches) {
-        const safeMatches = Array.isArray(matches) ? matches.map((match) => ({ ...match })) : [];
-        const uidSet = new Set();
-        for (const match of safeMatches) {
-            if (match?.uid1) uidSet.add(String(match.uid1));
-            if (match?.uid2) uidSet.add(String(match.uid2));
+    clearRefreshTimer() {
+        if (this.refreshTimer) {
+            clearTimeout(this.refreshTimer);
+            this.refreshTimer = null;
         }
+    },
 
-        const uidList = [...uidSet];
-        const lineupByUid = {};
-        const batchSize = 4;
+    scheduleAutoRefresh(state) {
+        this.clearRefreshTimer();
+        const delay = getNextRefreshDelay(state?.fixtures);
+        if (!delay) return;
 
-        for (let index = 0; index < uidList.length; index += batchSize) {
-            const batch = uidList.slice(index, index + batchSize);
-            const batchResults = await Promise.all(batch.map(async (uid) => {
-                try {
-                    const payload = await API.getLineup(uid);
-                    this.lineupCache.set(String(uid), Promise.resolve(payload));
-                    return [uid, payload];
-                } catch {
-                    return [uid, null];
-                }
-            }));
-
-            for (const [uid, payload] of batchResults) {
-                if (payload) lineupByUid[String(uid)] = payload;
-            }
-        }
-
-        return safeMatches.map((match) => {
-            const left = lineupByUid[String(match.uid1)];
-            const right = lineupByUid[String(match.uid2)];
-            const total1 = Number(left?.event_total ?? match.total1 ?? 0);
-            const total2 = Number(right?.event_total ?? match.total2 ?? 0);
-            const today1 = Number(left?.total_live ?? match.today1 ?? 0);
-            const today2 = Number(right?.total_live ?? match.today2 ?? 0);
-            return {
-                ...match,
-                total1,
-                total2,
-                today1,
-                today2,
-                diff: Math.abs(total1 - total2),
-            };
-        });
+        this.refreshTimer = setTimeout(() => {
+            this.loadAll();
+        }, delay);
     },
 
     async loadAll() {
         try {
-            await Promise.all([
-                this.loadGames(),
-                this.loadH2H(),
-                this.loadTrends(),
-                this.loadFdr(),
-                this.loadRankings(),
-            ]);
-            Render.updateTime();
-        } catch (error) {
-            console.error("LoadAll error:", error);
-        }
-    },
-
-    async loadGames() {
-        try {
-            const data = await API.getGames();
-            Render.gameCount(data.count || 0);
-            if (data.event_name) Render.eventInfo(data.event_name);
-            Render.gamesList(data.games || []);
-        } catch (error) {
-            console.error("Games error:", error);
-        }
-    },
-
-    async loadH2H() {
-        try {
-            const data = await API.getH2H();
-            const hydrated = await this.hydrateH2HMatches(data || []);
-            Render.matchCount(hydrated.length || 0);
-            Render.h2hList(hydrated || []);
-        } catch (error) {
-            console.error("H2H error:", error);
-        }
-    },
-
-    async loadTrends() {
-        try {
-            Render.transferTrends(await API.getTransferTrends());
-        } catch (error) {
-            console.error("Trends error:", error);
-        }
-    },
-
-    async loadFdr() {
-        try {
-            Render.fdr(await API.getFdr());
-        } catch (error) {
-            console.error("FDR error:", error);
-            Render.fdr({
+            const state = await API.getState();
+            Render.eventInfo(state?.current_event_name || "Loading...");
+            Render.gameCount(state?.fixtures?.count || 0);
+            Render.gamesList(state?.fixtures?.games || []);
+            Render.matchCount(Array.isArray(state?.h2h) ? state.h2h.length : 0);
+            Render.h2hList(state?.h2h || []);
+            Render.transferTrends(state?.transfer_trends || {});
+            Render.fdr(state?.fdr || {
                 weeks: [],
                 html: '<tr><td colspan="5" style="text-align:center;padding:20px;">Load failed</td></tr>',
                 daily_averages: { today_average_count: 0, effective_average_count: 0 },
             });
-        }
-    },
-
-    async loadRankings() {
-        try {
-            const [h2hStandings, classicRankings] = await Promise.all([
-                API.getH2HStandings(),
-                API.getClassicRankings(),
-            ]);
-            Render.h2hStandings(h2hStandings);
-            Render.classicRankings(classicRankings);
+            Render.updateTime();
+            this.scheduleAutoRefresh(state);
         } catch (error) {
-            console.error("Standings error:", error);
+            console.error("LoadAll error:", error);
+            this.clearRefreshTimer();
         }
     },
 
@@ -693,16 +532,6 @@ const App = {
         }
     },
 
-    async showLineup(uid, name) {
-        Render.modalLoading("lineup-modal", "lineup-body", "lineup-title", `${name} Lineup`);
-        try {
-            Render.lineup(await this.getLineupCached(uid), name);
-        } catch (error) {
-            console.error(error);
-            Render.modalError("lineup-body");
-        }
-    },
-
     async showLineupDual(uid1, name1, uid2, name2) {
         Render.modalLoading("lineup-modal", "lineup-body", "lineup-title", `${name1} VS ${name2}`);
         try {
@@ -716,6 +545,7 @@ const App = {
 
     async manualRefresh() {
         Render.refreshButton("loading", "Refreshing...");
+        this.clearRefreshTimer();
         try {
             const data = await API.refresh();
             if (data.current_event_name) Render.eventInfo(data.current_event_name);
@@ -726,11 +556,6 @@ const App = {
         } finally {
             Render.refreshButton("idle", "Refresh");
         }
-    },
-
-    switchPage(page) {
-        this.currentPage = page;
-        Render.switchPage(page);
     },
 
     bindEvents() {
@@ -775,9 +600,7 @@ const App = {
     init() {
         document.addEventListener("DOMContentLoaded", () => {
             this.bindEvents();
-            this.switchPage(this.currentPage);
             this.loadAll();
-            setInterval(() => this.loadAll(), 60000);
         });
     },
 };

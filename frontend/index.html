@@ -7,7 +7,7 @@
     <link rel="icon" type="image/jpeg" href="/LOGO.png">
     <link rel="stylesheet" href="/css/style.css">
     <script>
-        window.__API_BASE__ = "https://nba-fantasy-api.nbafantasy.workers.dev";
+        window.__API_BASE__ = "";
     </script>
 </head>
 <body>
@@ -21,10 +21,6 @@
             </div>
         </div>
         <div class="controls">
-            <div class="nav-tabs">
-                <button class="nav-tab active" id="nav-home" onclick="App.switchPage('home')">主页</button>
-                <button class="nav-tab" id="nav-rankings" onclick="App.switchPage('rankings')">排行榜</button>
-            </div>
             <div class="status">
                 <span class="pulse"></span>
                 <span id="update-time">Loading...</span>
@@ -49,7 +45,7 @@
                 <div id="trend-overall-in" class="trend-list"></div>
                 <div class="trend-title">Overall Transfer Out</div>
                 <div id="trend-overall-out" class="trend-list"></div>
-                <div class="trend-title">Ownership Top 20</div>
+                <div class="trend-title">Ownership Top 10</div>
                 <div id="ownership-top" class="trend-list"></div>
             </div>
         </div>
@@ -74,70 +70,8 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="container page-view rankings-layout" id="page-rankings">
-        <div class="column rankings-column">
-            <div class="col-header">
-                <div class="col-title">Live H2H Standings</div>
-                <span class="col-badge" id="standings-badge">实时</span>
-            </div>
-            <table class="rankings-table">
-                <thead>
-                    <tr>
-                        <th>RANK</th>
-                        <th class="team-col">TEAM</th>
-                        <th>GW</th>
-                        <th>W</th>
-                        <th>D</th>
-                        <th>L</th>
-                        <th class="points-col">积分</th>
-                    </tr>
-                </thead>
-                <tbody id="rankings-body">
-                    <tr><td colspan="7" style="text-align:center;padding:20px;">Loading...</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="column rankings-column">
-            <div class="col-header">
-                <div class="col-title">Overall Ranking</div>
-                <span class="col-badge" id="overall-rankings-badge">League</span>
-            </div>
-            <table class="rankings-table classic-rankings-table">
-                <thead>
-                    <tr>
-                        <th class="team-col">TEAM</th>
-                        <th>总排</th>
-                        <th>总分</th>
-                    </tr>
-                </thead>
-                <tbody id="overall-rankings-body">
-                    <tr><td colspan="3" style="text-align:center;padding:20px;">Loading...</td></tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="column rankings-column">
-            <div class="col-header">
-                <div class="col-title">Weekly Ranking</div>
-                <span class="col-badge" id="weekly-rankings-badge">GW</span>
-            </div>
-            <table class="rankings-table classic-rankings-table">
-                <thead>
-                    <tr>
-                        <th class="team-col">TEAM</th>
-                        <th>周排</th>
-                        <th>周分</th>
-                    </tr>
-                </thead>
-                <tbody id="weekly-rankings-body">
-                    <tr><td colspan="3" style="text-align:center;padding:20px;">Loading...</td></tr>
-                </tbody>
-            </table>
-        </div>
-
+        <!-- Column 3: FDR -->
         <div class="column rankings-column">
             <div class="col-header">
                 <div class="col-title">FDR Ranking</div>

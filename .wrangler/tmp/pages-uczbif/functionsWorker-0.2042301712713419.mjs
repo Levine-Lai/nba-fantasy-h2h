@@ -1,9 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// .wrangler/tmp/pages-0mOz8M/functionsWorker-0.23497336611732456.mjs
-var __defProp2 = Object.defineProperty;
-var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
+// ../worker/src/index.js
 var BASE_URL = "https://nbafantasy.nba.com/api";
 var LEAGUE_ID = 1653;
 var CACHE_KEY = "latest_state";
@@ -40,6 +38,9 @@ var UID_LIST = [
 var DEBUG_UIDS = /* @__PURE__ */ new Set(["5095", "6412", "8580", "16447", "5467", "5410", "6441", "6562", "22761", "5101", "4319", "11", "23", "42"]);
 var FDR_TOTAL_WEIGHT = 0.7;
 var FDR_H2H_WEIGHT = 0.3;
+var WIN_PROB_FT_BONUS = 50;
+var WIN_PROB_CAPTAIN_BONUS = 65;
+var WIN_PROB_LOGISTIC_SCALE = 90;
 var FDR_H2H_RANK_BY_UID = {
   "2": 1,
   "15": 2,
@@ -183,7 +184,6 @@ function normalizeUid(uid) {
   return String(uid).trim();
 }
 __name(normalizeUid, "normalizeUid");
-__name2(normalizeUid, "normalizeUid");
 function uidToNumber(uid) {
   const normalized = normalizeUid(uid);
   if (!normalized) return null;
@@ -191,7 +191,6 @@ function uidToNumber(uid) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 __name(uidToNumber, "uidToNumber");
-__name2(uidToNumber, "uidToNumber");
 function getMapValueByUid(source, uid) {
   if (!source || typeof source !== "object") return null;
   const normalized = normalizeUid(uid);
@@ -201,12 +200,10 @@ function getMapValueByUid(source, uid) {
   return null;
 }
 __name(getMapValueByUid, "getMapValueByUid");
-__name2(getMapValueByUid, "getMapValueByUid");
 function isDebugUid(uid) {
   return DEBUG_UIDS.has(normalizeUid(uid));
 }
 __name(isDebugUid, "isDebugUid");
-__name2(isDebugUid, "isDebugUid");
 function summarizePlayersForDebug(players) {
   return (players || []).map((player) => ({
     element_id: player?.element_id ?? player?.id ?? null,
@@ -218,7 +215,6 @@ function summarizePlayersForDebug(players) {
   }));
 }
 __name(summarizePlayersForDebug, "summarizePlayersForDebug");
-__name2(summarizePlayersForDebug, "summarizePlayersForDebug");
 function debugUid(stage, uid, payload) {
   if (!isDebugUid(uid)) return;
   let serialized = "";
@@ -230,7 +226,16 @@ function debugUid(stage, uid, payload) {
   console.log(`[uid-debug][${normalizeUid(uid)}][${stage}] ${serialized}`);
 }
 __name(debugUid, "debugUid");
-__name2(debugUid, "debugUid");
+function isBeijingRefreshWindow(value = Date.now()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const bjHour = Number(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    hour: "2-digit",
+    hour12: false
+  }).format(date));
+  return bjHour >= 7 && bjHour < 14;
+}
+__name(isBeijingRefreshWindow, "isBeijingRefreshWindow");
 function buildPreviousPicksByUid(previousState) {
   const currentShape = previousState?.picks_by_uid;
   if (currentShape && typeof currentShape === "object") {
@@ -266,7 +271,6 @@ function buildPreviousPicksByUid(previousState) {
   return migrated;
 }
 __name(buildPreviousPicksByUid, "buildPreviousPicksByUid");
-__name2(buildPreviousPicksByUid, "buildPreviousPicksByUid");
 function getFutureFixtureWeeks(currentWeek) {
   const availableWeeks = [...new Set(ALL_FIXTURES.map(([gw]) => Number(gw)))].sort((a, b) => a - b);
   const futureWeeks = availableWeeks.filter((week) => week >= Number(currentWeek || 0)).slice(0, 3);
@@ -274,7 +278,6 @@ function getFutureFixtureWeeks(currentWeek) {
   return availableWeeks.slice(-3);
 }
 __name(getFutureFixtureWeeks, "getFutureFixtureWeeks");
-__name2(getFutureFixtureWeeks, "getFutureFixtureWeeks");
 function buildFdrPayload({ standingsByUid = {}, currentWeek }) {
   const weeks = getFutureFixtureWeeks(currentWeek);
   const byUid = {};
@@ -311,7 +314,7 @@ function buildFdrPayload({ standingsByUid = {}, currentWeek }) {
   rankedByH2h.forEach((item, idx) => {
     h2hStrengthByUid[item.uid] = 1 - idx / h2hDenom;
   });
-  const difficultyClass = /* @__PURE__ */ __name2((opponentUid) => {
+  const difficultyClass = /* @__PURE__ */ __name((opponentUid) => {
     if (!opponentUid) return 3;
     const classicStrength = classicStrengthByUid[opponentUid] ?? 0.5;
     const h2hStrength = h2hStrengthByUid[opponentUid] ?? classicStrength;
@@ -355,7 +358,6 @@ function buildFdrPayload({ standingsByUid = {}, currentWeek }) {
   };
 }
 __name(buildFdrPayload, "buildFdrPayload");
-__name2(buildFdrPayload, "buildFdrPayload");
 function formatKickoffBj(isoTime) {
   if (!isoTime) return "--:--";
   const dt = new Date(isoTime);
@@ -368,7 +370,6 @@ function formatKickoffBj(isoTime) {
   });
 }
 __name(formatKickoffBj, "formatKickoffBj");
-__name2(formatKickoffBj, "formatKickoffBj");
 function resolveFixtureStatus(fixture) {
   const kickoffMs = fixture?.kickoff_time ? new Date(fixture.kickoff_time).getTime() : null;
   const nowMs = Date.now();
@@ -389,12 +390,10 @@ function resolveFixtureStatus(fixture) {
   return { code: "upcoming", label: "\u672A\u5F00\u59CB" };
 }
 __name(resolveFixtureStatus, "resolveFixtureStatus");
-__name2(resolveFixtureStatus, "resolveFixtureStatus");
 function topListFromMap(counter, limit = 10) {
   return [...counter.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name, count]) => ({ name, count }));
 }
 __name(topListFromMap, "topListFromMap");
-__name2(topListFromMap, "topListFromMap");
 function buildTransferTrends({
   transfersByUid,
   leagueUids,
@@ -453,7 +452,6 @@ function buildTransferTrends({
   };
 }
 __name(buildTransferTrends, "buildTransferTrends");
-__name2(buildTransferTrends, "buildTransferTrends");
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -466,7 +464,6 @@ function jsonResponse(data, status = 200) {
   });
 }
 __name(jsonResponse, "jsonResponse");
-__name2(jsonResponse, "jsonResponse");
 async function fetchJson(path, retries = 3) {
   let lastError = null;
   for (let i = 0; i <= retries; i += 1) {
@@ -486,7 +483,6 @@ async function fetchJson(path, retries = 3) {
   throw lastError || new Error(`fetch failed ${path}`);
 }
 __name(fetchJson, "fetchJson");
-__name2(fetchJson, "fetchJson");
 async function fetchJsonSafe(path, retries = 3) {
   try {
     const data = await fetchJson(path, retries);
@@ -496,7 +492,6 @@ async function fetchJsonSafe(path, retries = 3) {
   }
 }
 __name(fetchJsonSafe, "fetchJsonSafe");
-__name2(fetchJsonSafe, "fetchJsonSafe");
 async function fetchAllStandings(phase) {
   const rows = [];
   const seenEntries = /* @__PURE__ */ new Set();
@@ -527,7 +522,6 @@ async function fetchAllStandings(phase) {
   return Array.isArray(fallback.data?.standings?.results) ? fallback.data.standings.results : [];
 }
 __name(fetchAllStandings, "fetchAllStandings");
-__name2(fetchAllStandings, "fetchAllStandings");
 function extractGwNumber(value) {
   if (value === null || value === void 0) return null;
   const text = String(value);
@@ -535,7 +529,6 @@ function extractGwNumber(value) {
   return match2 ? Number(match2[1]) : null;
 }
 __name(extractGwNumber, "extractGwNumber");
-__name2(extractGwNumber, "extractGwNumber");
 function getCurrentEvent(events) {
   const current = events.find((e) => e.is_current);
   if (current) return [current.id, current.name || `GW${current.id}`];
@@ -545,14 +538,12 @@ function getCurrentEvent(events) {
   return [last?.id || 1, last?.name || "GW1"];
 }
 __name(getCurrentEvent, "getCurrentEvent");
-__name2(getCurrentEvent, "getCurrentEvent");
 function fantasyScore(stats) {
   return Math.floor(
     (stats?.points_scored || 0) * 1 + (stats?.rebounds || 0) * 1 + (stats?.assists || 0) * 2 + (stats?.steals || 0) * 3 + (stats?.blocks || 0) * 3
   );
 }
 __name(fantasyScore, "fantasyScore");
-__name2(fantasyScore, "fantasyScore");
 function parseInjuryStatus(elem) {
   if (!elem) return null;
   const status = String(elem.status || "").toLowerCase();
@@ -570,7 +561,6 @@ function parseInjuryStatus(elem) {
   return "OUT";
 }
 __name(parseInjuryStatus, "parseInjuryStatus");
-__name2(parseInjuryStatus, "parseInjuryStatus");
 function extractHistoryRecords(historyData) {
   if (!historyData || typeof historyData !== "object") return [];
   for (const key of ["history", "chips", "card_history", "cards", "events", "results"]) {
@@ -579,7 +569,6 @@ function extractHistoryRecords(historyData) {
   return [];
 }
 __name(extractHistoryRecords, "extractHistoryRecords");
-__name2(extractHistoryRecords, "extractHistoryRecords");
 function parseEventMetaFromName(eventName) {
   const text = String(eventName || "");
   let match2 = text.match(/gameweek\s*(\d+)\s*-\s*day\s*(\d+)/i);
@@ -597,7 +586,6 @@ function parseEventMetaFromName(eventName) {
   return { gw: extractGwNumber(text), day: null };
 }
 __name(parseEventMetaFromName, "parseEventMetaFromName");
-__name2(parseEventMetaFromName, "parseEventMetaFromName");
 function buildEventMetaById(events) {
   const map = {};
   for (const item of events || []) {
@@ -613,7 +601,6 @@ function buildEventMetaById(events) {
   return map;
 }
 __name(buildEventMetaById, "buildEventMetaById");
-__name2(buildEventMetaById, "buildEventMetaById");
 function resolveTransferGwDay(transfer, eventMetaById) {
   const eventId = Number(transfer?.event);
   const eventMeta = eventMetaById?.[eventId] || {};
@@ -642,7 +629,6 @@ function resolveTransferGwDay(transfer, eventMetaById) {
   return { gw, day };
 }
 __name(resolveTransferGwDay, "resolveTransferGwDay");
-__name2(resolveTransferGwDay, "resolveTransferGwDay");
 function getWildcardDayFromHistory(historyData, currentGw, currentEvent, eventMetaById) {
   for (const item of extractHistoryRecords(historyData)) {
     const name = String(item?.name || "").toLowerCase();
@@ -660,7 +646,6 @@ function getWildcardDayFromHistory(historyData, currentGw, currentEvent, eventMe
   return null;
 }
 __name(getWildcardDayFromHistory, "getWildcardDayFromHistory");
-__name2(getWildcardDayFromHistory, "getWildcardDayFromHistory");
 function getChipDayMapFromHistory(historyData, currentGw, currentEvent, eventMetaById) {
   const chipDayMap = {};
   for (const item of extractHistoryRecords(historyData)) {
@@ -677,12 +662,10 @@ function getChipDayMapFromHistory(historyData, currentGw, currentEvent, eventMet
   return chipDayMap;
 }
 __name(getChipDayMapFromHistory, "getChipDayMapFromHistory");
-__name2(getChipDayMapFromHistory, "getChipDayMapFromHistory");
 function calculateTransferPenalty(transferCount) {
   return Math.max(0, transferCount - 2) * 100;
 }
 __name(calculateTransferPenalty, "calculateTransferPenalty");
-__name2(calculateTransferPenalty, "calculateTransferPenalty");
 function calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById) {
   const rows = Array.isArray(historyData?.current) ? historyData.current : [];
   let weeklyPoints = 0;
@@ -727,7 +710,6 @@ function calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, 
   };
 }
 __name(calculateWeekScoresFromHistory, "calculateWeekScoresFromHistory");
-__name2(calculateWeekScoresFromHistory, "calculateWeekScoresFromHistory");
 function getPlayerStats(elementId, liveElements, elements) {
   const live = liveElements[elementId];
   const elem = elements[elementId] || {};
@@ -755,7 +737,6 @@ function getPlayerStats(elementId, liveElements, elements) {
   };
 }
 __name(getPlayerStats, "getPlayerStats");
-__name2(getPlayerStats, "getPlayerStats");
 function buildTeamsPlayingToday(fixtures) {
   const teamIds = /* @__PURE__ */ new Set();
   for (const fixture of fixtures || []) {
@@ -765,14 +746,12 @@ function buildTeamsPlayingToday(fixtures) {
   return teamIds;
 }
 __name(buildTeamsPlayingToday, "buildTeamsPlayingToday");
-__name2(buildTeamsPlayingToday, "buildTeamsPlayingToday");
 function isPlayerAvailable(pick, teamsPlayingToday) {
   if (pick.injury) return false;
   if (pick.team_id && !teamsPlayingToday.has(Number(pick.team_id))) return false;
   return true;
 }
 __name(isPlayerAvailable, "isPlayerAvailable");
-__name2(isPlayerAvailable, "isPlayerAvailable");
 function calculateEffectiveScore(picks, teamsPlayingToday) {
   for (const p of picks) p.is_effective = false;
   const starters = picks.filter((p) => p.lineup_position <= 5).sort((a, b) => a.lineup_position - b.lineup_position);
@@ -780,7 +759,7 @@ function calculateEffectiveScore(picks, teamsPlayingToday) {
   const selected = [];
   let bcCount = 0;
   let fcCount = 0;
-  const addSelected = /* @__PURE__ */ __name2((pick) => {
+  const addSelected = /* @__PURE__ */ __name((pick) => {
     selected.push(pick);
     if (pick.position_type === 1) bcCount += 1;
     if (pick.position_type === 2) fcCount += 1;
@@ -807,7 +786,6 @@ function calculateEffectiveScore(picks, teamsPlayingToday) {
   return [Math.floor(score), selected, formation];
 }
 __name(calculateEffectiveScore, "calculateEffectiveScore");
-__name2(calculateEffectiveScore, "calculateEffectiveScore");
 function buildLeagueDailyAverages(picksByUid, teamsPlayingToday) {
   let totalTodayPlayers = 0;
   let totalAvailablePlayers = 0;
@@ -828,7 +806,6 @@ function buildLeagueDailyAverages(picksByUid, teamsPlayingToday) {
   };
 }
 __name(buildLeagueDailyAverages, "buildLeagueDailyAverages");
-__name2(buildLeagueDailyAverages, "buildLeagueDailyAverages");
 function buildWeeklyTransferSummary(transfers, currentGw, eventMetaById, elements, chipDayMap = {}) {
   const weeklyTransfers = [];
   for (const [index, transfer] of (transfers || []).entries()) {
@@ -891,7 +868,6 @@ function buildWeeklyTransferSummary(transfers, currentGw, eventMetaById, element
   };
 }
 __name(buildWeeklyTransferSummary, "buildWeeklyTransferSummary");
-__name2(buildWeeklyTransferSummary, "buildWeeklyTransferSummary");
 function buildLineupEconomySummary(players) {
   const effectivePlayers = (players || []).filter((player) => player?.is_effective);
   const totalCost = effectivePlayers.reduce((sum, player) => {
@@ -914,7 +890,6 @@ function buildLineupEconomySummary(players) {
   };
 }
 __name(buildLineupEconomySummary, "buildLineupEconomySummary");
-__name2(buildLineupEconomySummary, "buildLineupEconomySummary");
 function getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById) {
   for (const item of extractHistoryRecords(historyData)) {
     const name = String(item?.name || "").toLowerCase();
@@ -931,7 +906,6 @@ function getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById
   return null;
 }
 __name(getCaptainChipEvent, "getCaptainChipEvent");
-__name2(getCaptainChipEvent, "getCaptainChipEvent");
 async function buildCaptainUsageSummary(uidNumber, historyData, currentGw, currentEvent, eventMetaById, elements, eventLiveCache) {
   const chipEvent = getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById);
   if (!chipEvent?.event) {
@@ -980,7 +954,6 @@ async function buildCaptainUsageSummary(uidNumber, historyData, currentGw, curre
   };
 }
 __name(buildCaptainUsageSummary, "buildCaptainUsageSummary");
-__name2(buildCaptainUsageSummary, "buildCaptainUsageSummary");
 function buildWeekEventIds(events, currentWeek, currentEvent) {
   return (events || []).filter((event) => {
     const meta = parseEventMetaFromName(event?.name || "");
@@ -988,16 +961,25 @@ function buildWeekEventIds(events, currentWeek, currentEvent) {
   }).map((event) => Number(event.id)).filter((eventId) => eventId > Number(currentEvent || 0)).sort((a, b) => a - b);
 }
 __name(buildWeekEventIds, "buildWeekEventIds");
-__name2(buildWeekEventIds, "buildWeekEventIds");
 function getProjectedPlayerScore(player) {
   const formValue = Number(player?.form || 0) / 10;
   const ppgValue = Number(player?.points_per_game || 0) / 10;
   const nextValue = Number(player?.ep_next || 0) / 10;
-  const projected = formValue > 0 ? formValue : ppgValue > 0 ? ppgValue : nextValue;
+  let projected = 0;
+  if (formValue > 0 && ppgValue > 0 && nextValue > 0) {
+    projected = formValue * 0.6 + ppgValue * 0.25 + nextValue * 0.15;
+  } else if (formValue > 0 && ppgValue > 0) {
+    projected = formValue * 0.7 + ppgValue * 0.3;
+  } else if (formValue > 0) {
+    projected = formValue;
+  } else if (ppgValue > 0 && nextValue > 0) {
+    projected = ppgValue * 0.75 + nextValue * 0.25;
+  } else {
+    projected = ppgValue > 0 ? ppgValue : nextValue;
+  }
   return Number(projected.toFixed(1));
 }
 __name(getProjectedPlayerScore, "getProjectedPlayerScore");
-__name2(getProjectedPlayerScore, "getProjectedPlayerScore");
 function computeWeekTotalFromHistory(historyWeek, currentEvent, todayScore, gd1MissingPenalty) {
   if (!historyWeek?.has_week_rows) return null;
   const currentEventId = Number(currentEvent || 0);
@@ -1016,7 +998,6 @@ function computeWeekTotalFromHistory(historyWeek, currentEvent, todayScore, gd1M
   return Math.max(0, Math.round(total));
 }
 __name(computeWeekTotalFromHistory, "computeWeekTotalFromHistory");
-__name2(computeWeekTotalFromHistory, "computeWeekTotalFromHistory");
 function calculateProjectedFutureScore(players, futureTeamsByEvent) {
   let total = 0;
   let bestCaptainCandidate = 0;
@@ -1041,7 +1022,6 @@ function calculateProjectedFutureScore(players, futureTeamsByEvent) {
   };
 }
 __name(calculateProjectedFutureScore, "calculateProjectedFutureScore");
-__name2(calculateProjectedFutureScore, "calculateProjectedFutureScore");
 function buildManagerProjectionSummary(payload, futureTeamsByEvent) {
   const players = Array.isArray(payload?.players) ? payload.players : [];
   const projectedPlayers = players.map((player) => ({
@@ -1050,9 +1030,9 @@ function buildManagerProjectionSummary(payload, futureTeamsByEvent) {
   }));
   const futureSummary = calculateProjectedFutureScore(projectedPlayers, futureTeamsByEvent);
   const captainUsed = payload?.captain_used || {};
-  const captainBonus = !captainUsed.used && futureSummary.best_captain_candidate > 0 ? futureSummary.best_captain_candidate : 0;
+  const captainBonus = !captainUsed.used && futureSummary.best_captain_candidate > 0 ? WIN_PROB_CAPTAIN_BONUS : 0;
   const remainingFt = Math.max(0, 2 - Number(payload?.penalty_transfer_count || 0));
-  const ftBonus = Number((remainingFt * 4).toFixed(1));
+  const ftBonus = Number((remainingFt * WIN_PROB_FT_BONUS).toFixed(1));
   const expectedTotal = Number((Number(payload?.event_total || 0) + Number(futureSummary.projected_future_score || 0) + captainBonus + ftBonus).toFixed(1));
   return {
     projected_future_score: Number(futureSummary.projected_future_score || 0),
@@ -1065,12 +1045,10 @@ function buildManagerProjectionSummary(payload, futureTeamsByEvent) {
   };
 }
 __name(buildManagerProjectionSummary, "buildManagerProjectionSummary");
-__name2(buildManagerProjectionSummary, "buildManagerProjectionSummary");
 function buildWinProbabilitySummary(left, right) {
   const diff = Number(left.expected_total || 0) - Number(right.expected_total || 0);
-  const scale = 18;
-  const leftProb = 1 / (1 + Math.exp(-diff / scale));
-  const leftPct = Math.max(1, Math.min(99, Math.round(leftProb * 100)));
+  const leftProb = 1 / (1 + Math.exp(-diff / WIN_PROB_LOGISTIC_SCALE));
+  const leftPct = Math.max(5, Math.min(95, Math.round(leftProb * 100)));
   const rightPct = 100 - leftPct;
   return {
     left: leftPct,
@@ -1078,7 +1056,6 @@ function buildWinProbabilitySummary(left, right) {
   };
 }
 __name(buildWinProbabilitySummary, "buildWinProbabilitySummary");
-__name2(buildWinProbabilitySummary, "buildWinProbabilitySummary");
 function buildOwnershipSummary(picksByUid) {
   const holderMap = {};
   const managerCount = UID_LIST.length;
@@ -1099,18 +1076,45 @@ function buildOwnershipSummary(picksByUid) {
       holderMap[elementId].holder_count += 1;
     }
   }
-  const top20 = Object.values(holderMap).map((item) => ({
+  const top10 = Object.values(holderMap).map((item) => ({
     ...item,
     ownership_percent: Number((item.holder_count / Math.max(1, managerCount) * 100).toFixed(1))
-  })).sort((a, b) => b.ownership_percent - a.ownership_percent || b.holder_count - a.holder_count || a.name.localeCompare(b.name)).slice(0, 20);
+  })).sort((a, b) => b.ownership_percent - a.ownership_percent || b.holder_count - a.holder_count || a.name.localeCompare(b.name)).slice(0, 10);
   return {
     by_element: holderMap,
-    top20,
+    top10,
     manager_count: managerCount
   };
 }
 __name(buildOwnershipSummary, "buildOwnershipSummary");
-__name2(buildOwnershipSummary, "buildOwnershipSummary");
+function buildTodayValueLeaders(picksByUid, teamsPlayingToday) {
+  const byElement = {};
+  for (const uid of UID_LIST) {
+    const players = Array.isArray(picksByUid?.[uid]?.players) ? picksByUid[uid].players : [];
+    for (const player of players) {
+      const elementId = Number(player?.element_id || 0);
+      const teamId = Number(player?.team_id || 0);
+      const nowCost = Number(player?.now_cost || 0) / 10;
+      if (!elementId || !teamId || !teamsPlayingToday.has(teamId) || nowCost <= 0) continue;
+      const finalPoints = Number(player?.final_points || 0);
+      const value = finalPoints / nowCost;
+      const current = byElement[elementId];
+      if (!current || finalPoints > Number(current.points || 0)) {
+        byElement[elementId] = {
+          element_id: elementId,
+          name: player?.name || `#${elementId}`,
+          price: Number(nowCost.toFixed(1)),
+          points: finalPoints,
+          value: Number(value.toFixed(1))
+        };
+      }
+    }
+  }
+  return Object.values(byElement).sort(
+    (a, b) => Number(b.value || 0) - Number(a.value || 0) || Number(b.points || 0) - Number(a.points || 0) || Number(a.price || 0) - Number(b.price || 0) || String(a.name || "").localeCompare(String(b.name || ""))
+  ).slice(0, 10);
+}
+__name(buildTodayValueLeaders, "buildTodayValueLeaders");
 function buildClassicRankingsPayload(overallRows, weeklyRows, currentWeek, weeklyPhase) {
   const overallByUid = {};
   const weeklyByUid = {};
@@ -1144,7 +1148,6 @@ function buildClassicRankingsPayload(overallRows, weeklyRows, currentWeek, weekl
   });
 }
 __name(buildClassicRankingsPayload, "buildClassicRankingsPayload");
-__name2(buildClassicRankingsPayload, "buildClassicRankingsPayload");
 function buildLiveH2HStandings(baseStatsByUid, liveMatches) {
   const table = {};
   for (const uid of UID_LIST) {
@@ -1201,7 +1204,6 @@ function buildLiveH2HStandings(baseStatsByUid, liveMatches) {
   }));
 }
 __name(buildLiveH2HStandings, "buildLiveH2HStandings");
-__name2(buildLiveH2HStandings, "buildLiveH2HStandings");
 async function mapLimit(list, limit, fn) {
   const results = new Array(list.length);
   let index = 0;
@@ -1216,7 +1218,6 @@ async function mapLimit(list, limit, fn) {
   return results;
 }
 __name(mapLimit, "mapLimit");
-__name2(mapLimit, "mapLimit");
 async function buildState(previousState = null, targetUids = UID_LIST) {
   const bootstrap = await fetchJson("/bootstrap-static/");
   const events = bootstrap.events || [];
@@ -1690,8 +1691,9 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     eventMetaById,
     elements
   }) : previousState?.transfer_trends || { league: {}, global: {}, overall: {} };
-  transferTrends.ownership_top = ownershipSummary.top20;
+  transferTrends.ownership_top = ownershipSummary.top10;
   transferTrends.ownership_manager_count = ownershipSummary.manager_count;
+  transferTrends.today_value_top = buildTodayValueLeaders(picksByUid, teamsPlayingToday);
   const fdr = buildFdrPayload({
     standingsByUid,
     currentWeek
@@ -1728,7 +1730,6 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   };
 }
 __name(buildState, "buildState");
-__name2(buildState, "buildState");
 async function refreshState(env, options = {}) {
   const previous = await getState(env);
   const full = !!options.full;
@@ -1752,7 +1753,6 @@ async function refreshState(env, options = {}) {
   return state;
 }
 __name(refreshState, "refreshState");
-__name2(refreshState, "refreshState");
 async function getState(env) {
   const raw = await env.NBA_CACHE.get(CACHE_KEY);
   if (!raw) return null;
@@ -1763,7 +1763,6 @@ async function getState(env) {
   }
 }
 __name(getState, "getState");
-__name2(getState, "getState");
 var src_default = {
   async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") return jsonResponse({ ok: true });
@@ -1786,7 +1785,7 @@ var src_default = {
     }
     let state = await getState(env);
     if (!state) {
-      state = await refreshState(env, { full: false });
+      state = await refreshState(env, { full: true });
     }
     if (path === "/api/state") return jsonResponse(state);
     if (path === "/api/fixtures") return jsonResponse(state.fixtures);
@@ -1802,9 +1801,8 @@ var src_default = {
       let payload = state.picks_by_uid[uid] || {};
       const forceFresh = url.searchParams.get("fresh") === "1";
       if (forceFresh || !payload.players || payload.players.length === 0) {
-        state = await buildState(state, [uid]);
-        await env.NBA_CACHE.put(CACHE_KEY, JSON.stringify(state));
-        payload = state.picks_by_uid[uid] || {};
+        const freshState = await buildState(state, [uid]);
+        payload = freshState.picks_by_uid[uid] || {};
       }
       debugUid("api_response", uid, {
         total_live: payload.total_live || 0,
@@ -1843,14 +1841,18 @@ var src_default = {
     return jsonResponse({ error: "not found" }, 404);
   },
   async scheduled(event, env, ctx) {
+    if (!isBeijingRefreshWindow(event?.scheduledTime || Date.now())) return;
     ctx.waitUntil(refreshState(env));
   }
 };
+
+// api/[[path]].js
 async function onRequest(context) {
   return src_default.fetch(context.request, context.env, context);
 }
 __name(onRequest, "onRequest");
-__name2(onRequest, "onRequest");
+
+// ../.wrangler/tmp/pages-uczbif/functionsRoutes-0.8459937960684148.mjs
 var routes = [
   {
     routePath: "/api/:path*",
@@ -1860,6 +1862,8 @@ var routes = [
     modules: [onRequest]
   }
 ];
+
+// ../../Node.js环境/node_global/node_modules/wrangler/node_modules/path-to-regexp/dist.es2015/index.js
 function lexer(str) {
   var tokens = [];
   var i = 0;
@@ -1944,7 +1948,6 @@ function lexer(str) {
   return tokens;
 }
 __name(lexer, "lexer");
-__name2(lexer, "lexer");
 function parse(str, options) {
   if (options === void 0) {
     options = {};
@@ -1955,18 +1958,18 @@ function parse(str, options) {
   var key = 0;
   var i = 0;
   var path = "";
-  var tryConsume = /* @__PURE__ */ __name2(function(type) {
+  var tryConsume = /* @__PURE__ */ __name(function(type) {
     if (i < tokens.length && tokens[i].type === type)
       return tokens[i++].value;
   }, "tryConsume");
-  var mustConsume = /* @__PURE__ */ __name2(function(type) {
+  var mustConsume = /* @__PURE__ */ __name(function(type) {
     var value2 = tryConsume(type);
     if (value2 !== void 0)
       return value2;
     var _a2 = tokens[i], nextType = _a2.type, index = _a2.index;
     throw new TypeError("Unexpected ".concat(nextType, " at ").concat(index, ", expected ").concat(type));
   }, "mustConsume");
-  var consumeText = /* @__PURE__ */ __name2(function() {
+  var consumeText = /* @__PURE__ */ __name(function() {
     var result2 = "";
     var value2;
     while (value2 = tryConsume("CHAR") || tryConsume("ESCAPED_CHAR")) {
@@ -1974,7 +1977,7 @@ function parse(str, options) {
     }
     return result2;
   }, "consumeText");
-  var isSafe = /* @__PURE__ */ __name2(function(value2) {
+  var isSafe = /* @__PURE__ */ __name(function(value2) {
     for (var _i = 0, delimiter_1 = delimiter; _i < delimiter_1.length; _i++) {
       var char2 = delimiter_1[_i];
       if (value2.indexOf(char2) > -1)
@@ -1982,7 +1985,7 @@ function parse(str, options) {
     }
     return false;
   }, "isSafe");
-  var safePattern = /* @__PURE__ */ __name2(function(prefix2) {
+  var safePattern = /* @__PURE__ */ __name(function(prefix2) {
     var prev = result[result.length - 1];
     var prevText = prefix2 || (prev && typeof prev === "string" ? prev : "");
     if (prev && !prevText) {
@@ -2045,14 +2048,12 @@ function parse(str, options) {
   return result;
 }
 __name(parse, "parse");
-__name2(parse, "parse");
 function match(str, options) {
   var keys = [];
   var re = pathToRegexp(str, keys, options);
   return regexpToFunction(re, keys, options);
 }
 __name(match, "match");
-__name2(match, "match");
 function regexpToFunction(re, keys, options) {
   if (options === void 0) {
     options = {};
@@ -2066,7 +2067,7 @@ function regexpToFunction(re, keys, options) {
       return false;
     var path = m[0], index = m.index;
     var params = /* @__PURE__ */ Object.create(null);
-    var _loop_1 = /* @__PURE__ */ __name2(function(i2) {
+    var _loop_1 = /* @__PURE__ */ __name(function(i2) {
       if (m[i2] === void 0)
         return "continue";
       var key = keys[i2 - 1];
@@ -2085,17 +2086,14 @@ function regexpToFunction(re, keys, options) {
   };
 }
 __name(regexpToFunction, "regexpToFunction");
-__name2(regexpToFunction, "regexpToFunction");
 function escapeString(str) {
   return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, "\\$1");
 }
 __name(escapeString, "escapeString");
-__name2(escapeString, "escapeString");
 function flags(options) {
   return options && options.sensitive ? "" : "i";
 }
 __name(flags, "flags");
-__name2(flags, "flags");
 function regexpToRegexp(path, keys) {
   if (!keys)
     return path;
@@ -2116,7 +2114,6 @@ function regexpToRegexp(path, keys) {
   return path;
 }
 __name(regexpToRegexp, "regexpToRegexp");
-__name2(regexpToRegexp, "regexpToRegexp");
 function arrayToRegexp(paths, keys, options) {
   var parts = paths.map(function(path) {
     return pathToRegexp(path, keys, options).source;
@@ -2124,12 +2121,10 @@ function arrayToRegexp(paths, keys, options) {
   return new RegExp("(?:".concat(parts.join("|"), ")"), flags(options));
 }
 __name(arrayToRegexp, "arrayToRegexp");
-__name2(arrayToRegexp, "arrayToRegexp");
 function stringToRegexp(path, keys, options) {
   return tokensToRegexp(parse(path, options), keys, options);
 }
 __name(stringToRegexp, "stringToRegexp");
-__name2(stringToRegexp, "stringToRegexp");
 function tokensToRegexp(tokens, keys, options) {
   if (options === void 0) {
     options = {};
@@ -2185,7 +2180,6 @@ function tokensToRegexp(tokens, keys, options) {
   return new RegExp(route, flags(options));
 }
 __name(tokensToRegexp, "tokensToRegexp");
-__name2(tokensToRegexp, "tokensToRegexp");
 function pathToRegexp(path, keys, options) {
   if (path instanceof RegExp)
     return regexpToRegexp(path, keys);
@@ -2194,7 +2188,8 @@ function pathToRegexp(path, keys, options) {
   return stringToRegexp(path, keys, options);
 }
 __name(pathToRegexp, "pathToRegexp");
-__name2(pathToRegexp, "pathToRegexp");
+
+// ../../Node.js环境/node_global/node_modules/wrangler/templates/pages-template-worker.ts
 var escapeRegex = /[.+?^${}()|[\]\\]/g;
 function* executeRequest(request) {
   const requestPath = new URL(request.url).pathname;
@@ -2245,14 +2240,13 @@ function* executeRequest(request) {
   }
 }
 __name(executeRequest, "executeRequest");
-__name2(executeRequest, "executeRequest");
 var pages_template_worker_default = {
   async fetch(originalRequest, env, workerContext) {
     let request = originalRequest;
     const handlerIterator = executeRequest(request);
     let data = {};
     let isFailOpen = false;
-    const next = /* @__PURE__ */ __name2(async (input, init) => {
+    const next = /* @__PURE__ */ __name(async (input, init) => {
       if (input !== void 0) {
         let url = input;
         if (typeof input === "string") {
@@ -2279,7 +2273,7 @@ var pages_template_worker_default = {
           },
           env,
           waitUntil: workerContext.waitUntil.bind(workerContext),
-          passThroughOnException: /* @__PURE__ */ __name2(() => {
+          passThroughOnException: /* @__PURE__ */ __name(() => {
             isFailOpen = true;
           }, "passThroughOnException")
         };
@@ -2307,14 +2301,16 @@ var pages_template_worker_default = {
     }
   }
 };
-var cloneResponse = /* @__PURE__ */ __name2((response) => (
+var cloneResponse = /* @__PURE__ */ __name((response) => (
   // https://fetch.spec.whatwg.org/#null-body-status
   new Response(
     [101, 204, 205, 304].includes(response.status) ? null : response.body,
     response
   )
 ), "cloneResponse");
-var drainBody = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx) => {
+
+// ../../Node.js环境/node_global/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
+var drainBody = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
   try {
     return await middlewareCtx.next(request, env);
   } finally {
@@ -2330,6 +2326,8 @@ var drainBody = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx
   }
 }, "drainBody");
 var middleware_ensure_req_body_drained_default = drainBody;
+
+// ../../Node.js环境/node_global/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts
 function reduceError(e) {
   return {
     name: e?.name,
@@ -2339,8 +2337,7 @@ function reduceError(e) {
   };
 }
 __name(reduceError, "reduceError");
-__name2(reduceError, "reduceError");
-var jsonError = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx) => {
+var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
   try {
     return await middlewareCtx.next(request, env);
   } catch (e) {
@@ -2352,17 +2349,20 @@ var jsonError = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx
   }
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
+
+// ../.wrangler/tmp/bundle-roTzYP/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
 ];
 var middleware_insertion_facade_default = pages_template_worker_default;
+
+// ../../Node.js环境/node_global/node_modules/wrangler/templates/middleware/common.ts
 var __facade_middleware__ = [];
 function __facade_register__(...args) {
   __facade_middleware__.push(...args.flat());
 }
 __name(__facade_register__, "__facade_register__");
-__name2(__facade_register__, "__facade_register__");
 function __facade_invokeChain__(request, env, ctx, dispatch, middlewareChain) {
   const [head, ...tail] = middlewareChain;
   const middlewareCtx = {
@@ -2374,7 +2374,6 @@ function __facade_invokeChain__(request, env, ctx, dispatch, middlewareChain) {
   return head(request, env, ctx, middlewareCtx);
 }
 __name(__facade_invokeChain__, "__facade_invokeChain__");
-__name2(__facade_invokeChain__, "__facade_invokeChain__");
 function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
   return __facade_invokeChain__(request, env, ctx, dispatch, [
     ...__facade_middleware__,
@@ -2382,18 +2381,16 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
   ]);
 }
 __name(__facade_invoke__, "__facade_invoke__");
-__name2(__facade_invoke__, "__facade_invoke__");
+
+// ../.wrangler/tmp/bundle-roTzYP/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
-  static {
-    __name(this, "___Facade_ScheduledController__");
-  }
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
     this.cron = cron;
     this.#noRetry = noRetry;
   }
   static {
-    __name2(this, "__Facade_ScheduledController__");
+    __name(this, "__Facade_ScheduledController__");
   }
   #noRetry;
   noRetry() {
@@ -2410,7 +2407,7 @@ function wrapExportedHandler(worker) {
   for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__) {
     __facade_register__(middleware);
   }
-  const fetchDispatcher = /* @__PURE__ */ __name2(function(request, env, ctx) {
+  const fetchDispatcher = /* @__PURE__ */ __name(function(request, env, ctx) {
     if (worker.fetch === void 0) {
       throw new Error("Handler does not export a fetch() function.");
     }
@@ -2419,7 +2416,7 @@ function wrapExportedHandler(worker) {
   return {
     ...worker,
     fetch(request, env, ctx) {
-      const dispatcher = /* @__PURE__ */ __name2(function(type, init) {
+      const dispatcher = /* @__PURE__ */ __name(function(type, init) {
         if (type === "scheduled" && worker.scheduled !== void 0) {
           const controller = new __Facade_ScheduledController__(
             Date.now(),
@@ -2435,7 +2432,6 @@ function wrapExportedHandler(worker) {
   };
 }
 __name(wrapExportedHandler, "wrapExportedHandler");
-__name2(wrapExportedHandler, "wrapExportedHandler");
 function wrapWorkerEntrypoint(klass) {
   if (__INTERNAL_WRANGLER_MIDDLEWARE__ === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__.length === 0) {
     return klass;
@@ -2444,7 +2440,7 @@ function wrapWorkerEntrypoint(klass) {
     __facade_register__(middleware);
   }
   return class extends klass {
-    #fetchDispatcher = /* @__PURE__ */ __name2((request, env, ctx) => {
+    #fetchDispatcher = /* @__PURE__ */ __name((request, env, ctx) => {
       this.env = env;
       this.ctx = ctx;
       if (super.fetch === void 0) {
@@ -2452,7 +2448,7 @@ function wrapWorkerEntrypoint(klass) {
       }
       return super.fetch(request);
     }, "#fetchDispatcher");
-    #dispatcher = /* @__PURE__ */ __name2((type, init) => {
+    #dispatcher = /* @__PURE__ */ __name((type, init) => {
       if (type === "scheduled" && super.scheduled !== void 0) {
         const controller = new __Facade_ScheduledController__(
           Date.now(),
@@ -2475,7 +2471,6 @@ function wrapWorkerEntrypoint(klass) {
   };
 }
 __name(wrapWorkerEntrypoint, "wrapWorkerEntrypoint");
-__name2(wrapWorkerEntrypoint, "wrapWorkerEntrypoint");
 var WRAPPED_ENTRY;
 if (typeof middleware_insertion_facade_default === "object") {
   WRAPPED_ENTRY = wrapExportedHandler(middleware_insertion_facade_default);
@@ -2483,178 +2478,8 @@ if (typeof middleware_insertion_facade_default === "object") {
   WRAPPED_ENTRY = wrapWorkerEntrypoint(middleware_insertion_facade_default);
 }
 var middleware_loader_entry_default = WRAPPED_ENTRY;
-
-// ../Node.js环境/node_global/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
-var drainBody2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
-  try {
-    return await middlewareCtx.next(request, env);
-  } finally {
-    try {
-      if (request.body !== null && !request.bodyUsed) {
-        const reader = request.body.getReader();
-        while (!(await reader.read()).done) {
-        }
-      }
-    } catch (e) {
-      console.error("Failed to drain the unused request body.", e);
-    }
-  }
-}, "drainBody");
-var middleware_ensure_req_body_drained_default2 = drainBody2;
-
-// ../Node.js环境/node_global/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts
-function reduceError2(e) {
-  return {
-    name: e?.name,
-    message: e?.message ?? String(e),
-    stack: e?.stack,
-    cause: e?.cause === void 0 ? void 0 : reduceError2(e.cause)
-  };
-}
-__name(reduceError2, "reduceError");
-var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
-  try {
-    return await middlewareCtx.next(request, env);
-  } catch (e) {
-    const error = reduceError2(e);
-    return Response.json(error, {
-      status: 500,
-      headers: { "MF-Experimental-Error-Stack": "true" }
-    });
-  }
-}, "jsonError");
-var middleware_miniflare3_json_error_default2 = jsonError2;
-
-// .wrangler/tmp/bundle-6tH749/middleware-insertion-facade.js
-var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
-  middleware_ensure_req_body_drained_default2,
-  middleware_miniflare3_json_error_default2
-];
-var middleware_insertion_facade_default2 = middleware_loader_entry_default;
-
-// ../Node.js环境/node_global/node_modules/wrangler/templates/middleware/common.ts
-var __facade_middleware__2 = [];
-function __facade_register__2(...args) {
-  __facade_middleware__2.push(...args.flat());
-}
-__name(__facade_register__2, "__facade_register__");
-function __facade_invokeChain__2(request, env, ctx, dispatch, middlewareChain) {
-  const [head, ...tail] = middlewareChain;
-  const middlewareCtx = {
-    dispatch,
-    next(newRequest, newEnv) {
-      return __facade_invokeChain__2(newRequest, newEnv, ctx, dispatch, tail);
-    }
-  };
-  return head(request, env, ctx, middlewareCtx);
-}
-__name(__facade_invokeChain__2, "__facade_invokeChain__");
-function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
-  return __facade_invokeChain__2(request, env, ctx, dispatch, [
-    ...__facade_middleware__2,
-    finalMiddleware
-  ]);
-}
-__name(__facade_invoke__2, "__facade_invoke__");
-
-// .wrangler/tmp/bundle-6tH749/middleware-loader.entry.ts
-var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
-  constructor(scheduledTime, cron, noRetry) {
-    this.scheduledTime = scheduledTime;
-    this.cron = cron;
-    this.#noRetry = noRetry;
-  }
-  static {
-    __name(this, "__Facade_ScheduledController__");
-  }
-  #noRetry;
-  noRetry() {
-    if (!(this instanceof ___Facade_ScheduledController__2)) {
-      throw new TypeError("Illegal invocation");
-    }
-    this.#noRetry();
-  }
-};
-function wrapExportedHandler2(worker) {
-  if (__INTERNAL_WRANGLER_MIDDLEWARE__2 === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__2.length === 0) {
-    return worker;
-  }
-  for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__2) {
-    __facade_register__2(middleware);
-  }
-  const fetchDispatcher = /* @__PURE__ */ __name(function(request, env, ctx) {
-    if (worker.fetch === void 0) {
-      throw new Error("Handler does not export a fetch() function.");
-    }
-    return worker.fetch(request, env, ctx);
-  }, "fetchDispatcher");
-  return {
-    ...worker,
-    fetch(request, env, ctx) {
-      const dispatcher = /* @__PURE__ */ __name(function(type, init) {
-        if (type === "scheduled" && worker.scheduled !== void 0) {
-          const controller = new __Facade_ScheduledController__2(
-            Date.now(),
-            init.cron ?? "",
-            () => {
-            }
-          );
-          return worker.scheduled(controller, env, ctx);
-        }
-      }, "dispatcher");
-      return __facade_invoke__2(request, env, ctx, dispatcher, fetchDispatcher);
-    }
-  };
-}
-__name(wrapExportedHandler2, "wrapExportedHandler");
-function wrapWorkerEntrypoint2(klass) {
-  if (__INTERNAL_WRANGLER_MIDDLEWARE__2 === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__2.length === 0) {
-    return klass;
-  }
-  for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__2) {
-    __facade_register__2(middleware);
-  }
-  return class extends klass {
-    #fetchDispatcher = /* @__PURE__ */ __name((request, env, ctx) => {
-      this.env = env;
-      this.ctx = ctx;
-      if (super.fetch === void 0) {
-        throw new Error("Entrypoint class does not define a fetch() function.");
-      }
-      return super.fetch(request);
-    }, "#fetchDispatcher");
-    #dispatcher = /* @__PURE__ */ __name((type, init) => {
-      if (type === "scheduled" && super.scheduled !== void 0) {
-        const controller = new __Facade_ScheduledController__2(
-          Date.now(),
-          init.cron ?? "",
-          () => {
-          }
-        );
-        return super.scheduled(controller);
-      }
-    }, "#dispatcher");
-    fetch(request) {
-      return __facade_invoke__2(
-        request,
-        this.env,
-        this.ctx,
-        this.#dispatcher,
-        this.#fetchDispatcher
-      );
-    }
-  };
-}
-__name(wrapWorkerEntrypoint2, "wrapWorkerEntrypoint");
-var WRAPPED_ENTRY2;
-if (typeof middleware_insertion_facade_default2 === "object") {
-  WRAPPED_ENTRY2 = wrapExportedHandler2(middleware_insertion_facade_default2);
-} else if (typeof middleware_insertion_facade_default2 === "function") {
-  WRAPPED_ENTRY2 = wrapWorkerEntrypoint2(middleware_insertion_facade_default2);
-}
-var middleware_loader_entry_default2 = WRAPPED_ENTRY2;
 export {
-  __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
-  middleware_loader_entry_default2 as default
+  __INTERNAL_WRANGLER_MIDDLEWARE__,
+  middleware_loader_entry_default as default
 };
-//# sourceMappingURL=functionsWorker-0.23497336611732456.js.map
+//# sourceMappingURL=functionsWorker-0.2042301712713419.mjs.map
