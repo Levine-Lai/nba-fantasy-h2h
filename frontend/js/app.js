@@ -18,7 +18,7 @@ const API = {
     },
 
     async getState() {
-        return (await this.fetch("/api/state")).json();
+        return (await this.fetch("/api/state?fresh_h2h=1")).json();
     },
 
     async getGameDetail(fixtureId) {
@@ -53,7 +53,9 @@ function renderTransferRecords(teamName, transferRecords, side = "left", captain
     const rows = (transferRecords || []).map((record) => `
         <div class="transfer-record ${side === "right" ? "align-right" : ""}">
             <div class="transfer-day">${escapeHtml(record.day_label || "DAY?")}</div>
-            <div class="transfer-move">${escapeHtml(record.move || "")}</div>
+            <div class="transfer-move">${record.out_name && record.in_name
+                ? `${escapeHtml(record.out_name)}<span class="transfer-arrow">-></span>${escapeHtml(record.in_name)}`
+                : escapeHtml(record.move || "")}</div>
             <div class="transfer-cost ${record.is_free ? "" : "penalty"} ${record.is_wildcard ? "wildcard" : ""} ${record.is_rich ? "rich" : ""}">
                 ${escapeHtml(record.cost_type || "")}
             </div>
@@ -182,16 +184,6 @@ const Render = {
         headerRow.innerHTML = `<th class="t-name">TEAM</th>${weeks.map((week) => `<th>${week}</th>`).join("")}<th class="avg-col">AVG</th>`;
         badge.textContent = weeks.length ? `GW ${weeks.join("-")}` : "Auto GW";
         body.innerHTML = data?.html || '<tr><td colspan="5" style="text-align:center;padding:20px;">No FDR data</td></tr>';
-        this.leagueAverages(data?.daily_averages);
-    },
-
-    leagueAverages(data) {
-        const avgToday = document.getElementById("avg-today-count");
-        const avgEffective = document.getElementById("avg-effective-count");
-        if (!avgToday || !avgEffective) return;
-
-        avgToday.textContent = Number.isFinite(Number(data?.today_average_count)) ? Number(data.today_average_count).toFixed(2) : "-";
-        avgEffective.textContent = Number.isFinite(Number(data?.effective_average_count)) ? Number(data.effective_average_count).toFixed(2) : "-";
     },
 
     gamesList(games) {
@@ -492,7 +484,6 @@ const App = {
             Render.fdr(state?.fdr || {
                 weeks: [],
                 html: '<tr><td colspan="5" style="text-align:center;padding:20px;">Load failed</td></tr>',
-                daily_averages: { today_average_count: 0, effective_average_count: 0 },
             });
             Render.updateTime();
             this.scheduleAutoRefresh(state);

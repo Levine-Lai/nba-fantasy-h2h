@@ -887,6 +887,165 @@ function calculateEffectiveScore(picks, teamsPlayingToday) {
   return [Math.floor(score), selected, formation];
 }
 
+function buildElementsMap(bootstrap) {
+  const elements = {};
+  for (const e of bootstrap?.elements || []) {
+    elements[e.id] = {
+      name: e.web_name || `#${e.id}`,
+      team: e.team,
+      position: e.element_type,
+      position_name: e.element_type === 1 ? "BC" : e.element_type === 2 ? "FC" : "UNK",
+      now_cost: Number(e.now_cost || 0),
+      form: Number(e.form || 0),
+      points_per_game: Number(e.points_per_game || 0),
+      ep_next: Number(e.ep_next || 0),
+      event_points: e.event_points || 0,
+      points_scored: e.points_scored || 0,
+      total_points: e.total_points || 0,
+      status: e.status || "",
+      news: e.news || "",
+    };
+  }
+  return elements;
+}
+
+function buildLiveElementsMap(liveRaw) {
+  const liveElements = {};
+  const rawElements = liveRaw?.elements;
+  if (Array.isArray(rawElements)) {
+    for (const item of rawElements) liveElements[item.id] = item;
+  } else if (rawElements && typeof rawElements === "object") {
+    for (const [k, v] of Object.entries(rawElements)) liveElements[Number(k)] = v;
+  }
+  return liveElements;
+}
+
+function buildLivePicksFromPicksData(picksData, elements, liveElements) {
+  return (picksData?.picks || []).map((pick) => {
+    const elementId = Number(pick?.element || 0);
+    const elem = elements[elementId] || {};
+    const stats = getPlayerStats(elementId, liveElements, elements);
+    const base = Number(stats?.fantasy || 0);
+    const isCaptain = !!pick?.is_captain;
+    const multiplier = Number(pick?.multiplier || 1) || 1;
+    const finalPoints = isCaptain ? base * multiplier : base;
+    return {
+      element_id: elementId,
+      name: elem.name || `#${elementId}`,
+      position_type: elem.position || 0,
+      position_name: elem.position_name || "UNK",
+      now_cost: Number(elem.now_cost || 0),
+      form: Number(elem.form || 0),
+      points_per_game: Number(elem.points_per_game || 0),
+      ep_next: Number(elem.ep_next || 0),
+      lineup_position: Number(pick?.position || 0),
+      is_captain: isCaptain,
+      is_vice: !!pick?.is_vice_captain,
+      multiplier,
+      base_points: base,
+      final_points: finalPoints,
+      stats,
+      injury: parseInjuryStatus(elem),
+      team_id: elem.team || 0,
+      is_effective: false,
+    };
+  });
+}
+
+async function buildFreshHomepageState(baseState) {
+  const matches = Array.isArray(baseState?.h2h) ? baseState.h2h : [];
+  const currentEvent = Number(baseState?.current_event || 0);
+  if (!matches.length || !currentEvent) return baseState;
+
+  const targetUids = [...new Set(
+    matches.flatMap((match) => [normalizeUid(match?.uid1), normalizeUid(match?.uid2)]).filter(Boolean)
+  )];
+  if (!targetUids.length) return baseState;
+
+  const [bootstrap, liveRaw] = await Promise.all([
+    fetchJson("/bootstrap-static/", 1),
+    fetchJson(`/event/${currentEvent}/live/`, 1),
+  ]);
+  const elements = buildElementsMap(bootstrap);
+  const liveElements = buildLiveElementsMap(liveRaw);
+  const teamsPlayingToday = buildTeamsPlayingToday(baseState?.fixtures?.games || []);
+  const freshScoresByUid = {};
+
+  await mapLimit(targetUids, 4, async (uid) => {
+    const previous = baseState?.picks_by_uid?.[uid] || {};
+    const picksRes = await fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 1);
+    if (!picksRes.ok || !Array.isArray(picksRes.data?.picks)) {
+      freshScoresByUid[uid] = {
+        total_live: Number(previous?.total_live || 0),
+        event_total: Number(previous?.event_total || 0),
+      };
+      return;
+    }
+
+    const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements);
+    const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
+    const freshToday = Number(effectiveScore || 0);
+    const cachedToday = Number(previous?.total_live || 0);
+    const cachedWeek = Number(previous?.event_total || 0);
+    const freshWeek = Math.max(0, cachedWeek - cachedToday + freshToday);
+
+    freshScoresByUid[uid] = {
+      total_live: freshToday,
+      event_total: freshWeek,
+    };
+  });
+
+  const nextPicksByUid = { ...(baseState?.picks_by_uid || {}) };
+  for (const uid of targetUids) {
+    if (!nextPicksByUid[uid]) continue;
+    const fresh = freshScoresByUid[uid];
+    if (!fresh) continue;
+    nextPicksByUid[uid] = {
+      ...nextPicksByUid[uid],
+      total_live: Number(fresh.total_live || 0),
+      event_total: Number(fresh.event_total || 0),
+    };
+  }
+
+  const nextMatches = matches.map((match) => {
+    const uid1 = normalizeUid(match?.uid1);
+    const uid2 = normalizeUid(match?.uid2);
+    const fresh1 = freshScoresByUid[uid1];
+    const fresh2 = freshScoresByUid[uid2];
+    const total1 = Number(fresh1?.event_total ?? match?.total1 ?? 0);
+    const total2 = Number(fresh2?.event_total ?? match?.total2 ?? 0);
+    const today1 = Number(fresh1?.total_live ?? match?.today1 ?? 0);
+    const today2 = Number(fresh2?.total_live ?? match?.today2 ?? 0);
+    const futureDelta1 = Math.max(0, Number(match?.projected_total1 || total1) - Number(match?.total1 || 0));
+    const futureDelta2 = Math.max(0, Number(match?.projected_total2 || total2) - Number(match?.total2 || 0));
+    const projectedTotal1 = Number((total1 + futureDelta1).toFixed(1));
+    const projectedTotal2 = Number((total2 + futureDelta2).toFixed(1));
+    const winProb = buildWinProbabilitySummary(
+      { expected_total: projectedTotal1 },
+      { expected_total: projectedTotal2 }
+    );
+
+    return {
+      ...match,
+      total1,
+      total2,
+      today1,
+      today2,
+      diff: Math.abs(total1 - total2),
+      projected_total1: projectedTotal1,
+      projected_total2: projectedTotal2,
+      win_prob1: winProb.left,
+      win_prob2: winProb.right,
+    };
+  });
+
+  return {
+    ...baseState,
+    h2h: nextMatches,
+    picks_by_uid: nextPicksByUid,
+  };
+}
+
 function buildLeagueDailyAverages(picksByUid, teamsPlayingToday) {
   let totalTodayPlayers = 0;
   let totalAvailablePlayers = 0;
@@ -2013,7 +2172,11 @@ export default {
         state = await refreshState(env, { full: true });
       }
 
-      if (path === "/api/state") return jsonResponse(state);
+      if (path === "/api/state") {
+        const useFreshH2H = url.searchParams.get("fresh_h2h") === "1";
+        const responseState = useFreshH2H ? await buildFreshHomepageState(state) : state;
+        return jsonResponse(responseState);
+      }
       if (path === "/api/fixtures") return jsonResponse(state.fixtures);
       if (path === "/api/h2h") return jsonResponse(state.h2h);
       if (path === "/api/h2h-standings") return jsonResponse(state.h2h_standings || []);

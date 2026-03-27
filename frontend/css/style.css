@@ -421,11 +421,11 @@ body {
 
 .transfer-record {
     display: grid;
-    grid-template-columns: 52px 1fr 48px;
-    gap: 8px;
+    grid-template-columns: 54px minmax(0, 1fr) auto;
+    gap: 10px;
     align-items: center;
-    font-size: 11px;
-    padding: 6px 0;
+    font-size: 12px;
+    padding: 7px 0;
     border-bottom: 1px dashed #d7e4f2;
 }
 
@@ -460,17 +460,32 @@ body {
 .transfer-day {
     color: #64748b;
     font-weight: 800;
+    white-space: nowrap;
 }
 
 .transfer-move {
     color: #0f172a;
     font-weight: 600;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .transfer-cost {
     text-align: right;
     font-weight: 800;
     color: #0f766e;
+    white-space: nowrap;
+}
+
+.transfer-arrow {
+    color: #94a3b8;
+    font-weight: 700;
+    flex: 0 0 auto;
 }
 
 .transfer-cost.wildcard {
@@ -494,6 +509,11 @@ body {
 .right-panel .transfer-captain-label,
 .right-panel .transfer-captain-value {
     text-align: right;
+}
+
+.right-panel .transfer-move,
+.transfer-record.align-right .transfer-move {
+    justify-content: flex-end;
 }
 
 /* ===== FDR Table ===== */
@@ -552,13 +572,6 @@ body {
 .fdr-4 { background: #ff003c; }
 .fdr-5 { background: #6b001a; }
 
-.league-metrics {
-    margin-top: 18px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-}
-
 .rankings-column {
     min-height: auto;
 }
@@ -601,28 +614,6 @@ body {
 
 .rankings-table tr.live-row {
     background: #f8fbff;
-}
-
-.metric-card {
-    background: linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%);
-    border: 1px solid #d9e8f7;
-    border-radius: 14px;
-    padding: 14px 16px;
-}
-
-.metric-label {
-    font-size: 12px;
-    font-weight: 700;
-    color: #52606d;
-    margin-bottom: 8px;
-}
-
-.metric-value {
-    font-size: 26px;
-    line-height: 1;
-    font-weight: 900;
-    color: #0f172a;
-    font-variant-numeric: tabular-nums;
 }
 
 /* ===== Modal ===== */
@@ -1074,6 +1065,13 @@ body {
         gap: 4px;
     }
 
+    .transfer-move {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: initial;
+        display: block;
+    }
+
     .transfer-record,
     .transfer-record.align-right,
     .right-panel .transfer-panel-title,
@@ -1087,12 +1085,9 @@ body {
         text-align: left;
     }
 
-    .league-metrics {
-        grid-template-columns: 1fr;
-    }
-
-    .metric-value {
-        font-size: 22px;
+    .right-panel .transfer-move,
+    .transfer-record.align-right .transfer-move {
+        justify-content: flex-start;
     }
 
     .modal {
