@@ -702,8 +702,8 @@ const Render = {
         if (isDual && dualData) {
             body.innerHTML = `
                 <div class="lineup-view-switch">
-                    <button class="lineup-mode-btn active" data-lineup-mode="today" type="button">今日阵容</button>
-                    <button class="lineup-mode-btn" data-lineup-mode="future" type="button">未来 7 天</button>
+                    <button class="lineup-mode-btn active" data-lineup-mode="today" type="button" onclick="setLineupMode('today')">今日阵容</button>
+                    <button class="lineup-mode-btn" data-lineup-mode="future" type="button" onclick="setLineupMode('future')">未来 7 天</button>
                 </div>
                 <div class="lineup-mode-panel active" data-lineup-panel="today">
                     <div class="dual-lineup-container">
@@ -724,6 +724,15 @@ const Render = {
         body.innerHTML = createLineupSection(data, name);
     },
 };
+
+function setLineupMode(mode = "today") {
+    document.querySelectorAll(".lineup-mode-btn").forEach((button) => {
+        button.classList.toggle("active", button.dataset.lineupMode === mode);
+    });
+    document.querySelectorAll(".lineup-mode-panel").forEach((panel) => {
+        panel.classList.toggle("active", panel.dataset.lineupPanel === mode);
+    });
+}
 
 const App = {
     lineupCache: new Map(),
@@ -957,12 +966,7 @@ const App = {
             const lineupModeButton = event.target.closest(".lineup-mode-btn");
             if (lineupModeButton) {
                 const mode = lineupModeButton.dataset.lineupMode || "today";
-                document.querySelectorAll(".lineup-mode-btn").forEach((button) => {
-                    button.classList.toggle("active", button === lineupModeButton);
-                });
-                document.querySelectorAll(".lineup-mode-panel").forEach((panel) => {
-                    panel.classList.toggle("active", panel.dataset.lineupPanel === mode);
-                });
+                setLineupMode(mode);
                 return;
             }
 
@@ -1025,6 +1029,7 @@ function closeModal(event, modalId) {
 window.App = App;
 window.closeModal = closeModal;
 window.manualRefresh = () => App.manualRefresh();
+window.setLineupMode = setLineupMode;
 
 App.init();
 
