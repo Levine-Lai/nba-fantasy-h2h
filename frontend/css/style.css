@@ -692,7 +692,7 @@ body {
 
 .modal.lineup-wide {
     width: 96%;
-    max-width: 1380px;
+    max-width: 1220px;
 }
 
 .modal-header {
@@ -1028,29 +1028,18 @@ body {
 .future-compare-stack {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
 }
 
-.future-compare-scroll {
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-}
-
-.future-compare-board {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(520px, 1fr));
-    gap: 12px;
-    min-width: 1060px;
-    align-items: start;
+.future-compare-stack-vertical {
+    gap: 16px;
 }
 
 .future-schedule-panel {
     background: #fff;
     border-radius: 14px;
     border: 1px solid #e6edf5;
-    padding: 12px;
+    padding: 14px;
     box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
 
@@ -1064,10 +1053,6 @@ body {
 
 .future-schedule-matrix {
     width: max-content;
-}
-
-.future-compare-board .future-schedule-scroll {
-    overflow: visible;
 }
 
 .future-team-header {
@@ -1207,7 +1192,7 @@ body {
 
 .future-player-cell,
 .future-match-cell {
-    min-height: 58px;
+    min-height: 56px;
     border-right: 1px solid #e3ebf4;
 }
 
@@ -1519,12 +1504,6 @@ body {
         margin-right: -2px;
     }
 
-    .future-compare-board {
-        grid-template-columns: repeat(2, minmax(420px, 1fr));
-        min-width: 860px;
-        gap: 10px;
-    }
-
     .modal {
         width: 94%;
         max-height: 88vh;
@@ -1715,7 +1694,7 @@ body {
     padding: 4px;
     border-radius: 999px;
     background: #eef4fa;
-    margin-bottom: 14px;
+    margin-bottom: 0;
 }
 
 .reference-position-tab {

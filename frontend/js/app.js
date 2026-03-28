@@ -719,11 +719,9 @@ const Render = {
                     </div>
                 </div>
                 <div class="lineup-mode-panel" data-lineup-panel="future">
-                    <div class="future-compare-scroll">
-                        <div class="future-compare-board">
-                            ${createFutureCompareSection(data, name)}
-                            ${createFutureCompareSection(dualData, dualName)}
-                        </div>
+                    <div class="future-compare-stack future-compare-stack-vertical">
+                        ${createFutureCompareSection(data, name)}
+                        ${createFutureCompareSection(dualData, dualName)}
                     </div>
                 </div>
             `;
