@@ -692,7 +692,16 @@ body {
 
 .modal.lineup-wide {
     width: 96%;
-    max-width: 1220px;
+    max-width: 1320px;
+}
+
+.modal.lineup-wide .modal-header {
+    padding: 16px 20px;
+}
+
+.modal.lineup-wide .modal-body {
+    padding: 16px;
+    max-height: 76vh;
 }
 
 .modal-header {
@@ -1032,14 +1041,14 @@ body {
 }
 
 .future-compare-stack-vertical {
-    gap: 16px;
+    gap: 12px;
 }
 
 .future-schedule-panel {
     background: #fff;
     border-radius: 14px;
     border: 1px solid #e6edf5;
-    padding: 14px;
+    padding: 12px;
     box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
 
@@ -1060,17 +1069,17 @@ body {
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .future-team-name {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 800;
     color: #0f172a;
 }
 
 .future-team-sub {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     color: #64748b;
 }
@@ -1092,8 +1101,8 @@ body {
 
 .future-head-player,
 .future-head-day {
-    padding: 10px 8px;
-    font-size: 11px;
+    padding: 8px 6px;
+    font-size: 10px;
     font-weight: 900;
     color: #334155;
     text-align: center;
@@ -1102,7 +1111,7 @@ body {
 
 .future-head-player {
     text-align: left;
-    padding-left: 16px;
+    padding-left: 12px;
 }
 
 .future-head-day:last-child {
@@ -1118,17 +1127,17 @@ body {
 
 .future-summary-label,
 .future-summary-cell {
-    padding: 8px;
+    padding: 6px;
     border-right: 1px solid #e3ebf4;
 }
 
 .future-summary-label {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 900;
     color: #334155;
     display: flex;
     align-items: center;
-    padding-left: 16px;
+    padding-left: 12px;
 }
 
 .future-summary-cell:last-child {
@@ -1140,26 +1149,26 @@ body {
 }
 
 .future-summary-top {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 900;
     color: #0f172a;
     line-height: 1;
 }
 
 .future-summary-bottom {
-    font-size: 10px;
+    font-size: 9px;
     color: #64748b;
-    margin-top: 4px;
+    margin-top: 3px;
     font-weight: 700;
 }
 
 .future-group {
-    margin-top: 10px;
+    margin-top: 8px;
 }
 
 .future-group-title {
-    padding: 8px 12px;
-    font-size: 13px;
+    padding: 7px 10px;
+    font-size: 12px;
     font-weight: 900;
     color: #fff;
     border-radius: 12px 12px 0 0;
@@ -1192,7 +1201,7 @@ body {
 
 .future-player-cell,
 .future-match-cell {
-    min-height: 56px;
+    min-height: 48px;
     border-right: 1px solid #e3ebf4;
 }
 
@@ -1200,7 +1209,7 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 8px 10px;
+    padding: 6px 8px;
     background: #fff;
 }
 
@@ -1209,15 +1218,15 @@ body {
 }
 
 .future-player-name {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 800;
     color: #0f172a;
     line-height: 1.2;
 }
 
 .future-player-meta {
-    margin-top: 4px;
-    font-size: 12px;
+    margin-top: 3px;
+    font-size: 10px;
     font-weight: 700;
     color: #64748b;
 }
@@ -1227,7 +1236,7 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     background: #fff;
 }
 
@@ -1236,19 +1245,19 @@ body {
 }
 
 .future-match-cell.empty {
-    font-size: 18px;
+    font-size: 15px;
     font-weight: 900;
     color: #94a3b8;
 }
 
 .future-match-logo {
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 18px;
     object-fit: contain;
 }
 
 .future-match-venue {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 900;
     color: #64748b;
 }
@@ -1487,17 +1496,17 @@ body {
     .future-head-player,
     .future-summary-label,
     .future-player-cell {
-        min-width: 144px;
+        min-width: 124px;
     }
 
     .future-head-day,
     .future-summary-cell,
     .future-match-cell {
-        min-width: 58px;
+        min-width: 50px;
     }
 
     .future-schedule-panel {
-        padding: 10px;
+        padding: 9px;
     }
 
     .future-schedule-scroll {

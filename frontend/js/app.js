@@ -653,8 +653,8 @@ const Render = {
                 `;
             }
 
-            const columnStyle = `style="grid-template-columns:minmax(118px, 1.2fr) repeat(${days.length}, minmax(46px, 1fr));"`;
-            const tableMinWidth = Math.max(500, 156 + days.length * 56);
+            const columnStyle = `style="grid-template-columns:minmax(132px, 1.25fr) repeat(${days.length}, minmax(42px, 1fr));"`;
+            const tableMinWidth = Math.max(540, 174 + days.length * 52);
             return `
                 <div class="future-schedule-panel">
                     <div class="future-team-header">
