@@ -646,20 +646,20 @@ const Render = {
                     <div class="future-schedule-panel">
                         <div class="future-team-header">
                             <div class="future-team-name">${escapeHtml(teamName)}</div>
-                            <div class="future-team-sub">当前阵容未来 7 天赛程</div>
+                            <div class="future-team-sub">当前阵容未来 5 天赛程</div>
                         </div>
                         <div class="trend-empty">No future schedule data</div>
                     </div>
                 `;
             }
 
-            const columnStyle = `style="grid-template-columns:minmax(132px, 1.25fr) repeat(${days.length}, minmax(42px, 1fr));"`;
-            const tableMinWidth = Math.max(540, 174 + days.length * 52);
+            const columnStyle = `style="grid-template-columns:minmax(118px, 1.15fr) repeat(${days.length}, minmax(42px, 1fr));"`;
+            const tableMinWidth = Math.max(500, 150 + days.length * 52);
             return `
                 <div class="future-schedule-panel">
                     <div class="future-team-header">
                         <div class="future-team-name">${escapeHtml(teamName)}</div>
-                        <div class="future-team-sub">当前阵容未来 7 天赛程</div>
+                        <div class="future-team-sub">当前阵容未来 5 天赛程</div>
                     </div>
                     <div class="future-schedule-scroll">
                         <div class="future-schedule-matrix" style="min-width:${tableMinWidth}px;">
@@ -710,7 +710,7 @@ const Render = {
             body.innerHTML = `
                 <div class="lineup-view-switch">
                     <button class="lineup-mode-btn active" data-lineup-mode="today" type="button" onclick="setLineupMode('today')">今日阵容</button>
-                    <button class="lineup-mode-btn" data-lineup-mode="future" type="button" onclick="setLineupMode('future')">未来 7 天</button>
+                    <button class="lineup-mode-btn" data-lineup-mode="future" type="button" onclick="setLineupMode('future')">未来 5 天</button>
                 </div>
                 <div class="lineup-mode-panel active" data-lineup-panel="today">
                     <div class="dual-lineup-container">

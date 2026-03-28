@@ -1398,7 +1398,7 @@ function buildWeekEventIds(events, currentWeek, currentEvent) {
     .sort((a, b) => a - b);
 }
 
-function buildUpcomingEventIds(events, currentEvent, limit = 7) {
+function buildUpcomingEventIds(events, currentEvent, limit = 5) {
   const currentId = Number(currentEvent || 0);
   return (events || [])
     .map((event) => Number(event?.id || 0))
@@ -2058,7 +2058,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     fetchAllStandings(1),
     weeklyStandingsPhase ? fetchAllStandings(weeklyStandingsPhase) : Promise.resolve([]),
   ]);
-  const upcomingEventIds = buildUpcomingEventIds(events, currentEvent, 7);
+  const upcomingEventIds = buildUpcomingEventIds(events, currentEvent, 5);
   const fixturesByEvent = {
     [currentEvent]: fixturesRaw || [],
   };

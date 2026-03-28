@@ -1069,9 +1069,9 @@ body {
 
 .future-compare-board {
     display: grid;
-    grid-template-columns: repeat(2, minmax(430px, 1fr));
+    grid-template-columns: repeat(2, minmax(400px, 1fr));
     gap: 10px;
-    min-width: 880px;
+    min-width: 820px;
     align-items: start;
 }
 
@@ -1510,8 +1510,8 @@ body {
     }
 
     .future-compare-board {
-        grid-template-columns: repeat(2, minmax(370px, 1fr));
-        min-width: 760px;
+        grid-template-columns: repeat(2, minmax(340px, 1fr));
+        min-width: 700px;
         gap: 8px;
     }
 
