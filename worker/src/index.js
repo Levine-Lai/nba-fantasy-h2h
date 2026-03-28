@@ -1372,6 +1372,32 @@ function buildWeekEventIds(events, currentWeek, currentEvent) {
     .sort((a, b) => a - b);
 }
 
+function buildWeekDayContexts(currentEvent, currentDay, eventMetaById, teamsPlayingToday, futureWeekEventIds, futureFixturesByEvent) {
+  const contexts = [];
+  const initialDay = Number(currentDay || 0) || Number(eventMetaById?.[currentEvent]?.day || 0) || 1;
+  contexts.push({
+    event_id: Number(currentEvent || 0),
+    day: initialDay,
+    day_label: `DAY${initialDay}`,
+    teams_playing: teamsPlayingToday,
+  });
+
+  for (const eventId of futureWeekEventIds || []) {
+    if (contexts.length >= 7) break;
+    const meta = eventMetaById?.[eventId] || {};
+    const fallbackDay = initialDay + contexts.length;
+    const day = Number(meta.day || 0) || fallbackDay;
+    contexts.push({
+      event_id: Number(eventId || 0),
+      day,
+      day_label: `DAY${day}`,
+      teams_playing: buildTeamsPlayingToday(futureFixturesByEvent?.[eventId] || []),
+    });
+  }
+
+  return contexts.slice(0, 7);
+}
+
 function getNextEventInfo(events, currentEvent) {
   const currentId = Number(currentEvent || 0);
   const candidates = (events || [])
@@ -1990,12 +2016,20 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
 
   const games = (fixturesRaw || []).map((f) => {
     const status = resolveFixtureStatus(f);
+    const homeTeamName = teams[f.team_h] || `Team #${f.team_h}`;
+    const awayTeamName = teams[f.team_a] || `Team #${f.team_a}`;
+    const homeVisual = getTeamVisualMeta(homeTeamName);
+    const awayVisual = getTeamVisualMeta(awayTeamName);
     return {
       id: f.id,
       team_h: f.team_h,
       team_a: f.team_a,
-      home_team: teams[f.team_h] || `Team #${f.team_h}`,
-      away_team: teams[f.team_a] || `Team #${f.team_a}`,
+      home_team: homeTeamName,
+      away_team: awayTeamName,
+      home_logo_url: homeVisual.logo_url,
+      away_logo_url: awayVisual.logo_url,
+      home_color: homeVisual.color,
+      away_color: awayVisual.color,
       home_score: f.team_h_score || 0,
       away_score: f.team_a_score || 0,
       started: !!f.started,
@@ -2008,6 +2042,14 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   });
   const teamsPlayingToday = buildTeamsPlayingToday(games);
   const futureTeamsByEvent = futureWeekEventIds.map((eventId) => buildTeamsPlayingToday(futureFixturesByEvent[eventId] || []));
+  const weekDayContexts = buildWeekDayContexts(
+    currentEvent,
+    currentDay,
+    eventMetaById,
+    teamsPlayingToday,
+    futureWeekEventIds,
+    futureFixturesByEvent
+  );
   const eventLiveCache = {
     [currentEvent]: liveElements,
   };
@@ -2033,9 +2075,17 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     }
     homePlayers.sort((a, b) => b.fantasy - a.fantasy);
     awayPlayers.sort((a, b) => b.fantasy - a.fantasy);
+    const homeTeamName = teams[fixture.team_h] || `Team #${fixture.team_h}`;
+    const awayTeamName = teams[fixture.team_a] || `Team #${fixture.team_a}`;
+    const homeVisual = getTeamVisualMeta(homeTeamName);
+    const awayVisual = getTeamVisualMeta(awayTeamName);
     fixtureDetails[fixture.id] = {
-      home_team: teams[fixture.team_h] || `Team #${fixture.team_h}`,
-      away_team: teams[fixture.team_a] || `Team #${fixture.team_a}`,
+      home_team: homeTeamName,
+      away_team: awayTeamName,
+      home_logo_url: homeVisual.logo_url,
+      away_logo_url: awayVisual.logo_url,
+      home_color: homeVisual.color,
+      away_color: awayVisual.color,
       home_players: homePlayers,
       away_players: awayPlayers,
     };
@@ -2426,6 +2476,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
         ? Number((player?.is_effective ? 100 - ownershipPercent : -ownershipPercent).toFixed(1))
         : null;
     }
+    picksByUid[uid].future_day_outlook = buildManagerFutureDayOutlook(picksByUid[uid], weekDayContexts);
   }
 
   const league_daily_averages = buildLeagueDailyAverages(picksByUid, teamsPlayingToday);
@@ -2535,6 +2586,34 @@ async function getState(env) {
   } catch {
     return null;
   }
+}
+
+function buildManagerFutureDayOutlook(payload, weekDayContexts) {
+  const players = Array.isArray(payload?.players) ? payload.players : [];
+  const currentEvent = Number(payload?.current_event || 0);
+
+  return (weekDayContexts || []).map((context) => {
+    const isToday = Number(context?.event_id || 0) === currentEvent;
+    const teamSet = context?.teams_playing instanceof Set ? context.teams_playing : new Set();
+    const rawActiveCount = players.filter((player) => teamSet.has(Number(player?.team_id || 0))).length;
+    const simulated = players.map((player) => ({
+      ...player,
+      injury: isToday ? player?.injury : null,
+      final_points: isToday ? Number(player?.final_points || 0) : getProjectedPlayerScore(player),
+      base_points: isToday ? Number(player?.base_points || 0) : getProjectedPlayerScore(player),
+      is_effective: false,
+    }));
+    const [projectedPoints, selected, formation] = calculateEffectiveScore(simulated, teamSet);
+    return {
+      event_id: Number(context?.event_id || 0),
+      day: Number(context?.day || 0) || null,
+      day_label: context?.day_label || "DAY?",
+      raw_active_count: rawActiveCount,
+      effective_count: Number(selected?.length || 0),
+      projected_points: Number(projectedPoints || 0),
+      formation: formation || "N/A",
+    };
+  });
 }
 
 async function getInjuriesPayload(env, options = {}) {

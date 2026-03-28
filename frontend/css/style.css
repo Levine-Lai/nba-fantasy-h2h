@@ -250,6 +250,20 @@ body {
     margin: 2px 0;
 }
 
+.game-team-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.game-team-logo {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    flex: 0 0 auto;
+}
+
 .game-team {
     font-size: 13px;
     font-weight: 600;
@@ -333,6 +347,23 @@ body {
     background: #f8fbff;
     transform: translateY(-2px);
     box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
+}
+
+.team-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.manager-logo {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 12px;
+    background: #fff;
+    border: 1px solid #d9e2ec;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+    flex: 0 0 auto;
 }
 
 .team-name {
@@ -712,6 +743,18 @@ body {
     border-bottom: 2px solid #e0e0e0;
 }
 
+.team-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.team-section-logo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
 /* ===== Stats Table ===== */
 .stats-table {
     width: 100%;
@@ -941,6 +984,124 @@ body {
     gap: 20px;
 }
 
+.lineup-view-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px;
+    border-radius: 999px;
+    background: #eef4fa;
+    margin-bottom: 16px;
+}
+
+.lineup-mode-btn {
+    border: none;
+    background: transparent;
+    color: #52606d;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 8px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.lineup-mode-btn.active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.lineup-mode-panel {
+    display: none;
+}
+
+.lineup-mode-panel.active {
+    display: block;
+}
+
+.future-compare-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.future-team-panel {
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid #e6edf5;
+    padding: 16px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.future-team-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.future-team-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.future-team-sub {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.future-day-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.future-day-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #f8fbff;
+    border: 1px solid #e5edf6;
+}
+
+.future-day-label {
+    font-size: 13px;
+    font-weight: 800;
+    color: #334155;
+}
+
+.future-day-chips {
+    display: inline-flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.future-day-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 66px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.future-day-chip.effective {
+    background: #dcfce7;
+    color: #166534;
+}
+
 .dual-lineup-side {
     background: white;
     border-radius: 12px;
@@ -1129,6 +1290,26 @@ body {
 
     .reference-select {
         width: 100%;
+    }
+
+    .reference-game-row,
+    .reference-average-row {
+        grid-template-columns: 1fr;
+    }
+
+    .reference-score-chip {
+        width: 100%;
+        min-height: 56px;
+    }
+
+    .future-team-header,
+    .future-day-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .future-day-chips {
+        justify-content: flex-start;
     }
 
     .modal {
@@ -1321,10 +1502,10 @@ body {
 }
 
 .reference-select {
-    width: 240px;
+    width: 210px;
     border: 1px solid #d7e4f2;
-    border-radius: 10px;
-    padding: 12px 14px;
+    border-radius: 12px;
+    padding: 14px 14px;
     background: #fff;
     font-size: 14px;
     color: #0f172a;
@@ -1332,9 +1513,9 @@ body {
 
 .reference-btn {
     align-self: end;
-    height: 46px;
-    border-radius: 10px;
-    padding: 0 18px;
+    height: 50px;
+    border-radius: 12px;
+    padding: 0 20px;
 }
 
 .reference-card {
@@ -1383,9 +1564,13 @@ body {
 }
 
 .reference-game-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: 14px;
     border-top: 1px dashed #dbe4ee;
     padding-top: 10px;
-    min-height: 62px;
+    min-height: 88px;
 }
 
 .reference-game-row:first-child {
@@ -1393,67 +1578,75 @@ body {
     padding-top: 0;
 }
 
-.reference-game-top {
+.reference-game-copy,
+.reference-average-copy {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
 }
 
 .reference-game-date {
-    font-size: 13px;
-    font-weight: 700;
-    color: #475569;
-}
-
-.reference-game-score {
-    font-size: 14px;
-    font-weight: 900;
-    color: #00b44b;
-}
-
-.reference-game-meta {
-    margin-top: 4px;
-    font-size: 12px;
+    font-size: 18px;
+    font-weight: 800;
     color: #334155;
 }
 
+.reference-game-meta {
+    margin-top: 8px;
+    font-size: 15px;
+    color: #334155;
+    line-height: 1.6;
+    word-break: break-word;
+}
+
+.reference-score-chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 108px;
+    padding: 12px 16px;
+    border-radius: 18px;
+    background: var(--team-color-soft, rgba(15, 23, 42, 0.14));
+    color: var(--team-color, #0f172a);
+    font-size: 30px;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: 0.01em;
+    text-shadow: 0 0 12px rgba(255, 255, 255, 0.55);
+    box-shadow: inset 0 0 0 2px var(--team-color, #334155), 0 0 18px var(--team-color-soft, rgba(15, 23, 42, 0.14));
+}
+
+.reference-score-chip.average-chip {
+    font-size: 28px;
+}
+
 .reference-placeholder .reference-game-date,
-.reference-placeholder .reference-game-score,
+.reference-placeholder .reference-score-chip,
 .reference-placeholder .reference-game-meta {
     color: #cbd5e1;
 }
 
 .reference-average-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: 14px;
     border-top: 1px solid #d7e4f2;
     margin-top: 4px;
     padding-top: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.reference-average-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
+    min-height: 88px;
 }
 
 .reference-average-label {
-    font-size: 12px;
+    font-size: 18px;
     font-weight: 900;
-    color: #475569;
-}
-
-.reference-average-score {
-    font-size: 14px;
-    font-weight: 900;
-    color: #0f172a;
+    color: #334155;
 }
 
 .reference-average-meta {
-    font-size: 12px;
+    margin-top: 8px;
+    font-size: 15px;
     color: #334155;
     line-height: 1.5;
 }

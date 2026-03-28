@@ -69,6 +69,60 @@ function normalizeStatusClass(status) {
     return String(status || "").trim().toLowerCase().replace(/[^a-z]+/g, "-");
 }
 
+function hexToRgba(hex, alpha = 0.14) {
+    const raw = String(hex || "").trim();
+    const normalized = raw.startsWith("#") ? raw.slice(1) : raw;
+    if (!/^[0-9a-f]{6}$/i.test(normalized)) {
+        return `rgba(15, 23, 42, ${alpha})`;
+    }
+    const r = parseInt(normalized.slice(0, 2), 16);
+    const g = parseInt(normalized.slice(2, 4), 16);
+    const b = parseInt(normalized.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function getManagerLogoUrl(name) {
+    return `/players-logos/${encodeURIComponent(String(name || "").trim())}.jpg`;
+}
+
+function getTeamLogoUrl(teamName, providedUrl = "") {
+    if (providedUrl) return providedUrl;
+    const key = String(teamName || "").trim().toLowerCase();
+    const logoMap = {
+        "atlanta hawks": "hawks.png",
+        "boston celtics": "celtics.png",
+        "brooklyn nets": "nets.png",
+        "charlotte hornets": "hornets.png",
+        "chicago bulls": "bulls.png",
+        "cleveland cavaliers": "cavaliers.png",
+        "dallas mavericks": "mavericks.png",
+        "denver nuggets": "nuggets.png",
+        "detroit pistons": "pistons.png",
+        "golden state warriors": "warriors.png",
+        "houston rockets": "rockets.png",
+        "indiana pacers": "pacers.png",
+        "los angeles clippers": "clippers.png",
+        "los angeles lakers": "lakers.png",
+        "memphis grizzlies": "grizzlies.png",
+        "miami heat": "heat.png",
+        "milwaukee bucks": "bucks.png",
+        "minnesota timberwolves": "timberwolves.png",
+        "new orleans pelicans": "pelicans.png",
+        "new york knicks": "knicks.png",
+        "oklahoma city thunder": "thunder.png",
+        "orlando magic": "magic.png",
+        "philadelphia 76ers": "sixers.png",
+        "phoenix suns": "suns.png",
+        "portland trail blazers": "blazers.png",
+        "sacramento kings": "kings.png",
+        "san antonio spurs": "spurs.png",
+        "toronto raptors": "raptors.png",
+        "utah jazz": "jazz.png",
+        "washington wizards": "wizards.png",
+    };
+    return `/nba-team-logos/${logoMap[key] || "_.png"}`;
+}
+
 function renderTransferRecords(teamName, transferRecords, side = "left", captainUsed = null) {
     const rows = (transferRecords || []).map((record) => `
         <div class="transfer-record ${side === "right" ? "align-right" : ""}">
@@ -263,7 +317,7 @@ const Render = {
         }
 
         container.innerHTML = opponents.map((item) => `
-            <div class="reference-card" style="--team-color:${escapeHtml(item.team_color || "#334155")}">
+            <div class="reference-card" style="--team-color:${escapeHtml(item.team_color || "#334155")};--team-color-soft:${escapeHtml(hexToRgba(item.team_color || "#334155", 0.14))};">
                 <div class="reference-card-head">
                     <div class="reference-team-wrap">
                         <img class="reference-team-logo" src="${escapeHtml(item.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(item.opponent_team || "-")} logo" decoding="async" width="34" height="34" loading="lazy" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
@@ -274,51 +328,51 @@ const Render = {
                     ${(Array.isArray(item.games) ? item.games : []).map((game) => game
                         ? `
                             <div class="reference-game-row">
-                                <div class="reference-game-top">
-                                    <span class="reference-game-date">${escapeHtml(game.date_label || "-")} ${escapeHtml(game.venue_label || "")}</span>
-                                    <span class="reference-game-score">${Math.round(Number(game.fantasy_points || 0))}分</span>
+                                <div class="reference-game-copy">
+                                    <div class="reference-game-date">${escapeHtml(game.date_label || "-")} ${escapeHtml(game.venue_label || "")}</div>
+                                    <div class="reference-game-meta">
+                                        ${Number(game.minutes || 0) > 0 ? `${Math.round(Number(game.minutes || 0))}分钟 ` : ""}
+                                        ${Math.round(Number(game.points_scored || 0))}分
+                                        ${Math.round(Number(game.rebounds || 0))}板
+                                        ${Math.round(Number(game.assists || 0))}助
+                                        ${Math.round(Number(game.steals || 0))}断
+                                        ${Math.round(Number(game.blocks || 0))}帽
+                                    </div>
                                 </div>
-                                <div class="reference-game-meta">
-                                    ${Number(game.minutes || 0) > 0 ? `${Math.round(Number(game.minutes || 0))}分钟 ` : ""}
-                                    ${Math.round(Number(game.points_scored || 0))}分
-                                    ${Math.round(Number(game.rebounds || 0))}板
-                                    ${Math.round(Number(game.assists || 0))}助
-                                    ${Math.round(Number(game.steals || 0))}断
-                                    ${Math.round(Number(game.blocks || 0))}帽
-                                </div>
+                                <div class="reference-score-chip">${Math.round(Number(game.fantasy_points || 0))}分</div>
                             </div>
                         `
                         : `
                             <div class="reference-game-row reference-placeholder">
-                                <div class="reference-game-top">
-                                    <span class="reference-game-date">--</span>
-                                    <span class="reference-game-score">--</span>
+                                <div class="reference-game-copy">
+                                    <div class="reference-game-date">--</div>
+                                    <div class="reference-game-meta">--</div>
                                 </div>
-                                <div class="reference-game-meta">--</div>
+                                <div class="reference-score-chip">--</div>
                             </div>
                         `).join("")}
                     <div class="reference-average-row">
                         ${item.averages
                             ? `
-                                <div class="reference-average-top">
-                                    <span class="reference-average-label">场均</span>
-                                    <span class="reference-average-score">${Number(item.averages.fantasy_points || 0).toFixed(1)}分</span>
+                                <div class="reference-average-copy">
+                                    <div class="reference-average-label">场均</div>
+                                    <div class="reference-average-meta">
+                                        ${Number(item.averages.minutes || 0) > 0 ? `${Number(item.averages.minutes || 0).toFixed(1)}分钟 ` : ""}
+                                        ${Number(item.averages.points_scored || 0).toFixed(1)}分
+                                        ${Number(item.averages.rebounds || 0).toFixed(1)}板
+                                        ${Number(item.averages.assists || 0).toFixed(1)}助
+                                        ${Number(item.averages.steals || 0).toFixed(1)}断
+                                        ${Number(item.averages.blocks || 0).toFixed(1)}帽
+                                    </div>
                                 </div>
-                                <div class="reference-average-meta">
-                                    ${Number(item.averages.minutes || 0) > 0 ? `${Number(item.averages.minutes || 0).toFixed(1)}分钟 ` : ""}
-                                    ${Number(item.averages.points_scored || 0).toFixed(1)}分
-                                    ${Number(item.averages.rebounds || 0).toFixed(1)}板
-                                    ${Number(item.averages.assists || 0).toFixed(1)}助
-                                    ${Number(item.averages.steals || 0).toFixed(1)}断
-                                    ${Number(item.averages.blocks || 0).toFixed(1)}帽
-                                </div>
+                                <div class="reference-score-chip average-chip">${Number(item.averages.fantasy_points || 0).toFixed(1)}分</div>
                             `
                             : `
-                                <div class="reference-average-top">
-                                    <span class="reference-average-label">场均</span>
-                                    <span class="reference-average-score">--</span>
+                                <div class="reference-average-copy">
+                                    <div class="reference-average-label">场均</div>
+                                    <div class="reference-average-meta">暂无数据</div>
                                 </div>
-                                <div class="reference-average-meta">暂无数据</div>
+                                <div class="reference-score-chip average-chip">--</div>
                             `}
                     </div>
                 </div>
@@ -344,11 +398,17 @@ const Render = {
                 <div class="game-item js-game-item" data-fixture-id="${game.id}">
                     <div class="game-teams">
                         <div class="game-row">
-                            <span class="game-team">${escapeHtml(game.away_team)}</span>
+                            <span class="game-team-wrap">
+                                <img class="game-team-logo" src="${escapeHtml(getTeamLogoUrl(game.away_team, game.away_logo_url))}" alt="${escapeHtml(game.away_team)} logo" decoding="async" width="24" height="24" loading="lazy" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
+                                <span class="game-team">${escapeHtml(game.away_team)}</span>
+                            </span>
                             <span class="game-score ${awayClass}">${game.away_score}</span>
                         </div>
                         <div class="game-row">
-                            <span class="game-team">${escapeHtml(game.home_team)}</span>
+                            <span class="game-team-wrap">
+                                <img class="game-team-logo" src="${escapeHtml(getTeamLogoUrl(game.home_team, game.home_logo_url))}" alt="${escapeHtml(game.home_team)} logo" decoding="async" width="24" height="24" loading="lazy" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
+                                <span class="game-team">${escapeHtml(game.home_team)}</span>
+                            </span>
                             <span class="game-score ${homeClass}">${game.home_score}</span>
                         </div>
                     </div>
@@ -381,7 +441,10 @@ const Render = {
                 <div class="match-block">
                     <div class="match-card">
                         <div class="team-side ${leftClass} ${leftMuted} js-transfer-toggle" data-panel-id="${leftPanelId}" data-uid="${match.uid1}" data-team="${escapeHtml(match.t1)}" data-side="left">
-                            <div class="team-name">${escapeHtml(match.t1)}</div>
+                            <div class="team-head">
+                                <img class="manager-logo" src="${escapeHtml(getManagerLogoUrl(match.t1))}" alt="${escapeHtml(match.t1)} logo" decoding="async" width="40" height="40" loading="lazy" onerror="this.onerror=null;this.src='/LOGO.png';">
+                                <div class="team-name">${escapeHtml(match.t1)}</div>
+                            </div>
                             <div class="score-main ${leftClass}">${leftScore}</div>
                             <div class="score-sub">Today ${match.today1}</div>
                             <div class="score-prob">Win ${Number(match.win_prob1 || 50)}%</div>
@@ -391,7 +454,10 @@ const Render = {
                             <div class="match-diff">Diff: ${Math.abs(Number(match.diff || 0))}</div>
                         </div>
                         <div class="team-side ${rightClass} ${rightMuted} js-transfer-toggle" data-panel-id="${rightPanelId}" data-uid="${match.uid2}" data-team="${escapeHtml(match.t2)}" data-side="right">
-                            <div class="team-name">${escapeHtml(match.t2)}</div>
+                            <div class="team-head">
+                                <img class="manager-logo" src="${escapeHtml(getManagerLogoUrl(match.t2))}" alt="${escapeHtml(match.t2)} logo" decoding="async" width="40" height="40" loading="lazy" onerror="this.onerror=null;this.src='/LOGO.png';">
+                                <div class="team-name">${escapeHtml(match.t2)}</div>
+                            </div>
                             <div class="score-main ${rightClass}">${rightScore}</div>
                             <div class="score-sub">Today ${match.today2}</div>
                             <div class="score-prob">Win ${Number(match.win_prob2 || 50)}%</div>
@@ -432,9 +498,12 @@ const Render = {
 
         if (title) title.textContent = `${data.away_team} @ ${data.home_team}`;
 
-        const createTable = (players, teamName) => `
+        const createTable = (players, teamName, logoUrl) => `
             <div class="team-section">
-                <h3>${escapeHtml(teamName)}</h3>
+                <h3 class="team-section-title">
+                    <img class="team-section-logo" src="${escapeHtml(getTeamLogoUrl(teamName, logoUrl))}" alt="${escapeHtml(teamName)} logo" decoding="async" width="28" height="28" loading="lazy" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
+                    <span>${escapeHtml(teamName)}</span>
+                </h3>
                 <table class="stats-table">
                     <thead>
                         <tr>
@@ -468,8 +537,8 @@ const Render = {
 
         body.innerHTML = `
             <div class="game-detail-container">
-                ${createTable(data.away_players, data.away_team)}
-                ${createTable(data.home_players, data.home_team)}
+                ${createTable(data.away_players, data.away_team, data.away_logo_url)}
+                ${createTable(data.home_players, data.home_team, data.home_logo_url)}
             </div>
         `;
     },
@@ -564,11 +633,46 @@ const Render = {
             `;
         };
 
+        const createFutureCompareSection = (lineupData, teamName) => {
+            const outlook = Array.isArray(lineupData?.future_day_outlook) ? lineupData.future_day_outlook : [];
+            return `
+                <div class="future-team-panel">
+                    <div class="future-team-header">
+                        <div class="future-team-name">${escapeHtml(teamName)}</div>
+                        <div class="future-team-sub">当前阵容未来 7 天人数</div>
+                    </div>
+                    <div class="future-day-list">
+                        ${outlook.map((day) => `
+                            <div class="future-day-row">
+                                <div class="future-day-label">${escapeHtml(day.day_label || "DAY?")}</div>
+                                <div class="future-day-chips">
+                                    <span class="future-day-chip">上场 ${Number(day.raw_active_count || 0)}</span>
+                                    <span class="future-day-chip effective">有效 ${Number(day.effective_count || 0)}</span>
+                                </div>
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
+            `;
+        };
+
         if (isDual && dualData) {
             body.innerHTML = `
-                <div class="dual-lineup-container">
-                    ${createLineupSection(data, name)}
-                    ${createLineupSection(dualData, dualName)}
+                <div class="lineup-view-switch">
+                    <button class="lineup-mode-btn active" data-lineup-mode="today" type="button">今日阵容</button>
+                    <button class="lineup-mode-btn" data-lineup-mode="future" type="button">未来 7 天</button>
+                </div>
+                <div class="lineup-mode-panel active" data-lineup-panel="today">
+                    <div class="dual-lineup-container">
+                        ${createLineupSection(data, name)}
+                        ${createLineupSection(dualData, dualName)}
+                    </div>
+                </div>
+                <div class="lineup-mode-panel" data-lineup-panel="future">
+                    <div class="future-compare-stack">
+                        ${createFutureCompareSection(data, name)}
+                        ${createFutureCompareSection(dualData, dualName)}
+                    </div>
                 </div>
             `;
             return;
@@ -804,6 +908,18 @@ const App = {
 
             if (event.target.closest("#reference-search-btn")) {
                 this.searchPlayerReference();
+                return;
+            }
+
+            const lineupModeButton = event.target.closest(".lineup-mode-btn");
+            if (lineupModeButton) {
+                const mode = lineupModeButton.dataset.lineupMode || "today";
+                document.querySelectorAll(".lineup-mode-btn").forEach((button) => {
+                    button.classList.toggle("active", button === lineupModeButton);
+                });
+                document.querySelectorAll(".lineup-mode-panel").forEach((panel) => {
+                    panel.classList.toggle("active", panel.dataset.lineupPanel === mode);
+                });
                 return;
             }
 

@@ -1,4 +1,15 @@
 # nba-fantasy-h2h
+## 2026-03-28 前端展示优化
+1. `对阵参考` 卡片改为更宽松的双区布局：
+   - 左侧两行：日期 / 基础数据
+   - 右侧为与球队表头同色系的高亮 fantasy 分数块
+   - 场均区域沿用相同高亮样式，场均 fantasy 分固定放在最右侧
+2. `Live H2H` 首页卡片新增经理 logo，资源目录为 `frontend/players-logos/`
+3. `Today's Fixtures` 首页列表与比赛详情弹窗新增球队 logo，资源目录为 `frontend/nba-team-logos/`
+4. 对阵详情弹窗新增双模式：
+   - `今日阵容`
+   - `未来 7 天`
+5. `/api/picks/{uid}` payload 新增 `future_day_outlook` 字段，用于展示当前 roster 今天到未来六天的上场人数 / 有效人数
 ## 2026-03-28 对阵参考 / EO 更新
 1. 顶部导航中的 `球员高分榜` 已改为 `对阵参考`。
 2. `对阵参考` 当前以 `Nikola Jokic` 为示例，数据来源为官方 NBA Fantasy API：
