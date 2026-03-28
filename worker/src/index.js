@@ -470,22 +470,7 @@ function buildTransferTrends({
     }
   }
 
-  const globalInCounter = new Map();
-  const globalOutCounter = new Map();
-  for (const elem of Object.values(elements)) {
-    if (!elem) continue;
-    const name = elem.name || "";
-    const inCount = Number(elem.transfers_in_event || 0);
-    const outCount = Number(elem.transfers_out_event || 0);
-    if (inCount > 0) globalInCounter.set(name, inCount);
-    if (outCount > 0) globalOutCounter.set(name, outCount);
-  }
-
-  const global = {
-    // 全服目前无法获得逐笔“谁换谁”数据，这里展示当前 Event 的全服热门转入/转出。
-    top_in: topListFromMap(globalInCounter, 10),
-    top_out: topListFromMap(globalOutCounter, 10),
-  };
+  const global = buildGlobalTransferTrends(elements);
 
   return {
     league: {
@@ -496,6 +481,25 @@ function buildTransferTrends({
     },
     global,
     overall: global,
+  };
+}
+
+function buildGlobalTransferTrends(elements) {
+  const globalInCounter = new Map();
+  const globalOutCounter = new Map();
+  for (const elem of Object.values(elements || {})) {
+    if (!elem) continue;
+    const name = elem.name || "";
+    const inCount = Number(elem.transfers_in_event || 0);
+    const outCount = Number(elem.transfers_out_event || 0);
+    if (inCount > 0) globalInCounter.set(name, inCount);
+    if (outCount > 0) globalOutCounter.set(name, outCount);
+  }
+
+  return {
+    // 全服目前无法获得逐笔“谁换谁”数据，这里展示当前 Event 的全服热门转入/转出。
+    top_in: topListFromMap(globalInCounter, 10),
+    top_out: topListFromMap(globalOutCounter, 10),
   };
 }
 
@@ -2570,14 +2574,18 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
 
   const isFullRefresh = uids.length === UID_LIST.length;
   const transferTrends = isFullRefresh
-    ? buildTransferTrends({
-        transfersByUid,
-        leagueUids: uids,
-        currentWeek,
-        eventMetaById,
-        elements,
-      })
-    : previousState?.transfer_trends || { league: {}, global: {}, overall: {} };
+      ? buildTransferTrends({
+          transfersByUid,
+          leagueUids: uids,
+          currentWeek,
+          eventMetaById,
+          elements,
+        })
+    : {
+        ...(previousState?.transfer_trends || { league: {}, global: {}, overall: {} }),
+        global: buildGlobalTransferTrends(elements),
+        overall: buildGlobalTransferTrends(elements),
+      };
   transferTrends.ownership_top = ownershipSummary.top10;
   transferTrends.ownership_manager_count = ownershipSummary.manager_count;
   transferTrends.today_value_top = buildTodayValueLeaders(picksByUid, teamsPlayingToday);

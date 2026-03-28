@@ -692,7 +692,7 @@ body {
 
 .modal.lineup-wide {
     width: 96%;
-    max-width: 1320px;
+    max-width: 1360px;
 }
 
 .modal.lineup-wide .modal-header {
@@ -1040,10 +1040,6 @@ body {
     gap: 14px;
 }
 
-.future-compare-stack-vertical {
-    gap: 12px;
-}
-
 .future-schedule-panel {
     background: #fff;
     border-radius: 14px;
@@ -1062,6 +1058,25 @@ body {
 
 .future-schedule-matrix {
     width: max-content;
+}
+
+.future-compare-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+.future-compare-board {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(430px, 1fr));
+    gap: 10px;
+    min-width: 880px;
+    align-items: start;
+}
+
+.future-compare-board .future-schedule-scroll {
+    overflow: visible;
 }
 
 .future-team-header {
@@ -1441,7 +1456,7 @@ body {
 
     .reference-toolbar {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
         align-items: end;
         gap: 8px;
     }
@@ -1450,32 +1465,13 @@ body {
         width: 100%;
         min-width: 0;
         height: 46px;
-        grid-column: span 2;
+        grid-column: span 1;
     }
 
     .reference-select {
         width: 100%;
         min-width: 0;
         padding: 11px 12px;
-    }
-
-    .reference-position-tabs {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        width: 100%;
-        gap: 6px;
-        padding: 0;
-        background: transparent;
-    }
-
-    .reference-position-tab {
-        padding: 10px 0;
-        background: #eef4fa;
-    }
-
-    .reference-position-tab.active {
-        background: #dfeaf7;
-        box-shadow: none;
     }
 
     .reference-game-row,
@@ -1511,6 +1507,12 @@ body {
 
     .future-schedule-scroll {
         margin-right: -2px;
+    }
+
+    .future-compare-board {
+        grid-template-columns: repeat(2, minmax(370px, 1fr));
+        min-width: 760px;
+        gap: 8px;
     }
 
     .modal {
@@ -1694,34 +1696,6 @@ body {
     display: flex;
     flex-direction: column;
     gap: 6px;
-}
-
-.reference-position-tabs {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px;
-    border-radius: 999px;
-    background: #eef4fa;
-    margin-bottom: 0;
-}
-
-.reference-position-tab {
-    border: none;
-    background: transparent;
-    color: #52606d;
-    font-size: 12px;
-    font-weight: 800;
-    padding: 9px 16px;
-    border-radius: 999px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.reference-position-tab.active {
-    background: #ffffff;
-    color: #0f172a;
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
 }
 
 .reference-label {

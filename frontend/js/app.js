@@ -719,9 +719,11 @@ const Render = {
                     </div>
                 </div>
                 <div class="lineup-mode-panel" data-lineup-panel="future">
-                    <div class="future-compare-stack future-compare-stack-vertical">
-                        ${createFutureCompareSection(data, name)}
-                        ${createFutureCompareSection(dualData, dualName)}
+                    <div class="future-compare-scroll">
+                        <div class="future-compare-board">
+                            ${createFutureCompareSection(data, name)}
+                            ${createFutureCompareSection(dualData, dualName)}
+                        </div>
                     </div>
                 </div>
             `;
@@ -980,17 +982,6 @@ const App = {
                 return;
             }
 
-            const referencePositionButton = event.target.closest(".reference-position-tab");
-            if (referencePositionButton) {
-                this.referencePositionFilter = referencePositionButton.dataset.referencePos || "ALL";
-                document.querySelectorAll(".reference-position-tab").forEach((button) => {
-                    button.classList.toggle("active", button === referencePositionButton);
-                });
-                const teamSelect = document.getElementById("reference-team-select");
-                this.populateReferencePlayers(teamSelect?.value || "");
-                return;
-            }
-
             const lineupModeButton = event.target.closest(".lineup-mode-btn");
             if (lineupModeButton) {
                 const mode = lineupModeButton.dataset.lineupMode || "today";
@@ -1030,6 +1021,10 @@ const App = {
         document.addEventListener("change", (event) => {
             if (event.target?.id === "reference-team-select") {
                 this.populateReferencePlayers(event.target.value);
+            } else if (event.target?.id === "reference-position-select") {
+                this.referencePositionFilter = String(event.target.value || "ALL");
+                const teamSelect = document.getElementById("reference-team-select");
+                this.populateReferencePlayers(teamSelect?.value || "");
             }
         });
 
