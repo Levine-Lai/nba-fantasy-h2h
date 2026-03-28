@@ -9,7 +9,12 @@
 4. 对阵详情弹窗新增双模式：
    - `今日阵容`
    - `未来 7 天`
-5. `/api/picks/{uid}` payload 新增 `future_day_outlook` 字段，用于展示当前 roster 今天到未来六天的上场人数 / 有效人数
+5. `未来 7 天` 模式已从简单人数卡片改为赛程矩阵：
+   - 上方先显示今天到未来六天的上场人数 / 有效人数
+   - 下方按 `FRONT COURT / BACK COURT` 分组，逐球员展示每天是否有比赛
+   - 单元格显示对手 logo 与 `vs/@`
+6. `/api/picks/{uid}` payload 新增 `future_schedule` 字段；`future_day_outlook` 保留为汇总行兼容字段
+7. `对阵参考` 卡片在桌面端进一步收紧了行高、信息字号和 fantasy 分数块尺寸，保持结构不变但整体更紧凑
 ## 2026-03-28 对阵参考 / EO 更新
 1. 顶部导航中的 `球员高分榜` 已改为 `对阵参考`。
 2. `对阵参考` 当前以 `Nikola Jokic` 为示例，数据来源为官方 NBA Fantasy API：

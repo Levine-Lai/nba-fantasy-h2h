@@ -1026,7 +1026,7 @@ body {
     gap: 16px;
 }
 
-.future-team-panel {
+.future-schedule-panel {
     background: #fff;
     border-radius: 14px;
     border: 1px solid #e6edf5;
@@ -1054,52 +1054,182 @@ body {
     color: #64748b;
 }
 
-.future-day-list {
+.future-table-head,
+.future-summary-row,
+.future-player-row {
+    display: grid;
+    align-items: stretch;
+}
+
+.future-table-head {
+    gap: 0;
+    border: 1px solid #dce6f1;
+    border-radius: 14px 14px 0 0;
+    overflow: hidden;
+    background: #eff5fb;
+}
+
+.future-head-player,
+.future-head-day {
+    padding: 12px 10px;
+    font-size: 12px;
+    font-weight: 900;
+    color: #334155;
+    text-align: center;
+    border-right: 1px solid #dce6f1;
+}
+
+.future-head-player {
+    text-align: left;
+    padding-left: 16px;
+}
+
+.future-head-day:last-child {
+    border-right: none;
+}
+
+.future-summary-row {
+    border-left: 1px solid #dce6f1;
+    border-right: 1px solid #dce6f1;
+    border-bottom: 1px solid #dce6f1;
+    background: #f8fbff;
+}
+
+.future-summary-label,
+.future-summary-cell {
+    padding: 10px;
+    border-right: 1px solid #e3ebf4;
+}
+
+.future-summary-label {
+    font-size: 13px;
+    font-weight: 900;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    padding-left: 16px;
+}
+
+.future-summary-cell:last-child {
+    border-right: none;
+}
+
+.future-summary-cell {
+    text-align: center;
+}
+
+.future-summary-top {
+    font-size: 18px;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1;
+}
+
+.future-summary-bottom {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 4px;
+    font-weight: 700;
+}
+
+.future-group {
+    margin-top: 14px;
+}
+
+.future-group-title {
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 900;
+    color: #fff;
+    border-radius: 12px 12px 0 0;
+    letter-spacing: 0.04em;
+}
+
+.future-group-title.fc {
+    background: #c8102e;
+}
+
+.future-group-title.bc {
+    background: #1d428a;
+}
+
+.future-group-rows {
+    border: 1px solid #dce6f1;
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+}
+
+.future-player-row {
+    border-top: 1px solid #e3ebf4;
+    background: #fff;
+}
+
+.future-player-row:first-child {
+    border-top: none;
+}
+
+.future-player-cell,
+.future-match-cell {
+    min-height: 72px;
+    border-right: 1px solid #e3ebf4;
+}
+
+.future-player-cell {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-}
-
-.future-day-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border-radius: 12px;
-    background: #f8fbff;
-    border: 1px solid #e5edf6;
-}
-
-.future-day-label {
-    font-size: 13px;
-    font-weight: 800;
-    color: #334155;
-}
-
-.future-day-chips {
-    display: inline-flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-.future-day-chip {
-    display: inline-flex;
-    align-items: center;
     justify-content: center;
-    min-width: 66px;
-    padding: 5px 10px;
-    border-radius: 999px;
-    background: #e2e8f0;
-    color: #334155;
-    font-size: 12px;
-    font-weight: 800;
+    padding: 10px 16px;
+    background: #fff;
 }
 
-.future-day-chip.effective {
-    background: #dcfce7;
-    color: #166534;
+.future-player-cell.effective {
+    background: linear-gradient(180deg, #ffffff 0%, #f0fff4 100%);
+}
+
+.future-player-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+}
+
+.future-player-meta {
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.future-match-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    background: #fff;
+}
+
+.future-match-cell:last-child {
+    border-right: none;
+}
+
+.future-match-cell.empty {
+    font-size: 22px;
+    font-weight: 900;
+    color: #94a3b8;
+}
+
+.future-match-logo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
+.future-match-venue {
+    font-size: 11px;
+    font-weight: 900;
+    color: #64748b;
 }
 
 .dual-lineup-side {
@@ -1302,14 +1432,27 @@ body {
         min-height: 56px;
     }
 
-    .future-team-header,
-    .future-day-row {
+    .future-team-header {
         flex-direction: column;
         align-items: flex-start;
     }
 
-    .future-day-chips {
-        justify-content: flex-start;
+    .future-table-head,
+    .future-summary-row,
+    .future-player-row {
+        overflow-x: auto;
+    }
+
+    .future-head-player,
+    .future-summary-label,
+    .future-player-cell {
+        min-width: 170px;
+    }
+
+    .future-head-day,
+    .future-summary-cell,
+    .future-match-cell {
+        min-width: 64px;
     }
 
     .modal {
@@ -1567,10 +1710,10 @@ body {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: stretch;
-    gap: 14px;
+    gap: 12px;
     border-top: 1px dashed #dbe4ee;
-    padding-top: 10px;
-    min-height: 88px;
+    padding-top: 8px;
+    min-height: 74px;
 }
 
 .reference-game-row:first-child {
@@ -1587,16 +1730,16 @@ body {
 }
 
 .reference-game-date {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 800;
     color: #334155;
 }
 
 .reference-game-meta {
-    margin-top: 8px;
-    font-size: 15px;
+    margin-top: 6px;
+    font-size: 13px;
     color: #334155;
-    line-height: 1.6;
+    line-height: 1.5;
     word-break: break-word;
 }
 
@@ -1604,12 +1747,12 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 108px;
-    padding: 12px 16px;
-    border-radius: 18px;
+    min-width: 88px;
+    padding: 10px 14px;
+    border-radius: 16px;
     background: var(--team-color-soft, rgba(15, 23, 42, 0.14));
     color: var(--team-color, #0f172a);
-    font-size: 30px;
+    font-size: 22px;
     font-weight: 900;
     line-height: 1;
     letter-spacing: 0.01em;
@@ -1618,7 +1761,7 @@ body {
 }
 
 .reference-score-chip.average-chip {
-    font-size: 28px;
+    font-size: 21px;
 }
 
 .reference-placeholder .reference-game-date,
@@ -1631,22 +1774,22 @@ body {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: stretch;
-    gap: 14px;
+    gap: 12px;
     border-top: 1px solid #d7e4f2;
     margin-top: 4px;
-    padding-top: 10px;
-    min-height: 88px;
+    padding-top: 8px;
+    min-height: 74px;
 }
 
 .reference-average-label {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 900;
     color: #334155;
 }
 
 .reference-average-meta {
-    margin-top: 8px;
-    font-size: 15px;
+    margin-top: 6px;
+    font-size: 13px;
     color: #334155;
     line-height: 1.5;
 }

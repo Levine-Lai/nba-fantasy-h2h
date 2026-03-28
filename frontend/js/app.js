@@ -634,24 +634,67 @@ const Render = {
         };
 
         const createFutureCompareSection = (lineupData, teamName) => {
-            const outlook = Array.isArray(lineupData?.future_day_outlook) ? lineupData.future_day_outlook : [];
+            const schedule = lineupData?.future_schedule || {};
+            const days = Array.isArray(schedule?.days) ? schedule.days : [];
+            const summary = Array.isArray(schedule?.summary) ? schedule.summary : [];
+            const groups = Array.isArray(schedule?.groups) ? schedule.groups : [];
+
+            if (!days.length || !groups.length) {
+                return `
+                    <div class="future-schedule-panel">
+                        <div class="future-team-header">
+                            <div class="future-team-name">${escapeHtml(teamName)}</div>
+                            <div class="future-team-sub">当前阵容未来 7 天赛程</div>
+                        </div>
+                        <div class="trend-empty">No future schedule data</div>
+                    </div>
+                `;
+            }
+
+            const columnStyle = `style="grid-template-columns:minmax(190px, 1.6fr) repeat(${days.length}, minmax(68px, 1fr));"`;
             return `
-                <div class="future-team-panel">
+                <div class="future-schedule-panel">
                     <div class="future-team-header">
                         <div class="future-team-name">${escapeHtml(teamName)}</div>
-                        <div class="future-team-sub">当前阵容未来 7 天人数</div>
+                        <div class="future-team-sub">当前阵容未来 7 天赛程</div>
                     </div>
-                    <div class="future-day-list">
-                        ${outlook.map((day) => `
-                            <div class="future-day-row">
-                                <div class="future-day-label">${escapeHtml(day.day_label || "DAY?")}</div>
-                                <div class="future-day-chips">
-                                    <span class="future-day-chip">上场 ${Number(day.raw_active_count || 0)}</span>
-                                    <span class="future-day-chip effective">有效 ${Number(day.effective_count || 0)}</span>
-                                </div>
+                    <div class="future-table-head" ${columnStyle}>
+                        <div class="future-head-player">PLAYER</div>
+                        ${days.map((day) => `<div class="future-head-day">${escapeHtml(day.day_label || "DAY?")}</div>`).join("")}
+                    </div>
+                    <div class="future-summary-row" ${columnStyle}>
+                        <div class="future-summary-label">人数</div>
+                        ${summary.map((day) => `
+                            <div class="future-summary-cell">
+                                <div class="future-summary-top">${Number(day.raw_active_count || 0)}</div>
+                                <div class="future-summary-bottom">有效 ${Number(day.effective_count || 0)}</div>
                             </div>
                         `).join("")}
                     </div>
+                    ${groups.map((group) => `
+                        <div class="future-group">
+                            <div class="future-group-title ${group.position === "FC" ? "fc" : "bc"}">${escapeHtml(group.label || group.position || "")}</div>
+                            <div class="future-group-rows">
+                                ${group.players.map((player) => `
+                                    <div class="future-player-row" ${columnStyle}>
+                                        <div class="future-player-cell ${player.is_effective ? "effective" : ""}">
+                                            <div class="future-player-name">${escapeHtml(player.name)}</div>
+                                            <div class="future-player-meta">${escapeHtml(player.team_short || "")} ${escapeHtml(player.position_name || "")}</div>
+                                        </div>
+                                        ${player.cells.map((cell) => cell?.has_game
+                                            ? `
+                                                <div class="future-match-cell">
+                                                    <img class="future-match-logo" src="${escapeHtml(cell.opponent_logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(cell.opponent_name || "-")} logo" decoding="async" width="28" height="28" loading="lazy" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
+                                                    <div class="future-match-venue">${escapeHtml(cell.venue_label || "")}</div>
+                                                </div>
+                                            `
+                                            : `<div class="future-match-cell empty">-</div>`
+                                        ).join("")}
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </div>
+                    `).join("")}
                 </div>
             `;
         };

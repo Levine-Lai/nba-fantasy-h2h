@@ -972,10 +972,28 @@ function buildLiveElementsMap(liveRaw) {
   return liveElements;
 }
 
-function buildLivePicksFromPicksData(picksData, elements, liveElements) {
+function buildTeamsMetaMap(bootstrap) {
+  const map = {};
+  for (const team of bootstrap?.teams || []) {
+    const teamId = Number(team?.id || 0);
+    if (!teamId) continue;
+    const visual = getTeamVisualMeta(team?.name || "");
+    map[teamId] = {
+      id: teamId,
+      name: team?.name || `Team #${teamId}`,
+      short_name: team?.short_name || team?.name || `#${teamId}`,
+      color: visual.color,
+      logo_url: visual.logo_url,
+    };
+  }
+  return map;
+}
+
+function buildLivePicksFromPicksData(picksData, elements, liveElements, teamsMetaById = {}) {
   return (picksData?.picks || []).map((pick) => {
     const elementId = Number(pick?.element || 0);
     const elem = elements[elementId] || {};
+    const teamMeta = teamsMetaById[Number(elem.team || 0)] || {};
     const stats = getPlayerStats(elementId, liveElements, elements);
     const base = Number(stats?.fantasy || 0);
     const isCaptain = !!pick?.is_captain;
@@ -999,6 +1017,9 @@ function buildLivePicksFromPicksData(picksData, elements, liveElements) {
       stats,
       injury: parseInjuryStatus(elem),
       team_id: elem.team || 0,
+      team_name: teamMeta?.name || "",
+      team_short: teamMeta?.short_name || "",
+      team_logo_url: teamMeta?.logo_url || "/nba-team-logos/_.png",
       is_effective: false,
     };
   });
@@ -1080,6 +1101,7 @@ async function buildFreshHomepageState(baseState) {
   const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(baseState?.current_event_name || "");
   const currentWeek = currentMeta.gw || extractGwNumber(baseState?.current_event_name) || extractGwNumber(currentEvent) || 22;
   const elements = buildElementsMap(bootstrap);
+  const teamsMetaById = buildTeamsMetaMap(bootstrap);
   const liveElements = buildLiveElementsMap(liveRaw);
   const teamsPlayingToday = buildTeamsPlayingToday(baseState?.fixtures?.games || []);
   const freshScoresByUid = {};
@@ -1095,7 +1117,7 @@ async function buildFreshHomepageState(baseState) {
       return;
     }
 
-    const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements);
+    const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
     const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
     const freshToday = Number(effectiveScore || 0);
     let summary = previous?.week_total_summary || null;
@@ -1372,30 +1394,60 @@ function buildWeekEventIds(events, currentWeek, currentEvent) {
     .sort((a, b) => a - b);
 }
 
-function buildWeekDayContexts(currentEvent, currentDay, eventMetaById, teamsPlayingToday, futureWeekEventIds, futureFixturesByEvent) {
-  const contexts = [];
-  const initialDay = Number(currentDay || 0) || Number(eventMetaById?.[currentEvent]?.day || 0) || 1;
-  contexts.push({
-    event_id: Number(currentEvent || 0),
-    day: initialDay,
-    day_label: `DAY${initialDay}`,
-    teams_playing: teamsPlayingToday,
-  });
+function buildUpcomingEventIds(events, currentEvent, limit = 7) {
+  const currentId = Number(currentEvent || 0);
+  return (events || [])
+    .map((event) => Number(event?.id || 0))
+    .filter((eventId) => eventId >= currentId)
+    .sort((a, b) => a - b)
+    .slice(0, limit);
+}
 
-  for (const eventId of futureWeekEventIds || []) {
-    if (contexts.length >= 7) break;
+function formatEventShortLabel(eventMeta, eventId, fallbackIndex = 0) {
+  const gw = Number(eventMeta?.gw || 0);
+  const day = Number(eventMeta?.day || 0);
+  if (gw > 0 && day > 0) return `GW${gw}.${day}`;
+  if (day > 0) return `DAY${day}`;
+  return `E${Number(eventId || 0) || fallbackIndex + 1}`;
+}
+
+function buildUpcomingDayContexts(upcomingEventIds, eventMetaById, fixturesByEvent) {
+  return (upcomingEventIds || []).map((eventId, index) => {
     const meta = eventMetaById?.[eventId] || {};
-    const fallbackDay = initialDay + contexts.length;
-    const day = Number(meta.day || 0) || fallbackDay;
-    contexts.push({
+    return {
       event_id: Number(eventId || 0),
-      day,
-      day_label: `DAY${day}`,
-      teams_playing: buildTeamsPlayingToday(futureFixturesByEvent?.[eventId] || []),
-    });
-  }
+      gw: Number(meta.gw || 0) || null,
+      day: Number(meta.day || 0) || null,
+      day_label: formatEventShortLabel(meta, eventId, index),
+      teams_playing: buildTeamsPlayingToday(fixturesByEvent?.[eventId] || []),
+    };
+  });
+}
 
-  return contexts.slice(0, 7);
+function buildFixtureLookup(fixtures, teamsMetaById) {
+  const lookup = {};
+  for (const fixture of fixtures || []) {
+    const homeId = Number(fixture?.team_h || 0);
+    const awayId = Number(fixture?.team_a || 0);
+    if (!homeId || !awayId) continue;
+    const homeMeta = teamsMetaById?.[homeId] || {};
+    const awayMeta = teamsMetaById?.[awayId] || {};
+    lookup[homeId] = {
+      opponent_team_id: awayId,
+      opponent_name: awayMeta?.name || `Team #${awayId}`,
+      opponent_short: awayMeta?.short_name || awayMeta?.name || `#${awayId}`,
+      opponent_logo_url: awayMeta?.logo_url || "/nba-team-logos/_.png",
+      venue_label: "vs",
+    };
+    lookup[awayId] = {
+      opponent_team_id: homeId,
+      opponent_name: homeMeta?.name || `Team #${homeId}`,
+      opponent_short: homeMeta?.short_name || homeMeta?.name || `#${homeId}`,
+      opponent_logo_url: homeMeta?.logo_url || "/nba-team-logos/_.png",
+      venue_label: "@",
+    };
+  }
+  return lookup;
 }
 
 function getNextEventInfo(events, currentEvent) {
@@ -1970,6 +2022,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   const weeklyStandingsPhase = currentWeek >= 1 && currentWeek <= 25 ? currentWeek + 1 : null;
   const futureWeekEventIds = buildWeekEventIds(events, currentWeek, currentEvent);
   const previousPicksByUid = buildPreviousPicksByUid(previousState);
+  const teamsMetaById = buildTeamsMetaMap(bootstrap);
 
   const teams = {};
   for (const t of bootstrap.teams || []) teams[t.id] = t.name;
@@ -2001,9 +2054,17 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     fetchAllStandings(1),
     weeklyStandingsPhase ? fetchAllStandings(weeklyStandingsPhase) : Promise.resolve([]),
   ]);
+  const upcomingEventIds = buildUpcomingEventIds(events, currentEvent, 7);
+  const fixturesByEvent = {
+    [currentEvent]: fixturesRaw || [],
+  };
+  for (const eventId of upcomingEventIds) {
+    if (eventId === currentEvent) continue;
+    fixturesByEvent[eventId] = await fetchJson(`/fixtures/?event=${eventId}`);
+  }
   const futureFixturesByEvent = {};
   for (const eventId of futureWeekEventIds) {
-    futureFixturesByEvent[eventId] = await fetchJson(`/fixtures/?event=${eventId}`);
+    futureFixturesByEvent[eventId] = fixturesByEvent[eventId] || [];
   }
 
   const liveElements = {};
@@ -2042,14 +2103,11 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   });
   const teamsPlayingToday = buildTeamsPlayingToday(games);
   const futureTeamsByEvent = futureWeekEventIds.map((eventId) => buildTeamsPlayingToday(futureFixturesByEvent[eventId] || []));
-  const weekDayContexts = buildWeekDayContexts(
-    currentEvent,
-    currentDay,
-    eventMetaById,
-    teamsPlayingToday,
-    futureWeekEventIds,
-    futureFixturesByEvent
-  );
+  const upcomingDayContexts = buildUpcomingDayContexts(upcomingEventIds, eventMetaById, fixturesByEvent);
+  const fixtureLookupByEvent = {};
+  for (const eventId of upcomingEventIds) {
+    fixtureLookupByEvent[eventId] = buildFixtureLookup(fixturesByEvent[eventId] || [], teamsMetaById);
+  }
   const eventLiveCache = {
     [currentEvent]: liveElements,
   };
@@ -2314,11 +2372,14 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
         multiplier: pick.multiplier || 1,
         base_points: base,
         final_points: finalPoints,
-        stats,
-        injury: parseInjuryStatus(elem),
-        team_id: elem.team || 0,
-        is_effective: false,
-      };
+      stats,
+      injury: parseInjuryStatus(elem),
+      team_id: elem.team || 0,
+      team_name: teamsMetaById[Number(elem.team || 0)]?.name || "",
+      team_short: teamsMetaById[Number(elem.team || 0)]?.short_name || "",
+      team_logo_url: teamsMetaById[Number(elem.team || 0)]?.logo_url || "/nba-team-logos/_.png",
+      is_effective: false,
+    };
     });
 
     const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
@@ -2476,7 +2537,9 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
         ? Number((player?.is_effective ? 100 - ownershipPercent : -ownershipPercent).toFixed(1))
         : null;
     }
-    picksByUid[uid].future_day_outlook = buildManagerFutureDayOutlook(picksByUid[uid], weekDayContexts);
+    const futureSchedule = buildManagerFutureSchedule(picksByUid[uid], upcomingDayContexts, fixtureLookupByEvent);
+    picksByUid[uid].future_schedule = futureSchedule;
+    picksByUid[uid].future_day_outlook = futureSchedule.summary;
   }
 
   const league_daily_averages = buildLeagueDailyAverages(picksByUid, teamsPlayingToday);
@@ -2588,11 +2651,10 @@ async function getState(env) {
   }
 }
 
-function buildManagerFutureDayOutlook(payload, weekDayContexts) {
+function buildManagerFutureSchedule(payload, dayContexts, fixtureLookupByEvent) {
   const players = Array.isArray(payload?.players) ? payload.players : [];
   const currentEvent = Number(payload?.current_event || 0);
-
-  return (weekDayContexts || []).map((context) => {
+  const summary = (dayContexts || []).map((context) => {
     const isToday = Number(context?.event_id || 0) === currentEvent;
     const teamSet = context?.teams_playing instanceof Set ? context.teams_playing : new Set();
     const rawActiveCount = players.filter((player) => teamSet.has(Number(player?.team_id || 0))).length;
@@ -2614,6 +2676,51 @@ function buildManagerFutureDayOutlook(payload, weekDayContexts) {
       formation: formation || "N/A",
     };
   });
+
+  const groups = [
+    { key: "FC", label: "FRONT COURT" },
+    { key: "BC", label: "BACK COURT" },
+  ].map((group) => ({
+    position: group.key,
+    label: group.label,
+    players: players
+      .filter((player) => String(player?.position_name || "") === group.key)
+      .sort((a, b) => Number(a?.lineup_position || 0) - Number(b?.lineup_position || 0))
+      .map((player) => ({
+        element_id: Number(player?.element_id || 0),
+        name: player?.name || "",
+        team_short: player?.team_short || "",
+        position_name: player?.position_name || group.key,
+        lineup_position: Number(player?.lineup_position || 0),
+        is_effective: !!player?.is_effective,
+        cells: (dayContexts || []).map((context) => {
+          const lookup = fixtureLookupByEvent?.[Number(context?.event_id || 0)] || {};
+          const matchup = lookup[Number(player?.team_id || 0)] || null;
+          return matchup
+            ? {
+                has_game: true,
+                venue_label: matchup.venue_label || "",
+                opponent_name: matchup.opponent_name || "",
+                opponent_short: matchup.opponent_short || "",
+                opponent_logo_url: matchup.opponent_logo_url || "/nba-team-logos/_.png",
+              }
+            : {
+                has_game: false,
+              };
+        }),
+      })),
+  })).filter((group) => group.players.length > 0);
+
+  return {
+    days: (dayContexts || []).map((context) => ({
+      event_id: Number(context?.event_id || 0),
+      day_label: context?.day_label || "DAY?",
+      gw: Number(context?.gw || 0) || null,
+      day: Number(context?.day || 0) || null,
+    })),
+    summary,
+    groups,
+  };
 }
 
 async function getInjuriesPayload(env, options = {}) {
