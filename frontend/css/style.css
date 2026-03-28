@@ -690,6 +690,11 @@ body {
     box-shadow: 0 25px 50px rgba(0,0,0,0.25);
 }
 
+.modal.lineup-wide {
+    width: 96%;
+    max-width: 1380px;
+}
+
 .modal-header {
     padding: 20px 24px;
     background: #f8f9fa;
@@ -1026,6 +1031,21 @@ body {
     gap: 12px;
 }
 
+.future-compare-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+.future-compare-board {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(520px, 1fr));
+    gap: 12px;
+    min-width: 1060px;
+    align-items: start;
+}
+
 .future-schedule-panel {
     background: #fff;
     border-radius: 14px;
@@ -1044,6 +1064,10 @@ body {
 
 .future-schedule-matrix {
     width: max-content;
+}
+
+.future-compare-board .future-schedule-scroll {
+    overflow: visible;
 }
 
 .future-team-header {
@@ -1191,7 +1215,7 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 10px 16px;
+    padding: 8px 10px;
     background: #fff;
 }
 
@@ -1423,33 +1447,41 @@ body {
 
     .reference-toolbar {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, max-content));
-        justify-content: start;
+        grid-template-columns: 1fr 1fr;
         align-items: end;
-        gap: 10px;
+        gap: 8px;
     }
 
     .reference-btn {
-        width: auto;
-        min-width: 108px;
+        width: 100%;
+        min-width: 0;
         height: 46px;
+        grid-column: span 2;
     }
 
     .reference-select {
-        width: 140px;
-        padding: 12px 12px;
+        width: 100%;
+        min-width: 0;
+        padding: 11px 12px;
     }
 
     .reference-position-tabs {
-        width: fit-content;
-        max-width: 100%;
-        overflow-x: auto;
-        white-space: nowrap;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+        gap: 6px;
+        padding: 0;
+        background: transparent;
     }
 
-    .reference-player-buttons {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 8px;
+    .reference-position-tab {
+        padding: 10px 0;
+        background: #eef4fa;
+    }
+
+    .reference-position-tab.active {
+        background: #dfeaf7;
+        box-shadow: none;
     }
 
     .reference-game-row,
@@ -1485,6 +1517,12 @@ body {
 
     .future-schedule-scroll {
         margin-right: -2px;
+    }
+
+    .future-compare-board {
+        grid-template-columns: repeat(2, minmax(420px, 1fr));
+        min-width: 860px;
+        gap: 10px;
     }
 
     .modal {
