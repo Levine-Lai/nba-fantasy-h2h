@@ -528,9 +528,9 @@ const Render = {
             const economy = lineupData.lineup_economy || {};
             const economyPanel = `
                 <div class="lineup-economy">
-                    <div class="economy-row"><span>浠婃棩鐞冨憳鎬讳环</span><strong>${Number(economy.effective_total_cost || 0).toFixed(1)}</strong></div>
-                    <div class="economy-row"><span>鍥炴湰绾?/span><strong>${Number(economy.breakeven_line || 0).toFixed(1)}</strong></div>
-                    <div class="economy-row"><span>鐘舵€?/span><strong>${escapeHtml(economy.status || "-")}</strong></div>
+                    <div class="economy-row"><span>今日球员总价</span><strong>${Number(economy.effective_total_cost || 0).toFixed(1)}</strong></div>
+                    <div class="economy-row"><span>回本线</span><strong>${Number(economy.breakeven_line || 0).toFixed(1)}</strong></div>
+                    <div class="economy-row"><span>状态</span><strong>${escapeHtml(economy.status || "-")}</strong></div>
                 </div>
             `;
 
