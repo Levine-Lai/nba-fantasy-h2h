@@ -2903,13 +2903,18 @@ async function fetchPlayerOptionsPayload() {
       id: Number(player?.id || 0),
       name: `${player?.first_name || ""} ${player?.second_name || ""}`.trim() || player?.web_name || `#${player?.id}`,
       web_name: player?.web_name || "",
+      position_name: Number(player?.element_type || 0) === 1 ? "BC" : Number(player?.element_type || 0) === 2 ? "FC" : "UNK",
+      now_cost: Number(player?.now_cost || 0),
     });
   }
 
   const teamsList = Object.values(teamsById)
     .map((team) => ({
       ...team,
-      players: team.players.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
+      players: team.players.sort((a, b) =>
+        Number(b.now_cost || 0) - Number(a.now_cost || 0) ||
+        String(a.name || "").localeCompare(String(b.name || ""))
+      ),
     }))
     .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
 

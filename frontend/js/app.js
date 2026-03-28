@@ -652,49 +652,54 @@ const Render = {
             }
 
             const columnStyle = `style="grid-template-columns:minmax(190px, 1.6fr) repeat(${days.length}, minmax(68px, 1fr));"`;
+            const tableMinWidth = Math.max(740, 260 + days.length * 86);
             return `
                 <div class="future-schedule-panel">
                     <div class="future-team-header">
                         <div class="future-team-name">${escapeHtml(teamName)}</div>
                         <div class="future-team-sub">当前阵容未来 7 天赛程</div>
                     </div>
-                    <div class="future-table-head" ${columnStyle}>
-                        <div class="future-head-player">PLAYER</div>
-                        ${days.map((day) => `<div class="future-head-day">${escapeHtml(day.day_label || "DAY?")}</div>`).join("")}
-                    </div>
-                    <div class="future-summary-row" ${columnStyle}>
-                        <div class="future-summary-label">人数</div>
-                        ${summary.map((day) => `
-                            <div class="future-summary-cell">
-                                <div class="future-summary-top">${Number(day.raw_active_count || 0)}</div>
-                                <div class="future-summary-bottom">有效 ${Number(day.effective_count || 0)}</div>
+                    <div class="future-schedule-scroll">
+                        <div class="future-schedule-matrix" style="min-width:${tableMinWidth}px;">
+                            <div class="future-table-head" ${columnStyle}>
+                                <div class="future-head-player">PLAYER</div>
+                                ${days.map((day) => `<div class="future-head-day">${escapeHtml(day.day_label || "DAY?")}</div>`).join("")}
                             </div>
-                        `).join("")}
-                    </div>
-                    ${groups.map((group) => `
-                        <div class="future-group">
-                            <div class="future-group-title ${group.position === "FC" ? "fc" : "bc"}">${escapeHtml(group.label || group.position || "")}</div>
-                            <div class="future-group-rows">
-                                ${group.players.map((player) => `
-                                    <div class="future-player-row" ${columnStyle}>
-                                        <div class="future-player-cell ${player.is_effective ? "effective" : ""}">
-                                            <div class="future-player-name">${escapeHtml(player.name)}</div>
-                                            <div class="future-player-meta">${escapeHtml(player.team_short || "")} ${escapeHtml(player.position_name || "")}</div>
-                                        </div>
-                                        ${player.cells.map((cell) => cell?.has_game
-                                            ? `
-                                                <div class="future-match-cell">
-                                                    <img class="future-match-logo" src="${escapeHtml(cell.opponent_logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(cell.opponent_name || "-")} logo" decoding="async" width="28" height="28" loading="lazy" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
-                                                    <div class="future-match-venue">${escapeHtml(cell.venue_label || "")}</div>
-                                                </div>
-                                            `
-                                            : `<div class="future-match-cell empty">-</div>`
-                                        ).join("")}
+                            <div class="future-summary-row" ${columnStyle}>
+                                <div class="future-summary-label">人数</div>
+                                ${summary.map((day) => `
+                                    <div class="future-summary-cell">
+                                        <div class="future-summary-top">${Number(day.raw_active_count || 0)}</div>
+                                        <div class="future-summary-bottom">有效 ${Number(day.effective_count || 0)}</div>
                                     </div>
                                 `).join("")}
                             </div>
+                            ${groups.map((group) => `
+                                <div class="future-group">
+                                    <div class="future-group-title ${group.position === "FC" ? "fc" : "bc"}">${escapeHtml(group.label || group.position || "")}</div>
+                                    <div class="future-group-rows">
+                                        ${group.players.map((player) => `
+                                            <div class="future-player-row" ${columnStyle}>
+                                                <div class="future-player-cell ${player.is_effective ? "effective" : ""}">
+                                                    <div class="future-player-name">${escapeHtml(player.name)}</div>
+                                                    <div class="future-player-meta">${escapeHtml(player.team_short || "")} ${escapeHtml(player.position_name || "")}</div>
+                                                </div>
+                                                ${player.cells.map((cell) => cell?.has_game
+                                                    ? `
+                                                        <div class="future-match-cell">
+                                                            <img class="future-match-logo" src="${escapeHtml(cell.opponent_logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(cell.opponent_name || "-")} logo" decoding="async" width="28" height="28" loading="lazy" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
+                                                            <div class="future-match-venue">${escapeHtml(cell.venue_label || "")}</div>
+                                                        </div>
+                                                    `
+                                                    : `<div class="future-match-cell empty">-</div>`
+                                                ).join("")}
+                                            </div>
+                                        `).join("")}
+                                    </div>
+                                </div>
+                            `).join("")}
                         </div>
-                    `).join("")}
+                    </div>
                 </div>
             `;
         };
@@ -741,6 +746,7 @@ const App = {
     playerReferenceLoaded: false,
     playerOptionsLoaded: false,
     playerOptions: [],
+    referencePositionFilter: "ALL",
 
     async getLineupCached(uid) {
         const key = String(uid);
@@ -893,13 +899,40 @@ const App = {
         const playerSelect = document.getElementById("reference-player-select");
         if (!playerSelect) return;
         const team = this.playerOptions.find((item) => String(item.id) === String(teamId));
-        const players = Array.isArray(team?.players) ? team.players : [];
+        const allPlayers = Array.isArray(team?.players) ? team.players : [];
+        const players = allPlayers.filter((player) => (
+            this.referencePositionFilter === "ALL" || String(player?.position_name || "") === this.referencePositionFilter
+        ));
         playerSelect.innerHTML = players.map((player) => `
-            <option value="${escapeHtml(player.id)}">${escapeHtml(player.name || player.web_name || "-")}</option>
+            <option value="${escapeHtml(player.id)}">${escapeHtml(player.name || player.web_name || "-")} (${(Number(player.now_cost || 0) / 10).toFixed(1)})</option>
         `).join("");
+        this.renderReferencePlayerButtons(players);
         if (preferredPlayer && players.some((player) => String(player.id) === String(preferredPlayer))) {
             playerSelect.value = preferredPlayer;
+        } else if (players[0]) {
+            playerSelect.value = String(players[0].id);
         }
+    },
+
+    renderReferencePlayerButtons(players) {
+        const container = document.getElementById("reference-player-buttons");
+        const playerSelect = document.getElementById("reference-player-select");
+        if (!container) return;
+        if (!players || players.length === 0) {
+            container.innerHTML = '<div class="trend-empty">No players in this filter</div>';
+            return;
+        }
+        const activeId = String(playerSelect?.value || players[0]?.id || "");
+        container.innerHTML = players.map((player) => `
+            <button
+                class="reference-player-chip ${String(player.id) === activeId ? "active" : ""}"
+                data-reference-player="${escapeHtml(player.id)}"
+                type="button"
+            >
+                <span class="reference-player-chip-name">${escapeHtml(player.web_name || player.name || "-")}</span>
+                <span class="reference-player-chip-meta">${escapeHtml(player.position_name || "")} ${(Number(player.now_cost || 0) / 10).toFixed(1)}</span>
+            </button>
+        `).join("");
     },
 
     async loadPlayerOptions(force = false) {
@@ -963,6 +996,36 @@ const App = {
                 return;
             }
 
+            const referencePositionButton = event.target.closest(".reference-position-tab");
+            if (referencePositionButton) {
+                this.referencePositionFilter = referencePositionButton.dataset.referencePos || "ALL";
+                document.querySelectorAll(".reference-position-tab").forEach((button) => {
+                    button.classList.toggle("active", button === referencePositionButton);
+                });
+                const teamSelect = document.getElementById("reference-team-select");
+                this.populateReferencePlayers(teamSelect?.value || "");
+                return;
+            }
+
+            const referencePlayerButton = event.target.closest(".reference-player-chip");
+            if (referencePlayerButton) {
+                const playerId = referencePlayerButton.dataset.referencePlayer || "";
+                const playerSelect = document.getElementById("reference-player-select");
+                if (playerSelect && playerId) {
+                    playerSelect.value = playerId;
+                    const currentTeam = this.playerOptions.find((team) =>
+                        Array.isArray(team.players) && team.players.some((player) => String(player.id) === String(playerId))
+                    );
+                    const teamPlayers = Array.isArray(currentTeam?.players) ? currentTeam.players : [];
+                    const filtered = teamPlayers.filter((player) => (
+                        this.referencePositionFilter === "ALL" || String(player?.position_name || "") === this.referencePositionFilter
+                    ));
+                    this.renderReferencePlayerButtons(filtered);
+                    this.searchPlayerReference();
+                }
+                return;
+            }
+
             const lineupModeButton = event.target.closest(".lineup-mode-btn");
             if (lineupModeButton) {
                 const mode = lineupModeButton.dataset.lineupMode || "today";
@@ -1002,6 +1065,14 @@ const App = {
         document.addEventListener("change", (event) => {
             if (event.target?.id === "reference-team-select") {
                 this.populateReferencePlayers(event.target.value);
+            } else if (event.target?.id === "reference-player-select") {
+                const teamSelect = document.getElementById("reference-team-select");
+                const currentTeam = this.playerOptions.find((item) => String(item.id) === String(teamSelect?.value || ""));
+                const teamPlayers = Array.isArray(currentTeam?.players) ? currentTeam.players : [];
+                const filtered = teamPlayers.filter((player) => (
+                    this.referencePositionFilter === "ALL" || String(player?.position_name || "") === this.referencePositionFilter
+                ));
+                this.renderReferencePlayerButtons(filtered);
             }
         });
 

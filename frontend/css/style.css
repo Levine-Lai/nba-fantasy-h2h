@@ -1023,15 +1023,27 @@ body {
 .future-compare-stack {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
 }
 
 .future-schedule-panel {
     background: #fff;
     border-radius: 14px;
     border: 1px solid #e6edf5;
-    padding: 16px;
+    padding: 12px;
     box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.future-schedule-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+}
+
+.future-schedule-matrix {
+    width: max-content;
 }
 
 .future-team-header {
@@ -1039,17 +1051,17 @@ body {
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .future-team-name {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 800;
     color: #0f172a;
 }
 
 .future-team-sub {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     color: #64748b;
 }
@@ -1071,8 +1083,8 @@ body {
 
 .future-head-player,
 .future-head-day {
-    padding: 12px 10px;
-    font-size: 12px;
+    padding: 10px 8px;
+    font-size: 11px;
     font-weight: 900;
     color: #334155;
     text-align: center;
@@ -1097,12 +1109,12 @@ body {
 
 .future-summary-label,
 .future-summary-cell {
-    padding: 10px;
+    padding: 8px;
     border-right: 1px solid #e3ebf4;
 }
 
 .future-summary-label {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 900;
     color: #334155;
     display: flex;
@@ -1119,26 +1131,26 @@ body {
 }
 
 .future-summary-top {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 900;
     color: #0f172a;
     line-height: 1;
 }
 
 .future-summary-bottom {
-    font-size: 11px;
+    font-size: 10px;
     color: #64748b;
     margin-top: 4px;
     font-weight: 700;
 }
 
 .future-group {
-    margin-top: 14px;
+    margin-top: 10px;
 }
 
 .future-group-title {
-    padding: 10px 14px;
-    font-size: 14px;
+    padding: 8px 12px;
+    font-size: 13px;
     font-weight: 900;
     color: #fff;
     border-radius: 12px 12px 0 0;
@@ -1171,7 +1183,7 @@ body {
 
 .future-player-cell,
 .future-match-cell {
-    min-height: 72px;
+    min-height: 58px;
     border-right: 1px solid #e3ebf4;
 }
 
@@ -1188,7 +1200,7 @@ body {
 }
 
 .future-player-name {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 800;
     color: #0f172a;
     line-height: 1.2;
@@ -1196,7 +1208,7 @@ body {
 
 .future-player-meta {
     margin-top: 4px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     color: #64748b;
 }
@@ -1215,19 +1227,19 @@ body {
 }
 
 .future-match-cell.empty {
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 900;
     color: #94a3b8;
 }
 
 .future-match-logo {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     object-fit: contain;
 }
 
 .future-match-venue {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 900;
     color: #64748b;
 }
@@ -1411,15 +1423,33 @@ body {
 
     .reference-toolbar {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(3, minmax(0, max-content));
+        justify-content: start;
+        align-items: end;
+        gap: 10px;
     }
 
     .reference-btn {
-        width: 100%;
+        width: auto;
+        min-width: 108px;
+        height: 46px;
     }
 
     .reference-select {
-        width: 100%;
+        width: 140px;
+        padding: 12px 12px;
+    }
+
+    .reference-position-tabs {
+        width: fit-content;
+        max-width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .reference-player-buttons {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
     }
 
     .reference-game-row,
@@ -1437,22 +1467,24 @@ body {
         align-items: flex-start;
     }
 
-    .future-table-head,
-    .future-summary-row,
-    .future-player-row {
-        overflow-x: auto;
-    }
-
     .future-head-player,
     .future-summary-label,
     .future-player-cell {
-        min-width: 170px;
+        min-width: 144px;
     }
 
     .future-head-day,
     .future-summary-cell,
     .future-match-cell {
-        min-width: 64px;
+        min-width: 58px;
+    }
+
+    .future-schedule-panel {
+        padding: 10px;
+    }
+
+    .future-schedule-scroll {
+        margin-right: -2px;
     }
 
     .modal {
@@ -1638,6 +1670,34 @@ body {
     gap: 6px;
 }
 
+.reference-position-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px;
+    border-radius: 999px;
+    background: #eef4fa;
+    margin-bottom: 14px;
+}
+
+.reference-position-tab {
+    border: none;
+    background: transparent;
+    color: #52606d;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 9px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.reference-position-tab.active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
 .reference-label {
     font-size: 12px;
     font-weight: 800;
@@ -1659,6 +1719,51 @@ body {
     height: 50px;
     border-radius: 12px;
     padding: 0 20px;
+}
+
+.reference-player-buttons {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.reference-player-chip {
+    border: 1px solid #d7e4f2;
+    background: #fff;
+    border-radius: 12px;
+    padding: 10px 10px 9px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+}
+
+.reference-player-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+}
+
+.reference-player-chip.active {
+    border-color: #0f172a;
+    background: #f8fbff;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.1);
+}
+
+.reference-player-chip-name {
+    display: block;
+    font-size: 12px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.25;
+}
+
+.reference-player-chip-meta {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 700;
 }
 
 .reference-card {
