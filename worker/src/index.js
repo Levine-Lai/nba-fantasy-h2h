@@ -874,9 +874,23 @@ function buildTeamsPlayingToday(fixtures) {
   return teamIds;
 }
 
+function hasPlayerRecordedToday(pick) {
+  const stats = pick?.stats || {};
+  const minutes = Number(stats?.minutes || 0);
+  const boxScoreSum =
+    Number(stats?.points || 0) +
+    Number(stats?.rebounds || 0) +
+    Number(stats?.assists || 0) +
+    Number(stats?.steals || 0) +
+    Number(stats?.blocks || 0);
+  const fantasy = Number(stats?.fantasy || pick?.base_points || pick?.final_points || 0);
+  return minutes > 0 || boxScoreSum > 0 || fantasy > 0;
+}
+
 function isPlayerAvailable(pick, teamsPlayingToday) {
-  if (pick.injury) return false;
   if (pick.team_id && !teamsPlayingToday.has(Number(pick.team_id))) return false;
+  if (hasPlayerRecordedToday(pick)) return true;
+  if (pick.injury) return false;
   return true;
 }
 

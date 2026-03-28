@@ -1526,3 +1526,10 @@ body {
     font-size: 11px;
     padding: 6px 2px;
 }
+
+@media (max-width: 768px) {
+    .injury-list,
+    .reference-list {
+        grid-template-columns: 1fr !important;
+    }
+}
