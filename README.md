@@ -1,5 +1,27 @@
 # nba-fantasy-h2h
 
+## 2026-03-30 首页状态增强、Transfer 模块重做与本地攻防预览
+1. `Live H2H`
+   - `Win%` 后面新增状态 emoji，按当前胜面高低显示不同情绪
+   - 落后方卡片进一步弱化，输势会比之前更明显
+2. 站点标题区新增一行轻量文案：`微信公众号关注fantasylil！`
+3. `伤病信息`
+   - `Available` 作为最高优先级显示，排序高于 `Probable`
+   - 前端再次加了一层排序兜底，确保展示顺序稳定为 `Available -> Probable -> Questionable -> Doubtful -> Out`
+4. `Weekly Transfers`
+   - 首页原本分离的 `Overall Transfer In / Out` 合并为一个更大的榜单模块
+   - 右上角可切换 `In / Out`
+   - 现在展示的是“本周累计”的 league 内转入/转出统计
+   - 列为：`Name / Form / Value / Transfers`
+   - 其中 `Form` 使用球员场均 fantasy 分，`Value` 使用最近 form 相对当前身价的 value
+5. `对阵参考`
+   - `位置` 改为 `All / BC / FC` 的按钮组
+   - 手机端 `球队 / 位置 / 球员 / 开始查询` 统一为同宽布局
+6. 新增本地预览文件（暂不上网页）：
+   - `TEAM_ATTACK_DEFENSE_PREVIEW.html`
+   - `TEAM_ATTACK_DEFENSE_PREVIEW.md`
+   用于查看各队场均得分（Attack）与场均失分（Defense）的散点预览
+
 ## 2026-03-30 皇冠与首页收官胜率修正
 1. `Live H2H` 首页现在会在“本周总分最高”的经理头像上方显示一个小皇冠；若并列最高分，则并列经理都会显示皇冠。
 2. 修正首页 `Win%` 的两个关键问题：

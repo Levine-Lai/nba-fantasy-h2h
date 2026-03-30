@@ -69,6 +69,32 @@ function normalizeStatusClass(status) {
     return String(status || "").trim().toLowerCase().replace(/[^a-z]+/g, "-");
 }
 
+function getWinMoodEmoji(probability) {
+    const prob = Number(probability || 0);
+    if (prob >= 95) return "😄";
+    if (prob >= 75) return "😎";
+    if (prob >= 55) return "🙂";
+    if (prob > 45) return "😐";
+    if (prob > 20) return "😟";
+    if (prob > 0) return "😢";
+    return "😭";
+}
+
+function sortInjuriesForView(items) {
+    const order = {
+        available: 0,
+        probable: 1,
+        questionable: 2,
+        doubtful: 3,
+        out: 4,
+    };
+    return [...(items || [])].sort((a, b) => {
+        const left = Number(order[String(a?.status_short || a?.status || "").toLowerCase()] ?? 99);
+        const right = Number(order[String(b?.status_short || b?.status || "").toLowerCase()] ?? 99);
+        return left - right || String(a?.player_name || "").localeCompare(String(b?.player_name || ""));
+    });
+}
+
 function hexToRgba(hex, alpha = 0.14) {
     const raw = String(hex || "").trim();
     const normalized = raw.startsWith("#") ? raw.slice(1) : raw;
@@ -214,10 +240,9 @@ const Render = {
     },
 
     transferTrends(data) {
-        const transferIn = document.getElementById("trend-overall-in");
-        const transferOut = document.getElementById("trend-overall-out");
+        const transferTable = document.getElementById("trend-transfer-table");
         const ownership = document.getElementById("ownership-top");
-        if (!transferIn || !transferOut || !ownership) return;
+        if (!transferTable || !ownership) return;
 
         const renderList = (items, emptyText, labelFn, valueFn) => {
             if (!items || items.length === 0) {
@@ -233,13 +258,23 @@ const Render = {
             `).join("");
         };
 
-        const overallIn = data?.overall?.top_in || data?.global?.top_in || [];
-        const overallOut = data?.overall?.top_out || data?.global?.top_out || [];
+        const weeklyIn = data?.league?.top_in || [];
+        const weeklyOut = data?.league?.top_out || [];
         const ownershipTop = data?.ownership_top || [];
         const managerCount = Number(data?.ownership_manager_count || 26);
+        const direction = App.transferDirection === "out" ? "out" : "in";
+        const activeItems = direction === "out" ? weeklyOut : weeklyIn;
 
-        transferIn.innerHTML = renderList(overallIn, "No transfer-in trend data", (item) => escapeHtml(item.name), (item) => escapeHtml(item.count));
-        transferOut.innerHTML = renderList(overallOut, "No transfer-out trend data", (item) => escapeHtml(item.name), (item) => escapeHtml(item.count));
+        transferTable.innerHTML = activeItems.length
+            ? activeItems.map((item) => `
+                <div class="trend-table-row">
+                    <span class="trend-player-name">${escapeHtml(item.name)}</span>
+                    <span>${Number(item.form || 0).toFixed(1)}</span>
+                    <span>${Number(item.value || 0).toFixed(1)}</span>
+                    <span>${Number(item.transfers || item.count || 0)}</span>
+                </div>
+            `).join("")
+            : '<div class="trend-empty">No weekly transfer trend data</div>';
         ownership.innerHTML = renderList(
             ownershipTop,
             "No ownership data",
@@ -287,7 +322,7 @@ const Render = {
                     </div>
                 </div>
                 ${Array.isArray(team.injuries) && team.injuries.length
-                    ? `<div class="injury-rows">${team.injuries.map((item) => `
+                    ? `<div class="injury-rows">${sortInjuriesForView(team.injuries).map((item) => `
                         <div class="injury-row">
                             <div class="injury-line">
                                 <span class="injury-player">${escapeHtml(item.player_name)}</span>
@@ -444,6 +479,8 @@ const Render = {
             const rightHasCrown = rightScore === highestWeekTotal && highestWeekTotal > 0;
             const leftWinProb = Number(match.win_prob1 ?? 50);
             const rightWinProb = Number(match.win_prob2 ?? 50);
+            const leftMood = getWinMoodEmoji(leftWinProb);
+            const rightMood = getWinMoodEmoji(rightWinProb);
 
             return `
                 <div class="match-block">
@@ -458,7 +495,7 @@ const Render = {
                             </div>
                             <div class="score-main ${leftClass}">${leftScore}</div>
                             <div class="score-sub">Today ${match.today1}</div>
-                            <div class="score-prob">Win ${leftWinProb}%</div>
+                            <div class="score-prob">Win ${leftWinProb}% <span class="score-mood">${leftMood}</span></div>
                         </div>
                         <div class="vs-divider js-open-lineup" data-uid1="${match.uid1}" data-name1="${escapeHtml(match.t1)}" data-uid2="${match.uid2}" data-name2="${escapeHtml(match.t2)}">
                             <div class="vs-text">VS</div>
@@ -474,7 +511,7 @@ const Render = {
                             </div>
                             <div class="score-main ${rightClass}">${rightScore}</div>
                             <div class="score-sub">Today ${match.today2}</div>
-                            <div class="score-prob">Win ${rightWinProb}%</div>
+                            <div class="score-prob">Win ${rightWinProb}% <span class="score-mood">${rightMood}</span></div>
                         </div>
                     </div>
                     <div class="match-transfer-wrap">
@@ -765,6 +802,7 @@ const App = {
     playerOptionsLoaded: false,
     playerOptions: [],
     referencePositionFilter: "ALL",
+    transferDirection: "in",
 
     async getLineupCached(uid) {
         const key = String(uid);
@@ -794,12 +832,13 @@ const App = {
     async loadAll() {
         try {
             const state = await API.getState();
+            this.latestTransferTrends = state?.transfer_trends || {};
             Render.eventInfo(state?.current_event_name || "Loading...");
             Render.gameCount(state?.fixtures?.count || 0);
             Render.gamesList(state?.fixtures?.games || []);
             Render.matchCount(Array.isArray(state?.h2h) ? state.h2h.length : 0);
             Render.h2hList(state?.h2h || []);
-            Render.transferTrends(state?.transfer_trends || {});
+            Render.transferTrends(this.latestTransferTrends);
             Render.fdr(state?.fdr || {
                 weeks: [],
                 html: '<tr><td colspan="5" style="text-align:center;padding:20px;">Load failed</td></tr>',
@@ -996,6 +1035,27 @@ const App = {
                 return;
             }
 
+            const transferDirectionButton = event.target.closest(".trend-switch-btn");
+            if (transferDirectionButton) {
+                this.transferDirection = String(transferDirectionButton.dataset.transferDirection || "in");
+                document.querySelectorAll(".trend-switch-btn").forEach((button) => {
+                    button.classList.toggle("active", button.dataset.transferDirection === this.transferDirection);
+                });
+                Render.transferTrends(this.latestTransferTrends || {});
+                return;
+            }
+
+            const positionButton = event.target.closest(".reference-pos-btn");
+            if (positionButton) {
+                this.referencePositionFilter = String(positionButton.dataset.referencePosition || "ALL");
+                document.querySelectorAll(".reference-pos-btn").forEach((button) => {
+                    button.classList.toggle("active", button.dataset.referencePosition === this.referencePositionFilter);
+                });
+                const teamSelect = document.getElementById("reference-team-select");
+                this.populateReferencePlayers(teamSelect?.value || "");
+                return;
+            }
+
             const lineupModeButton = event.target.closest(".lineup-mode-btn");
             if (lineupModeButton) {
                 const mode = lineupModeButton.dataset.lineupMode || "today";
@@ -1035,10 +1095,6 @@ const App = {
         document.addEventListener("change", (event) => {
             if (event.target?.id === "reference-team-select") {
                 this.populateReferencePlayers(event.target.value);
-            } else if (event.target?.id === "reference-position-select") {
-                this.referencePositionFilter = String(event.target.value || "ALL");
-                const teamSelect = document.getElementById("reference-team-select");
-                this.populateReferencePlayers(teamSelect?.value || "");
             }
         });
 

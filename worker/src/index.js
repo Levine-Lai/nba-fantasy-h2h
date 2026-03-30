@@ -436,6 +436,27 @@ function topListFromMap(counter, limit = 10) {
     .map(([name, count]) => ({ name, count }));
 }
 
+function topPlayerListFromCounter(counter, elements, limit = 10) {
+  return [...counter.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([rawId, transfers]) => {
+      const elementId = Number(rawId || 0);
+      const elem = elements?.[elementId] || {};
+      const price = Number(elem.now_cost || 0) / 10;
+      const averageFantasy = Number(elem.points_per_game || 0);
+      const recentForm = Number(elem.form || 0);
+      const recentValue = price > 0 ? recentForm / price : 0;
+      return {
+        id: elementId,
+        name: elem.name || `#${elementId}`,
+        transfers: Number(transfers || 0),
+        form: Number(averageFantasy.toFixed(1)),
+        value: Number(recentValue.toFixed(1)),
+      };
+    });
+}
+
 function buildTransferTrends({
   transfersByUid,
   leagueUids,
@@ -462,8 +483,8 @@ function buildTransferTrends({
       const outName = elements[outId]?.name || `#${outId}`;
       const pair = `${outName} -> ${inName}`;
       pairCounter.set(pair, (pairCounter.get(pair) || 0) + 1);
-      inCounter.set(inName, (inCounter.get(inName) || 0) + 1);
-      outCounter.set(outName, (outCounter.get(outName) || 0) + 1);
+      if (inId > 0) inCounter.set(inId, (inCounter.get(inId) || 0) + 1);
+      if (outId > 0) outCounter.set(outId, (outCounter.get(outId) || 0) + 1);
     }
     if (managerTransfers > 0) {
       managerCounter.set(UID_MAP[uid] || String(uid), managerTransfers);
@@ -475,8 +496,8 @@ function buildTransferTrends({
   return {
     league: {
       top_pairs: topListFromMap(pairCounter, 10),
-      top_in: topListFromMap(inCounter, 10),
-      top_out: topListFromMap(outCounter, 10),
+      top_in: topPlayerListFromCounter(inCounter, elements, 10),
+      top_out: topPlayerListFromCounter(outCounter, elements, 10),
       top_managers: topListFromMap(managerCounter, 10),
     },
     global,

@@ -53,6 +53,12 @@ body {
     flex-direction: column;
 }
 
+.brand-tagline {
+    font-size: 13px;
+    font-weight: 400;
+    color: #64748b;
+}
+
 .brand h1 {
     font-size: 20px;
     font-weight: 800;
@@ -339,8 +345,8 @@ body {
 .team-side:last-child.winning { border-right: 4px solid #00c853; border-left: none; }
 .team-side:last-child.losing { border-right: 4px solid #ff1744; border-left: none; }
 .team-side.is-behind {
-    opacity: 0.72;
-    background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    opacity: 0.6;
+    background: linear-gradient(180deg, #f5f7fb 0%, #e7edf5 100%);
 }
 
 .team-side:hover {
@@ -414,6 +420,11 @@ body {
     font-size: 11px;
     color: #94a3b8;
     font-weight: 500;
+}
+
+.score-mood {
+    margin-left: 4px;
+    font-size: 12px;
 }
 
 .vs-divider {
@@ -1571,6 +1582,17 @@ body {
     padding-top: 12px;
 }
 
+.trend-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.trend-head .trend-title {
+    margin: 0;
+}
+
 .injury-subtitle {
     font-size: 13px;
     color: #6b7280;
@@ -1708,6 +1730,33 @@ body {
     align-items: flex-end;
     gap: 14px;
     margin-bottom: 14px;
+}
+
+.reference-pos-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 999px;
+    background: #eef4fa;
+}
+
+.reference-pos-btn {
+    border: none;
+    background: transparent;
+    color: #52606d;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 10px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.reference-pos-btn.active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
 }
 
 .reference-filter {
@@ -1948,6 +1997,78 @@ body {
     margin: 10px 0 6px;
 }
 
+.trend-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 999px;
+    background: #eef4fa;
+}
+
+.trend-switch-btn {
+    border: none;
+    background: transparent;
+    color: #52606d;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 8px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.trend-switch-btn.active {
+    background: #fff;
+    color: #0f172a;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.trend-table {
+    border: 1px solid #dbe4ee;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #fff;
+    margin-bottom: 8px;
+}
+
+.trend-table-head,
+.trend-table-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.8fr) 0.8fr 0.8fr 0.9fr;
+    align-items: center;
+    gap: 12px;
+}
+
+.trend-table-head {
+    padding: 12px 16px;
+    background: #f8fbff;
+    border-bottom: 1px solid #dbe4ee;
+    font-size: 12px;
+    font-weight: 900;
+    color: #475569;
+}
+
+.trend-table-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.trend-table-row {
+    padding: 14px 16px;
+    border-bottom: 1px solid #edf2f7;
+    font-size: 14px;
+    color: #0f172a;
+}
+
+.trend-table-row:last-child {
+    border-bottom: none;
+}
+
+.trend-player-name {
+    font-weight: 800;
+}
+
 .trend-list {
     background: #fafafa;
     border: 1px solid #efefef;
@@ -1996,5 +2117,51 @@ body {
     .injury-list,
     .reference-list {
         grid-template-columns: 1fr !important;
+    }
+
+    .reference-toolbar {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .reference-filter,
+    .reference-select,
+    .reference-btn,
+    .reference-pos-switch {
+        width: 100%;
+    }
+
+    .reference-pos-switch {
+        justify-content: space-between;
+    }
+
+    .reference-pos-btn {
+        flex: 1 1 0;
+        text-align: center;
+    }
+
+    .trend-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .trend-switch {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .trend-switch-btn {
+        flex: 1 1 0;
+        text-align: center;
+    }
+
+    .trend-table-head,
+    .trend-table-row {
+        grid-template-columns: minmax(0, 1.5fr) 0.8fr 0.8fr 0.9fr;
+        gap: 8px;
+        padding-left: 12px;
+        padding-right: 12px;
+        font-size: 13px;
     }
 }

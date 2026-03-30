@@ -17,6 +17,7 @@
             <img src="/LOGO.jpg" alt="NBA Fantasy H2H logo" class="brand-logo">
             <div class="brand-copy">
                 <h1>NBA Fantasy H2H</h1>
+                <div class="brand-tagline">微信公众号关注fantasylil！</div>
                 <span id="event-info">Loading... - League #1653</span>
             </div>
         </div>
@@ -57,10 +58,22 @@
                 <div class="loading"><div class="spinner"></div>Loading...</div>
             </div>
             <div class="trend-wrap">
-                <div class="trend-title">Overall Transfer In</div>
-                <div id="trend-overall-in" class="trend-list"></div>
-                <div class="trend-title">Overall Transfer Out</div>
-                <div id="trend-overall-out" class="trend-list"></div>
+                <div class="trend-head">
+                    <div class="trend-title">Weekly Transfers</div>
+                    <div class="trend-switch" id="transfer-direction-switch">
+                        <button class="trend-switch-btn active" data-transfer-direction="in" type="button">In</button>
+                        <button class="trend-switch-btn" data-transfer-direction="out" type="button">Out</button>
+                    </div>
+                </div>
+                <div class="trend-table">
+                    <div class="trend-table-head">
+                        <span>Name</span>
+                        <span>Form</span>
+                        <span>Value</span>
+                        <span>Transfers</span>
+                    </div>
+                    <div id="trend-transfer-table" class="trend-table-body"></div>
+                </div>
                 <div class="trend-title">Ownership Top 10</div>
                 <div id="ownership-top" class="trend-list"></div>
             </div>
@@ -109,12 +122,12 @@
                     <select id="reference-team-select" class="reference-select"></select>
                 </div>
                 <div class="reference-filter">
-                    <label class="reference-label" for="reference-position-select">位置</label>
-                    <select id="reference-position-select" class="reference-select">
-                        <option value="ALL">All</option>
-                        <option value="BC">BC</option>
-                        <option value="FC">FC</option>
-                    </select>
+                    <label class="reference-label">位置</label>
+                    <div class="reference-pos-switch" id="reference-position-switch">
+                        <button class="reference-pos-btn active" data-reference-position="ALL" type="button">All</button>
+                        <button class="reference-pos-btn" data-reference-position="BC" type="button">BC</button>
+                        <button class="reference-pos-btn" data-reference-position="FC" type="button">FC</button>
+                    </div>
                 </div>
                 <div class="reference-filter">
                     <label class="reference-label" for="reference-player-select">球员</label>
