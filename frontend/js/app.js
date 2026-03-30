@@ -41,6 +41,10 @@ const API = {
         return (await this.fetch("/api/team-attack-defense")).json();
     },
 
+    async getPaceDiffCsv() {
+        return (await this.fetch("/data.csv")).text();
+    },
+
     async getPlayerOptions() {
         return (await this.fetch("/api/player-options")).json();
     },
@@ -151,6 +155,41 @@ function getTeamLogoUrl(teamName, providedUrl = "") {
         "washington wizards": "wizards.png",
     };
     return `/nba-team-logos/${logoMap[key] || "_.png"}`;
+}
+
+function parseSeasonPaceDiffCsv(csvText) {
+    const text = String(csvText || "").trim();
+    if (!text) return [];
+    const lines = text.split(/\r?\n/).filter(Boolean);
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(",");
+    const teamIndex = headers.indexOf("Team");
+    const nrtgIndex = headers.indexOf("NRtg");
+    const paceIndex = headers.indexOf("Pace");
+    if (teamIndex === -1 || nrtgIndex === -1 || paceIndex === -1) return [];
+
+    return lines.slice(1)
+        .map((line) => {
+            const cols = line.split(",");
+            const teamName = String(cols[teamIndex] || "").replace(/\*+/g, "").trim();
+            if (!teamName || /league average/i.test(teamName)) return null;
+            const pace = Number(String(cols[paceIndex] || "").trim());
+            const nRtg = Number(String(cols[nrtgIndex] || "").replace(/^\+/, "").trim());
+            if (!Number.isFinite(pace) || !Number.isFinite(nRtg)) return null;
+            return {
+                team_name: teamName,
+                logo_url: getTeamLogoUrl(teamName),
+                pace: Number(pace.toFixed(1)),
+                n_rtg: Number(nRtg.toFixed(1)),
+                abs_n_rtg: Number(Math.abs(nRtg).toFixed(1)),
+            };
+        })
+        .filter(Boolean)
+        .sort((a, b) =>
+            a.abs_n_rtg - b.abs_n_rtg ||
+            b.pace - a.pace ||
+            String(a.team_name || "").localeCompare(String(b.team_name || ""))
+        );
 }
 
 function renderTransferRecords(teamName, transferRecords, side = "left", captainUsed = null) {
@@ -784,18 +823,17 @@ const Render = {
         body.innerHTML = createLineupSection(data, name);
     },
 
-    teamAttackDefense(data) {
+    teamAttackDefense(data, csvPaceTeams = []) {
         const badge = document.getElementById("other-badge");
         const subtitle = document.getElementById("other-subtitle");
         const container = document.getElementById("other-chart-wrap");
         if (!badge || !subtitle || !container) return;
 
         const teams = Array.isArray(data?.teams) ? data.teams : [];
-        const paceChart = data?.pace_chart || {};
-        const paceTeams = Array.isArray(paceChart?.teams) ? paceChart.teams : [];
+        const paceTeams = Array.isArray(csvPaceTeams) ? csvPaceTeams : [];
         const periodLabel = data?.period_label || "近30天";
         badge.textContent = periodLabel;
-        subtitle.textContent = `${periodLabel}攻防图 · ${data?.start_date || "--"} 至 ${data?.end_date || "--"} | 节奏图：${paceChart?.source_label || "赛季 / 代理"}`;
+        subtitle.textContent = `${periodLabel}攻防图 · ${data?.start_date || "--"} 至 ${data?.end_date || "--"} | 节奏图：赛季 Pace / |NRtg|`;
 
         if (!teams.length) {
             container.innerHTML = '<div class="trend-empty">No attack/defence data</div>';
@@ -829,15 +867,14 @@ const Render = {
         const yPos = (value) => padTop + (((value - minAgainst) / Math.max(1, maxAgainst - minAgainst))) * innerHeight;
         const midpointFor = ((minFor + maxFor) / 2).toFixed(1);
         const midpointAgainst = ((minAgainst + maxAgainst) / 2).toFixed(1);
-        const usesSeasonPace = paceChart?.source === "basketball-reference";
-        const paceValues = paceTeams.map((team) => Number(usesSeasonPace ? team.pace : team.pace_proxy || 0)).filter((value) => Number.isFinite(value));
-        const diffValues = paceTeams.map((team) => Number(usesSeasonPace ? team.abs_n_rtg : team.abs_diff || 0)).filter((value) => Number.isFinite(value));
+        const paceValues = paceTeams.map((team) => Number(team.pace || 0)).filter((value) => Number.isFinite(value));
+        const diffValues = paceTeams.map((team) => Number(team.abs_n_rtg || 0)).filter((value) => Number.isFinite(value));
         const minPace = paceValues.length ? Math.min(...paceValues) : 0;
         const maxPace = paceValues.length ? Math.max(...paceValues) : 1;
         const minDiff = diffValues.length ? Math.min(...diffValues) : 0;
         const maxDiff = diffValues.length ? Math.max(...diffValues) : 1;
-        const paceAxisLabel = compact ? "Pace" : (usesSeasonPace ? "Pace per game" : "Pace proxy: combined points per game");
-        const marginAxisLabel = compact ? (usesSeasonPace ? "|NRtg|" : "Abs diff") : (usesSeasonPace ? "Absolute net rating difference" : "Average absolute point differential");
+        const paceAxisLabel = compact ? "Pace" : "Pace per game";
+        const marginAxisLabel = compact ? "|NRtg|" : "Absolute net rating difference";
         const paceXPos = (value) => padLeft + (((value - minPace) / Math.max(1, maxPace - minPace))) * innerWidth;
         const paceYPos = (value) => padTop + ((((maxDiff - value)) / Math.max(1, maxDiff - minDiff))) * innerHeight;
         const midpointPace = ((minPace + maxPace) / 2).toFixed(1);
@@ -872,7 +909,7 @@ const Render = {
                     </div>
                 </div>
                 <div class="attack-defense-card">
-                    <div class="attack-defense-title">${usesSeasonPace ? "赛季球队节奏与分差对比图" : "近30天球队节奏与分差对比图"}</div>
+                    <div class="attack-defense-title">球队节奏与分差对比图</div>
                     <div class="attack-defense-plot" style="--plot-w:${plotWidth}px;--plot-h:${plotHeight}px;">
                         <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.25}px"></div>
                         <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.5}px"></div>
@@ -891,11 +928,9 @@ const Render = {
                         <div class="attack-defense-scale" style="left:${padLeft + innerWidth / 2 - 10}px;bottom:${padBottom - 28}px">${midpointPace}</div>
                         <div class="attack-defense-scale" style="right:${padRight - 4}px;bottom:${padBottom - 28}px">${maxPace.toFixed(1)}</div>
                         ${paceTeams.map((team) => {
-                            const paceValue = Number(usesSeasonPace ? team.pace : team.pace_proxy || 0);
-                            const diffValue = Number(usesSeasonPace ? team.abs_n_rtg : team.abs_diff || 0);
-                            const tooltip = usesSeasonPace
-                                ? `${escapeHtml(team.team_name)} | Pace ${paceValue.toFixed(1)} | |NRtg| ${diffValue.toFixed(1)}`
-                                : `${escapeHtml(team.team_name)} | Combined PTS ${paceValue.toFixed(1)} | Avg abs diff ${diffValue.toFixed(1)}`;
+                            const paceValue = Number(team.pace || 0);
+                            const diffValue = Number(team.abs_n_rtg || 0);
+                            const tooltip = `${escapeHtml(team.team_name)} | Pace ${paceValue.toFixed(1)} | |NRtg| ${diffValue.toFixed(1)}`;
                             return `
                             <div class="attack-defense-point" style="left:${paceXPos(paceValue) - pointHalf}px;top:${paceYPos(diffValue) - pointHalf}px" title="${tooltip}">
                                 <img src="${escapeHtml(team.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
@@ -1085,8 +1120,11 @@ const App = {
             container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
         }
         try {
-            const data = await API.getTeamAttackDefense();
-            Render.teamAttackDefense(data);
+            const [data, paceCsv] = await Promise.all([
+                API.getTeamAttackDefense(),
+                API.getPaceDiffCsv(),
+            ]);
+            Render.teamAttackDefense(data, parseSeasonPaceDiffCsv(paceCsv));
             this.otherLoaded = true;
         } catch (error) {
             console.error("Other page load error:", error);
