@@ -16,6 +16,9 @@
 5. `Weekly Transfers` 兜底
    - 若收官日 `overall/global` 转会榜为空，首页会自动回退到本周 league 口径
    - 若缓存里的 league 榜仍是旧版 `name/count` 结构，首页会在读取时即时重建
+6. `Form / Value` 兜底
+   - 最近 5 场主逻辑仍优先使用 `element-summary.history`
+   - 若 Worker 当次没拿到最近 5 场历史，则回退到官方 `bootstrap-static.form / 10`
 
 ## 2026-03-30 Other 子页、近30天攻防图与周报产出
 1. 新增导航子页 `其他`
