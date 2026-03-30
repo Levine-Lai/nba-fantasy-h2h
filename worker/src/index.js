@@ -1255,6 +1255,21 @@ async function buildFreshHomepageState(baseState) {
     };
   }
 
+  const ownershipSummary = buildOwnershipSummary(nextPicksByUid);
+  let nextTransferTrends = {
+    ...(baseState?.transfer_trends || {}),
+    ownership_top: ownershipSummary.top10,
+    ownership_manager_count: ownershipSummary.manager_count,
+  };
+  if (!hasDetailedTransferTrendRows(nextTransferTrends)) {
+    const detailedOverall = await buildGlobalTransferTrends(elements);
+    nextTransferTrends = {
+      ...nextTransferTrends,
+      global: detailedOverall,
+      overall: detailedOverall,
+    };
+  }
+
   const nextMatches = matches.map((match) => {
     const uid1 = normalizeUid(match?.uid1);
     const uid2 = normalizeUid(match?.uid2);
@@ -1293,6 +1308,7 @@ async function buildFreshHomepageState(baseState) {
     ...baseState,
     h2h: nextMatches,
     picks_by_uid: nextPicksByUid,
+    transfer_trends: nextTransferTrends,
   };
 }
 
@@ -1920,6 +1936,12 @@ function buildResolvedWinProbabilitySummary(leftScore, rightScore) {
   if (left > right) return { left: 100, right: 0 };
   if (right > left) return { left: 0, right: 100 };
   return { left: 50, right: 50 };
+}
+
+function hasDetailedTransferTrendRows(transferTrends) {
+  const sample = transferTrends?.overall?.top_in?.[0] || transferTrends?.global?.top_in?.[0] || null;
+  if (!sample || typeof sample !== "object") return false;
+  return ["cost", "form", "value", "transfers"].every((key) => key in sample);
 }
 
 function buildOwnershipSummary(picksByUid) {

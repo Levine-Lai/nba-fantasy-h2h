@@ -2059,6 +2059,23 @@ body {
     flex-direction: column;
 }
 
+.trend-table-head span,
+.trend-table-row span {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.trend-table-head span:first-child,
+.trend-table-row span:first-child {
+    justify-content: flex-start;
+}
+
+.trend-table-head span:not(:first-child),
+.trend-table-row span:not(:first-child) {
+    justify-content: center;
+}
+
 .trend-table-row {
     padding: 14px 16px;
     border-bottom: 1px solid #edf2f7;
@@ -2072,10 +2089,18 @@ body {
 
 .trend-player-name {
     font-weight: 800;
+    line-height: 1.35;
 }
 
+.trend-cell-number,
 .trend-number {
     text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.trend-table-row span:last-child {
+    font-weight: 900;
+    color: #0f172a;
 }
 
 .other-chart-wrap {

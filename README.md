@@ -1,5 +1,16 @@
 # nba-fantasy-h2h
 
+## 2026-03-30 首页 Trends 表修正
+1. `Overall Weekly Transfers`
+   - 首页 `/api/state?fresh_h2h=1` 现在会在读取到旧缓存结构时自动补全 `Cost / Form / Value / Transfers`
+   - 不需要等整包 KV 缓存重建，首页也能直接拿到完整榜单数据
+2. `Ownership Top 10`
+   - 首页同样会在 fresh state 阶段补全最新 `Cost / Held / Ownership`
+   - `Cost` 直接来自当前阵容缓存里的球员身价
+3. 表格显示
+   - `Weekly Transfers` 与 `Ownership Top 10` 的列对齐重新整理
+   - 最后一列加粗，数值列改为更稳定的居中对齐和等宽数字显示
+
 ## 2026-03-30 Other 子页、近30天攻防图与周报产出
 1. 新增导航子页 `其他`
    - 当前用于展示“近30天球队攻防图”

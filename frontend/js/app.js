@@ -248,18 +248,9 @@ const Render = {
         const ownership = document.getElementById("ownership-top");
         if (!transferTable || !ownership) return;
 
-        const renderList = (items, emptyText, labelFn, valueFn) => {
-            if (!items || items.length === 0) {
-                return `<div class="trend-empty">${escapeHtml(emptyText)}</div>`;
-            }
-
-            return items.map((item, index) => `
-                <div class="trend-item">
-                    <span class="trend-rank">#${index + 1}</span>
-                    <span class="trend-name">${labelFn(item)}</span>
-                    <span class="trend-count">${valueFn(item)}</span>
-                </div>
-            `).join("");
+        const formatOneDecimal = (value) => {
+            const num = Number(value);
+            return Number.isFinite(num) && num > 0 ? num.toFixed(1) : "--";
         };
 
         const weeklyIn = data?.overall?.top_in || data?.global?.top_in || [];
@@ -273,9 +264,9 @@ const Render = {
             ? activeItems.map((item) => `
                 <div class="trend-table-row">
                     <span class="trend-player-name">${escapeHtml(item.name)}</span>
-                    <span>${Number(item.cost || 0).toFixed(1)}</span>
-                    <span>${Number(item.form || 0).toFixed(1)}</span>
-                    <span>${Number(item.value || 0).toFixed(1)}</span>
+                    <span class="trend-cell-number">${formatOneDecimal(item.cost)}</span>
+                    <span class="trend-cell-number">${formatOneDecimal(item.form)}</span>
+                    <span class="trend-cell-number">${formatOneDecimal(item.value)}</span>
                     <span class="trend-number">${Number(item.transfers || item.count || 0)}</span>
                 </div>
             `).join("")
@@ -284,7 +275,7 @@ const Render = {
             ? ownershipTop.map((item) => `
                 <div class="trend-table-row ownership-row">
                     <span class="trend-player-name">${escapeHtml(item.name)}</span>
-                    <span>${Number(item.cost || 0).toFixed(1)}</span>
+                    <span class="trend-cell-number">${formatOneDecimal(item.cost)}</span>
                     <span class="trend-number">${Number(item.holder_count || 0)}/${managerCount}</span>
                     <span class="trend-number">${Number(item.ownership_percent || 0).toFixed(1)}%</span>
                 </div>
