@@ -704,8 +704,8 @@ const Render = {
                 `;
             }
 
-            const columnStyle = `style="grid-template-columns:minmax(118px, 1.15fr) repeat(${days.length}, minmax(42px, 1fr));"`;
-            const tableMinWidth = Math.max(500, 150 + days.length * 52);
+            const columnStyle = `style="grid-template-columns:minmax(92px, 1.02fr) repeat(${days.length}, minmax(34px, 1fr));"`;
+            const tableMinWidth = Math.max(300, 112 + days.length * 40);
             return `
                 <div class="future-schedule-panel">
                     <div class="future-team-header">
@@ -807,8 +807,9 @@ const Render = {
         const minAgainst = Math.min(...pointsAgainst);
         const maxAgainst = Math.max(...pointsAgainst);
         const viewportWidth = Math.max(320, Math.min(window.innerWidth || 760, 760));
+        const containerWidth = Math.max(280, Math.floor(container.getBoundingClientRect().width || viewportWidth));
         const compact = viewportWidth <= 768;
-        const plotWidth = compact ? Math.max(320, viewportWidth - 34) : 760;
+        const plotWidth = compact ? Math.max(260, containerWidth - 12) : 760;
         const plotHeight = compact ? Math.round(plotWidth * 0.9) : 620;
         const padLeft = compact ? 58 : 86;
         const padRight = compact ? 24 : 38;
@@ -817,6 +818,8 @@ const Render = {
         const innerWidth = plotWidth - padLeft - padRight;
         const innerHeight = plotHeight - padTop - padBottom;
         const pointHalf = compact ? 14 : 18;
+        const attackAxisLabel = compact ? "Attack PPG" : "Attack: points per game";
+        const defenceAxisLabel = compact ? "Defense: opponent points per game" : "Defense: opponent points per game";
         const xPos = (value) => padLeft + (1 - ((value - minAgainst) / Math.max(1, maxAgainst - minAgainst))) * innerWidth;
         const yPos = (value) => padTop + (1 - ((value - minFor) / Math.max(1, maxFor - minFor))) * innerHeight;
         const midpointFor = ((minFor + maxFor) / 2).toFixed(1);
@@ -832,10 +835,10 @@ const Render = {
                     <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.25}px"></div>
                     <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.5}px"></div>
                     <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.75}px"></div>
-                    <div class="attack-defense-axis attack-defense-axis-left">Attack: points per game</div>
-                    <div class="attack-defense-axis attack-defense-axis-bottom">Defense: opponent points per game</div>
-                    <div class="attack-defense-note good">Great attack,<br>great defence</div>
-                    <div class="attack-defense-note bad">Poor attack,<br>poor defence</div>
+                    <div class="attack-defense-axis attack-defense-axis-left">${attackAxisLabel}</div>
+                    <div class="attack-defense-axis attack-defense-axis-bottom">${defenceAxisLabel}</div>
+                    ${compact ? "" : '<div class="attack-defense-note good">Great attack,<br>great defence</div>'}
+                    ${compact ? "" : '<div class="attack-defense-note bad">Poor attack,<br>poor defence</div>'}
                     <div class="attack-defense-scale" style="left:${padLeft - 40}px;top:${padTop - 6}px">${maxFor.toFixed(1)}</div>
                     <div class="attack-defense-scale" style="left:${padLeft - 40}px;top:${padTop + innerHeight / 2 - 6}px">${midpointFor}</div>
                     <div class="attack-defense-scale" style="left:${padLeft - 40}px;top:${padTop + innerHeight - 6}px">${minFor.toFixed(1)}</div>

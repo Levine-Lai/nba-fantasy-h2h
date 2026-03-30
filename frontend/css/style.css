@@ -1088,6 +1088,8 @@ body {
     border: 1px solid #e6edf5;
     padding: 12px;
     box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+    min-width: 0;
+    overflow: hidden;
 }
 
 .future-schedule-scroll {
@@ -1099,7 +1101,8 @@ body {
 }
 
 .future-schedule-matrix {
-    width: max-content;
+    width: 100%;
+    min-width: 0;
 }
 
 .future-compare-scroll {
@@ -1111,14 +1114,15 @@ body {
 
 .future-compare-board {
     display: grid;
-    grid-template-columns: repeat(2, minmax(400px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
-    min-width: 820px;
+    min-width: 0;
     align-items: start;
 }
 
 .future-compare-board .future-schedule-scroll {
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: visible;
 }
 
 .future-team-header {
@@ -1158,7 +1162,7 @@ body {
 
 .future-head-player,
 .future-head-day {
-    padding: 8px 6px;
+    padding: 7px 5px;
     font-size: 10px;
     font-weight: 900;
     color: #334155;
@@ -1168,7 +1172,7 @@ body {
 
 .future-head-player {
     text-align: left;
-    padding-left: 12px;
+    padding-left: 10px;
 }
 
 .future-head-day:last-child {
@@ -1184,12 +1188,12 @@ body {
 
 .future-summary-label,
 .future-summary-cell {
-    padding: 6px;
+    padding: 5px;
     border-right: 1px solid #e3ebf4;
 }
 
 .future-summary-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 900;
     color: #334155;
     display: flex;
@@ -1206,7 +1210,7 @@ body {
 }
 
 .future-summary-top {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 900;
     color: #0f172a;
     line-height: 1;
@@ -1224,8 +1228,8 @@ body {
 }
 
 .future-group-title {
-    padding: 7px 10px;
-    font-size: 12px;
+    padding: 7px 9px;
+    font-size: 11px;
     font-weight: 900;
     color: #fff;
     border-radius: 12px 12px 0 0;
@@ -1258,7 +1262,7 @@ body {
 
 .future-player-cell,
 .future-match-cell {
-    min-height: 48px;
+    min-height: 44px;
     border-right: 1px solid #e3ebf4;
 }
 
@@ -1266,7 +1270,7 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 6px 8px;
+    padding: 6px 7px;
     background: #fff;
 }
 
@@ -1275,7 +1279,7 @@ body {
 }
 
 .future-player-name {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 800;
     color: #0f172a;
     line-height: 1.2;
@@ -1283,7 +1287,7 @@ body {
 
 .future-player-meta {
     margin-top: 3px;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     color: #64748b;
 }
@@ -1308,13 +1312,13 @@ body {
 }
 
 .future-match-logo {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     object-fit: contain;
 }
 
 .future-match-venue {
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 900;
     color: #64748b;
 }
@@ -1545,27 +1549,28 @@ body {
     .future-head-player,
     .future-summary-label,
     .future-player-cell {
-        min-width: 124px;
+        min-width: 108px;
     }
 
     .future-head-day,
     .future-summary-cell,
     .future-match-cell {
-        min-width: 50px;
+        min-width: 40px;
     }
 
     .future-schedule-panel {
         padding: 9px;
     }
 
-    .future-schedule-scroll {
-        margin-right: -2px;
-    }
-
     .future-compare-board {
         grid-template-columns: 1fr;
         min-width: 0;
         gap: 10px;
+    }
+
+    .future-compare-board .future-schedule-scroll {
+        overflow-x: auto;
+        overflow-y: hidden;
     }
 
     .modal {
@@ -2342,20 +2347,19 @@ body {
         height: var(--plot-h);
     }
 
-    .attack-defense-note.good {
-        right: 18px;
-        top: 96px;
-        font-size: 11px;
-    }
-
-    .attack-defense-note.bad {
-        left: 18px;
-        bottom: 56px;
-        font-size: 11px;
-    }
-
     .attack-defense-axis {
         font-size: 11px;
+    }
+
+    .attack-defense-axis-left {
+        left: 8px;
+    }
+
+    .attack-defense-axis-bottom {
+        bottom: 10px;
+        font-size: 10px;
+        max-width: 70%;
+        text-align: center;
     }
 
     .attack-defense-scale {
