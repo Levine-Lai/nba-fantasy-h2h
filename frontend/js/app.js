@@ -425,6 +425,10 @@ const Render = {
         const container = document.getElementById("h2h-list");
         if (!container) return;
 
+        const highestWeekTotal = (matches || []).reduce((max, match) => {
+            return Math.max(max, Number(match?.total1 || 0), Number(match?.total2 || 0));
+        }, 0);
+
         container.innerHTML = (matches || []).map((match) => {
             const leftScore = Number(match.total1 || 0);
             const rightScore = Number(match.total2 || 0);
@@ -436,18 +440,25 @@ const Render = {
             const rightMuted = !isDraw && isLeftWin ? "is-behind" : "";
             const leftPanelId = `transfers-${match.uid1}-${match.uid2}-left`;
             const rightPanelId = `transfers-${match.uid1}-${match.uid2}-right`;
+            const leftHasCrown = leftScore === highestWeekTotal && highestWeekTotal > 0;
+            const rightHasCrown = rightScore === highestWeekTotal && highestWeekTotal > 0;
+            const leftWinProb = Number(match.win_prob1 ?? 50);
+            const rightWinProb = Number(match.win_prob2 ?? 50);
 
             return `
                 <div class="match-block">
                     <div class="match-card">
                         <div class="team-side ${leftClass} ${leftMuted} js-transfer-toggle" data-panel-id="${leftPanelId}" data-uid="${match.uid1}" data-team="${escapeHtml(match.t1)}" data-side="left">
                             <div class="team-head">
-                                <img class="manager-logo" src="${escapeHtml(getManagerLogoUrl(match.t1))}" alt="${escapeHtml(match.t1)} logo" decoding="async" width="40" height="40" loading="lazy" onerror="this.onerror=null;this.src='/LOGO.png';">
+                                <div class="manager-logo-wrap">
+                                    ${leftHasCrown ? '<span class="manager-crown" aria-hidden="true">👑</span>' : ''}
+                                    <img class="manager-logo" src="${escapeHtml(getManagerLogoUrl(match.t1))}" alt="${escapeHtml(match.t1)} logo" decoding="async" width="40" height="40" loading="lazy" onerror="this.onerror=null;this.src='/LOGO.png';">
+                                </div>
                                 <div class="team-name">${escapeHtml(match.t1)}</div>
                             </div>
                             <div class="score-main ${leftClass}">${leftScore}</div>
                             <div class="score-sub">Today ${match.today1}</div>
-                            <div class="score-prob">Win ${Number(match.win_prob1 || 50)}%</div>
+                            <div class="score-prob">Win ${leftWinProb}%</div>
                         </div>
                         <div class="vs-divider js-open-lineup" data-uid1="${match.uid1}" data-name1="${escapeHtml(match.t1)}" data-uid2="${match.uid2}" data-name2="${escapeHtml(match.t2)}">
                             <div class="vs-text">VS</div>
@@ -455,12 +466,15 @@ const Render = {
                         </div>
                         <div class="team-side ${rightClass} ${rightMuted} js-transfer-toggle" data-panel-id="${rightPanelId}" data-uid="${match.uid2}" data-team="${escapeHtml(match.t2)}" data-side="right">
                             <div class="team-head">
-                                <img class="manager-logo" src="${escapeHtml(getManagerLogoUrl(match.t2))}" alt="${escapeHtml(match.t2)} logo" decoding="async" width="40" height="40" loading="lazy" onerror="this.onerror=null;this.src='/LOGO.png';">
+                                <div class="manager-logo-wrap">
+                                    ${rightHasCrown ? '<span class="manager-crown" aria-hidden="true">👑</span>' : ''}
+                                    <img class="manager-logo" src="${escapeHtml(getManagerLogoUrl(match.t2))}" alt="${escapeHtml(match.t2)} logo" decoding="async" width="40" height="40" loading="lazy" onerror="this.onerror=null;this.src='/LOGO.png';">
+                                </div>
                                 <div class="team-name">${escapeHtml(match.t2)}</div>
                             </div>
                             <div class="score-main ${rightClass}">${rightScore}</div>
                             <div class="score-sub">Today ${match.today2}</div>
-                            <div class="score-prob">Win ${Number(match.win_prob2 || 50)}%</div>
+                            <div class="score-prob">Win ${rightWinProb}%</div>
                         </div>
                     </div>
                     <div class="match-transfer-wrap">

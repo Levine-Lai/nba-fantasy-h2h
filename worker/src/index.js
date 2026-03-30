@@ -1104,10 +1104,16 @@ async function buildFreshHomepageState(baseState) {
   const eventMetaById = buildEventMetaById(events);
   const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(baseState?.current_event_name || "");
   const currentWeek = currentMeta.gw || extractGwNumber(baseState?.current_event_name) || extractGwNumber(currentEvent) || 22;
+  const futureWeekEventIds = buildWeekEventIds(events, currentWeek, currentEvent);
   const elements = buildElementsMap(bootstrap);
   const teamsMetaById = buildTeamsMetaMap(bootstrap);
   const liveElements = buildLiveElementsMap(liveRaw);
   const teamsPlayingToday = buildTeamsPlayingToday(baseState?.fixtures?.games || []);
+  const allCurrentFixturesFinished =
+    Array.isArray(baseState?.fixtures?.games) &&
+    baseState.fixtures.games.length > 0 &&
+    baseState.fixtures.games.every((game) => !!game?.finished);
+  const isWeekResolved = futureWeekEventIds.length === 0 && allCurrentFixturesFinished;
   const freshScoresByUid = {};
 
   await mapLimit(targetUids, 4, async (uid) => {
@@ -1181,10 +1187,12 @@ async function buildFreshHomepageState(baseState) {
     const futureDelta2 = Math.max(0, Number(match?.projected_total2 || total2) - Number(match?.total2 || 0));
     const projectedTotal1 = Number((total1 + futureDelta1).toFixed(1));
     const projectedTotal2 = Number((total2 + futureDelta2).toFixed(1));
-    const winProb = buildWinProbabilitySummary(
-      { expected_total: projectedTotal1 },
-      { expected_total: projectedTotal2 }
-    );
+    const winProb = isWeekResolved
+      ? buildResolvedWinProbabilitySummary(total1, total2)
+      : buildWinProbabilitySummary(
+          { expected_total: projectedTotal1 },
+          { expected_total: projectedTotal2 }
+        );
 
     return {
       ...match,

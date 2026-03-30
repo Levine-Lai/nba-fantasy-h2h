@@ -355,6 +355,14 @@ body {
     gap: 10px;
 }
 
+.manager-logo-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 6px;
+}
+
 .manager-logo {
     width: 40px;
     height: 40px;
@@ -364,6 +372,16 @@ body {
     border: 1px solid #d9e2ec;
     box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
     flex: 0 0 auto;
+}
+
+.manager-crown {
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
+    line-height: 1;
+    filter: drop-shadow(0 3px 6px rgba(15, 23, 42, 0.16));
 }
 
 .team-name {
