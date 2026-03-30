@@ -1825,6 +1825,14 @@ function buildWinProbabilitySummary(left, right) {
   };
 }
 
+function buildResolvedWinProbabilitySummary(leftScore, rightScore) {
+  const left = Number(leftScore || 0);
+  const right = Number(rightScore || 0);
+  if (left > right) return { left: 100, right: 0 };
+  if (right > left) return { left: 0, right: 100 };
+  return { left: 50, right: 50 };
+}
+
 function buildOwnershipSummary(picksByUid) {
   const holderMap = {};
   const managerCount = UID_LIST.length;
@@ -2105,6 +2113,8 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       kickoff_time: f.kickoff_time || null,
     };
   });
+  const allCurrentFixturesFinished = games.length > 0 && games.every((game) => !!game.finished);
+  const isWeekResolved = futureWeekEventIds.length === 0 && allCurrentFixturesFinished;
   const teamsPlayingToday = buildTeamsPlayingToday(games);
   const futureTeamsByEvent = futureWeekEventIds.map((eventId) => buildTeamsPlayingToday(futureFixturesByEvent[eventId] || []));
   const upcomingDayContexts = buildUpcomingDayContexts(upcomingEventIds, eventMetaById, fixturesByEvent);
@@ -2556,7 +2566,9 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     const uid2 = normalizeUid(match.uid2);
     const leftProjection = projectionByUid[uid1] || { expected_total: Number(match.total1 || 0) };
     const rightProjection = projectionByUid[uid2] || { expected_total: Number(match.total2 || 0) };
-    const winProb = buildWinProbabilitySummary(leftProjection, rightProjection);
+    const winProb = isWeekResolved
+      ? buildResolvedWinProbabilitySummary(match.total1, match.total2)
+      : buildWinProbabilitySummary(leftProjection, rightProjection);
     return {
       ...match,
       projected_total1: Number(leftProjection.expected_total || match.total1 || 0),
