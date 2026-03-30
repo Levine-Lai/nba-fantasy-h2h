@@ -791,9 +791,11 @@ const Render = {
         if (!badge || !subtitle || !container) return;
 
         const teams = Array.isArray(data?.teams) ? data.teams : [];
+        const paceChart = data?.pace_chart || {};
+        const paceTeams = Array.isArray(paceChart?.teams) ? paceChart.teams : [];
         const periodLabel = data?.period_label || "近30天";
         badge.textContent = periodLabel;
-        subtitle.textContent = `${periodLabel} · ${data?.start_date || "--"} 至 ${data?.end_date || "--"}`;
+        subtitle.textContent = `${periodLabel}攻防图 · ${data?.start_date || "--"} 至 ${data?.end_date || "--"} | 节奏图：${paceChart?.source_label || "赛季 / 代理"}`;
 
         if (!teams.length) {
             container.innerHTML = '<div class="trend-empty">No attack/defence data</div>';
@@ -802,42 +804,44 @@ const Render = {
 
         const pointsFor = teams.map((team) => Number(team.points_for || 0));
         const pointsAgainst = teams.map((team) => Number(team.points_against || 0));
-        const combinedPoints = teams.map((team) => Number(team.combined_points || 0));
-        const absMargins = teams.map((team) => Number(team.abs_margin || 0));
         const minFor = Math.min(...pointsFor);
         const maxFor = Math.max(...pointsFor);
         const minAgainst = Math.min(...pointsAgainst);
         const maxAgainst = Math.max(...pointsAgainst);
-        const minCombined = Math.min(...combinedPoints);
-        const maxCombined = Math.max(...combinedPoints);
-        const minAbsMargin = Math.min(...absMargins);
-        const maxAbsMargin = Math.max(...absMargins);
-        const viewportWidth = Math.max(320, Math.min(window.innerWidth || 760, 760));
+        const viewportWidth = Math.max(320, window.innerWidth || 1280);
         const containerWidth = Math.max(280, Math.floor(container.getBoundingClientRect().width || viewportWidth));
         const compact = viewportWidth <= 768;
-        const gridWidth = compact ? Math.max(260, containerWidth - 12) : Math.max(860, containerWidth - 24);
-        const cardWidth = compact ? gridWidth : Math.max(360, Math.floor((gridWidth - 20) / 2));
-        const plotWidth = compact ? cardWidth : Math.min(460, cardWidth);
-        const plotHeight = compact ? Math.round(plotWidth * 0.9) : 360;
-        const padLeft = compact ? 52 : 58;
-        const padRight = compact ? 22 : 26;
-        const padTop = compact ? 26 : 28;
-        const padBottom = compact ? 54 : 56;
+        const gridGap = compact ? 16 : 20;
+        const maxGridWidth = compact ? containerWidth : Math.min(containerWidth, 1120);
+        const cardWidth = compact ? maxGridWidth : Math.max(420, Math.floor((maxGridWidth - gridGap) / 2));
+        const plotWidth = compact ? Math.max(280, cardWidth - 8) : Math.min(cardWidth, 520);
+        const plotHeight = compact ? Math.round(plotWidth * 0.92) : Math.round(plotWidth * 0.78);
+        const padLeft = compact ? 42 : 52;
+        const padRight = compact ? 18 : 22;
+        const padTop = compact ? 24 : 26;
+        const padBottom = compact ? 44 : 48;
         const innerWidth = plotWidth - padLeft - padRight;
         const innerHeight = plotHeight - padTop - padBottom;
-        const pointHalf = compact ? 14 : 16;
+        const pointHalf = compact ? 11 : 14;
         const attackAxisLabel = compact ? "Attack PPG" : "Attack: points per game";
         const defenceAxisLabel = compact ? "Defense: opponent points per game" : "Defense: opponent points per game";
         const xPos = (value) => padLeft + (((value - minFor) / Math.max(1, maxFor - minFor))) * innerWidth;
         const yPos = (value) => padTop + (((value - minAgainst) / Math.max(1, maxAgainst - minAgainst))) * innerHeight;
         const midpointFor = ((minFor + maxFor) / 2).toFixed(1);
         const midpointAgainst = ((minAgainst + maxAgainst) / 2).toFixed(1);
-        const paceAxisLabel = compact ? "Total PTS proxy" : "Pace proxy: combined points per game";
-        const marginAxisLabel = compact ? "Avg abs diff" : "Average absolute point differential";
-        const paceXPos = (value) => padLeft + (((value - minCombined) / Math.max(1, maxCombined - minCombined))) * innerWidth;
-        const paceYPos = (value) => padTop + (((value - minAbsMargin) / Math.max(1, maxAbsMargin - minAbsMargin))) * innerHeight;
-        const midpointCombined = ((minCombined + maxCombined) / 2).toFixed(1);
-        const midpointAbsMargin = ((minAbsMargin + maxAbsMargin) / 2).toFixed(1);
+        const usesSeasonPace = paceChart?.source === "basketball-reference";
+        const paceValues = paceTeams.map((team) => Number(usesSeasonPace ? team.pace : team.pace_proxy || 0)).filter((value) => Number.isFinite(value));
+        const diffValues = paceTeams.map((team) => Number(usesSeasonPace ? team.abs_n_rtg : team.abs_diff || 0)).filter((value) => Number.isFinite(value));
+        const minPace = paceValues.length ? Math.min(...paceValues) : 0;
+        const maxPace = paceValues.length ? Math.max(...paceValues) : 1;
+        const minDiff = diffValues.length ? Math.min(...diffValues) : 0;
+        const maxDiff = diffValues.length ? Math.max(...diffValues) : 1;
+        const paceAxisLabel = compact ? "Pace" : (usesSeasonPace ? "Pace per game" : "Pace proxy: combined points per game");
+        const marginAxisLabel = compact ? (usesSeasonPace ? "|NRtg|" : "Abs diff") : (usesSeasonPace ? "Absolute net rating difference" : "Average absolute point differential");
+        const paceXPos = (value) => padLeft + (((value - minPace) / Math.max(1, maxPace - minPace))) * innerWidth;
+        const paceYPos = (value) => padTop + ((((maxDiff - value)) / Math.max(1, maxDiff - minDiff))) * innerHeight;
+        const midpointPace = ((minPace + maxPace) / 2).toFixed(1);
+        const midpointDiff = ((minDiff + maxDiff) / 2).toFixed(1);
 
         container.innerHTML = `
             <div class="other-charts-grid">
@@ -868,7 +872,7 @@ const Render = {
                     </div>
                 </div>
                 <div class="attack-defense-card">
-                    <div class="attack-defense-title">近30天球队节奏与分差对比图</div>
+                    <div class="attack-defense-title">${usesSeasonPace ? "赛季球队节奏与分差对比图" : "近30天球队节奏与分差对比图"}</div>
                     <div class="attack-defense-plot" style="--plot-w:${plotWidth}px;--plot-h:${plotHeight}px;">
                         <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.25}px"></div>
                         <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.5}px"></div>
@@ -880,17 +884,24 @@ const Render = {
                         <div class="attack-defense-axis attack-defense-axis-bottom">${paceAxisLabel}</div>
                         ${compact ? "" : '<div class="attack-defense-note good">Fast pace,<br>close games</div>'}
                         ${compact ? "" : '<div class="attack-defense-note bad">Slow pace,<br>blowout risk</div>'}
-                        <div class="attack-defense-scale" style="left:${padLeft - 38}px;top:${padTop - 6}px">${minAbsMargin.toFixed(1)}</div>
-                        <div class="attack-defense-scale" style="left:${padLeft - 38}px;top:${padTop + innerHeight / 2 - 6}px">${midpointAbsMargin}</div>
-                        <div class="attack-defense-scale" style="left:${padLeft - 38}px;top:${padTop + innerHeight - 6}px">${maxAbsMargin.toFixed(1)}</div>
-                        <div class="attack-defense-scale" style="left:${padLeft - 6}px;bottom:${padBottom - 28}px">${minCombined.toFixed(1)}</div>
-                        <div class="attack-defense-scale" style="left:${padLeft + innerWidth / 2 - 10}px;bottom:${padBottom - 28}px">${midpointCombined}</div>
-                        <div class="attack-defense-scale" style="right:${padRight - 4}px;bottom:${padBottom - 28}px">${maxCombined.toFixed(1)}</div>
-                        ${teams.map((team) => `
-                            <div class="attack-defense-point" style="left:${paceXPos(Number(team.combined_points || 0)) - pointHalf}px;top:${paceYPos(Number(team.abs_margin || 0)) - pointHalf}px" title="${escapeHtml(team.team_name)} | Combined PTS ${Number(team.combined_points || 0).toFixed(1)} | Avg abs diff ${Number(team.abs_margin || 0).toFixed(1)}">
+                        <div class="attack-defense-scale" style="left:${padLeft - 38}px;top:${padTop - 6}px">${maxDiff.toFixed(1)}</div>
+                        <div class="attack-defense-scale" style="left:${padLeft - 38}px;top:${padTop + innerHeight / 2 - 6}px">${midpointDiff}</div>
+                        <div class="attack-defense-scale" style="left:${padLeft - 38}px;top:${padTop + innerHeight - 6}px">${minDiff.toFixed(1)}</div>
+                        <div class="attack-defense-scale" style="left:${padLeft - 6}px;bottom:${padBottom - 28}px">${minPace.toFixed(1)}</div>
+                        <div class="attack-defense-scale" style="left:${padLeft + innerWidth / 2 - 10}px;bottom:${padBottom - 28}px">${midpointPace}</div>
+                        <div class="attack-defense-scale" style="right:${padRight - 4}px;bottom:${padBottom - 28}px">${maxPace.toFixed(1)}</div>
+                        ${paceTeams.map((team) => {
+                            const paceValue = Number(usesSeasonPace ? team.pace : team.pace_proxy || 0);
+                            const diffValue = Number(usesSeasonPace ? team.abs_n_rtg : team.abs_diff || 0);
+                            const tooltip = usesSeasonPace
+                                ? `${escapeHtml(team.team_name)} | Pace ${paceValue.toFixed(1)} | |NRtg| ${diffValue.toFixed(1)}`
+                                : `${escapeHtml(team.team_name)} | Combined PTS ${paceValue.toFixed(1)} | Avg abs diff ${diffValue.toFixed(1)}`;
+                            return `
+                            <div class="attack-defense-point" style="left:${paceXPos(paceValue) - pointHalf}px;top:${paceYPos(diffValue) - pointHalf}px" title="${tooltip}">
                                 <img src="${escapeHtml(team.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
                             </div>
-                        `).join("")}
+                        `;
+                        }).join("")}
                     </div>
                 </div>
             </div>

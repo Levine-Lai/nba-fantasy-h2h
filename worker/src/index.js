@@ -3025,6 +3025,71 @@ async function fetchTeamAttackDefensePayload() {
   };
 }
 
+function decodeHtmlText(value) {
+  return String(value || "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .trim();
+}
+
+function extractTableStat(rowHtml, stat) {
+  const match = rowHtml.match(new RegExp(`<(?:td|th)[^>]*data-stat="${stat}"[^>]*>([\\s\\S]*?)<\\/(?:td|th)>`, "i"));
+  return decodeHtmlText(match?.[1] || "");
+}
+
+async function fetchSeasonPaceDiffTeams() {
+  try {
+    const html = await fetchTextUrl("https://www.basketball-reference.com/leagues/NBA_2026.html", 2);
+    const tableMatch = html.match(/<table[^>]*id="advanced-team"[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/i);
+    if (!tableMatch) return null;
+
+    const rows = Array.from(tableMatch[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi));
+    const teams = rows
+      .map((rowMatch) => {
+        const rowHtml = rowMatch[1] || "";
+        const teamName = extractTableStat(rowHtml, "team_name")
+          .replace(/\*+/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!teamName || /league average/i.test(teamName)) return null;
+        const pace = Number(extractTableStat(rowHtml, "pace"));
+        const nRtg = Number(extractTableStat(rowHtml, "n_rtg"));
+        if (!Number.isFinite(pace) || !Number.isFinite(nRtg)) return null;
+        const visual = getTeamVisualMeta(teamName);
+        return {
+          team_name: teamName,
+          team_color: visual.color,
+          logo_url: visual.logo_url,
+          pace: Number(pace.toFixed(1)),
+          n_rtg: Number(nRtg.toFixed(1)),
+          abs_n_rtg: Number(Math.abs(nRtg).toFixed(1)),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) =>
+        a.abs_n_rtg - b.abs_n_rtg ||
+        b.pace - a.pace ||
+        String(a.team_name || "").localeCompare(String(b.team_name || ""))
+      );
+
+    if (!teams.length) return null;
+    return {
+      source: "basketball-reference",
+      source_label: "赛季 Advanced Stats",
+      period_label: "赛季",
+      metric_note: "x = Pace, y = |NRtg|",
+      teams,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function getTeamAttackDefensePayload(env, options = {}) {
   const force = !!options.force;
   const cached = await getTeamAttackDefenseCache(env);
@@ -3033,6 +3098,19 @@ async function getTeamAttackDefensePayload(env, options = {}) {
     return cached;
   }
   const payload = await fetchTeamAttackDefensePayload();
+  payload.pace_chart = (await fetchSeasonPaceDiffTeams()) || {
+    source: "proxy",
+    source_label: "近30天代理值",
+    period_label: "近30天",
+    metric_note: "x = 双方总分代理 Pace, y = 平均绝对分差",
+    teams: payload.teams.map((team) => ({
+      team_name: team.team_name,
+      team_color: team.team_color,
+      logo_url: team.logo_url,
+      pace_proxy: team.combined_points,
+      abs_diff: team.abs_margin,
+    })),
+  };
   try {
     await env.NBA_CACHE.put(TEAM_ATTACK_DEFENSE_CACHE_KEY, JSON.stringify(payload));
   } catch {

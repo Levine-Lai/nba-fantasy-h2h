@@ -2141,7 +2141,7 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px;
     align-items: start;
-    max-width: 980px;
+    max-width: 1120px;
     margin: 0 auto;
 }
 
@@ -2150,6 +2150,8 @@ body {
     flex-direction: column;
     gap: 16px;
     min-width: 0;
+    width: 100%;
+    overflow: hidden;
 }
 
 .attack-defense-title {
@@ -2160,7 +2162,7 @@ body {
 
 .attack-defense-plot {
     position: relative;
-    width: var(--plot-w);
+    width: min(100%, var(--plot-w));
     height: var(--plot-h);
     margin: 0 auto;
     border: 1px solid #dbe4ee;
@@ -2298,6 +2300,7 @@ body {
 @media (max-width: 768px) {
     .other-charts-grid {
         grid-template-columns: 1fr;
+        gap: 22px;
     }
 
     .injury-list,
