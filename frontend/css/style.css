@@ -2136,10 +2136,18 @@ body {
     min-height: 420px;
 }
 
+.other-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    align-items: start;
+}
+
 .attack-defense-card {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-width: 0;
 }
 
 .attack-defense-title {
@@ -2187,7 +2195,7 @@ body {
 }
 
 .attack-defense-axis-left {
-    left: 10px;
+    left: 6px;
     top: 50%;
     transform: translateY(-50%) rotate(-90deg);
     transform-origin: left top;
@@ -2241,6 +2249,39 @@ body {
     filter: drop-shadow(0 4px 8px rgba(15, 23, 42, 0.15));
 }
 
+.pace-probe-card {
+    min-height: 420px;
+}
+
+.pace-probe-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+    min-height: 420px;
+    padding: 24px;
+    border: 1px solid #dbe4ee;
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.05), rgba(255, 255, 255, 0.82)), #fff;
+}
+
+.pace-probe-badge {
+    align-self: flex-start;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.pace-probe-line {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #334155;
+    font-weight: 700;
+}
+
 .trend-list {
     background: #fafafa;
     border: 1px solid #efefef;
@@ -2286,6 +2327,10 @@ body {
 }
 
 @media (max-width: 768px) {
+    .other-charts-grid {
+        grid-template-columns: 1fr;
+    }
+
     .injury-list,
     .reference-list {
         grid-template-columns: 1fr !important;
@@ -2370,5 +2415,18 @@ body {
     .attack-defense-point img {
         width: 28px;
         height: 28px;
+    }
+
+    .pace-probe-card,
+    .pace-probe-body {
+        min-height: auto;
+    }
+
+    .pace-probe-body {
+        padding: 18px;
+    }
+
+    .pace-probe-line {
+        font-size: 14px;
     }
 }

@@ -809,47 +809,63 @@ const Render = {
         const viewportWidth = Math.max(320, Math.min(window.innerWidth || 760, 760));
         const containerWidth = Math.max(280, Math.floor(container.getBoundingClientRect().width || viewportWidth));
         const compact = viewportWidth <= 768;
-        const plotWidth = compact ? Math.max(260, containerWidth - 12) : 760;
-        const plotHeight = compact ? Math.round(plotWidth * 0.9) : 620;
-        const padLeft = compact ? 58 : 86;
-        const padRight = compact ? 24 : 38;
-        const padTop = compact ? 28 : 34;
-        const padBottom = compact ? 56 : 72;
+        const gridWidth = compact ? Math.max(260, containerWidth - 12) : Math.max(860, containerWidth - 24);
+        const cardWidth = compact ? gridWidth : Math.max(400, Math.floor((gridWidth - 20) / 2));
+        const plotWidth = compact ? cardWidth : Math.min(520, cardWidth);
+        const plotHeight = compact ? Math.round(plotWidth * 0.9) : 420;
+        const padLeft = compact ? 52 : 58;
+        const padRight = compact ? 22 : 26;
+        const padTop = compact ? 26 : 28;
+        const padBottom = compact ? 54 : 56;
         const innerWidth = plotWidth - padLeft - padRight;
         const innerHeight = plotHeight - padTop - padBottom;
-        const pointHalf = compact ? 14 : 18;
+        const pointHalf = compact ? 14 : 16;
         const attackAxisLabel = compact ? "Attack PPG" : "Attack: points per game";
         const defenceAxisLabel = compact ? "Defense: opponent points per game" : "Defense: opponent points per game";
-        const xPos = (value) => padLeft + (1 - ((value - minAgainst) / Math.max(1, maxAgainst - minAgainst))) * innerWidth;
-        const yPos = (value) => padTop + (1 - ((value - minFor) / Math.max(1, maxFor - minFor))) * innerHeight;
+        const xPos = (value) => padLeft + (((value - minFor) / Math.max(1, maxFor - minFor))) * innerWidth;
+        const yPos = (value) => padTop + (((value - minAgainst) / Math.max(1, maxAgainst - minAgainst))) * innerHeight;
         const midpointFor = ((minFor + maxFor) / 2).toFixed(1);
         const midpointAgainst = ((minAgainst + maxAgainst) / 2).toFixed(1);
+        const paceProbeLines = [
+            "官方 NBA team advanced stats 服务端请求当前返回 403。",
+            "ESPN 近30天 scoreboard / summary 目前没有稳定的 possessions / pace 总量字段。",
+            "为避免画出误导图表，这张图先保留数据位，等验证到可靠来源后再接入。"
+        ];
 
         container.innerHTML = `
-            <div class="attack-defense-card">
-                <div class="attack-defense-title">近30天球队攻防图</div>
-                <div class="attack-defense-plot" style="--plot-w:${plotWidth}px;--plot-h:${plotHeight}px;">
-                    <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.25}px"></div>
-                    <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.5}px"></div>
-                    <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.75}px"></div>
-                    <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.25}px"></div>
-                    <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.5}px"></div>
-                    <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.75}px"></div>
-                    <div class="attack-defense-axis attack-defense-axis-left">${attackAxisLabel}</div>
-                    <div class="attack-defense-axis attack-defense-axis-bottom">${defenceAxisLabel}</div>
-                    ${compact ? "" : '<div class="attack-defense-note good">Great attack,<br>great defence</div>'}
-                    ${compact ? "" : '<div class="attack-defense-note bad">Poor attack,<br>poor defence</div>'}
-                    <div class="attack-defense-scale" style="left:${padLeft - 40}px;top:${padTop - 6}px">${maxFor.toFixed(1)}</div>
-                    <div class="attack-defense-scale" style="left:${padLeft - 40}px;top:${padTop + innerHeight / 2 - 6}px">${midpointFor}</div>
-                    <div class="attack-defense-scale" style="left:${padLeft - 40}px;top:${padTop + innerHeight - 6}px">${minFor.toFixed(1)}</div>
-                    <div class="attack-defense-scale" style="left:${padLeft - 8}px;bottom:${padBottom - 28}px">${maxAgainst.toFixed(1)}</div>
-                    <div class="attack-defense-scale" style="left:${padLeft + innerWidth / 2 - 10}px;bottom:${padBottom - 28}px">${midpointAgainst}</div>
-                    <div class="attack-defense-scale" style="right:${padRight - 4}px;bottom:${padBottom - 28}px">${minAgainst.toFixed(1)}</div>
-                    ${teams.map((team) => `
-                        <div class="attack-defense-point" style="left:${xPos(Number(team.points_against || 0)) - pointHalf}px;top:${yPos(Number(team.points_for || 0)) - pointHalf}px" title="${escapeHtml(team.team_name)} | PPG ${Number(team.points_for || 0).toFixed(1)} | Opp PPG ${Number(team.points_against || 0).toFixed(1)}">
-                            <img src="${escapeHtml(team.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
-                        </div>
-                    `).join("")}
+            <div class="other-charts-grid">
+                <div class="attack-defense-card">
+                    <div class="attack-defense-title">近30天球队攻防对比图</div>
+                    <div class="attack-defense-plot" style="--plot-w:${plotWidth}px;--plot-h:${plotHeight}px;">
+                        <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.25}px"></div>
+                        <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.5}px"></div>
+                        <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.75}px"></div>
+                        <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.25}px"></div>
+                        <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.5}px"></div>
+                        <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.75}px"></div>
+                        <div class="attack-defense-axis attack-defense-axis-left">${defenceAxisLabel}</div>
+                        <div class="attack-defense-axis attack-defense-axis-bottom">${attackAxisLabel}</div>
+                        ${compact ? "" : '<div class="attack-defense-note good">Great attack,<br>great defence</div>'}
+                        ${compact ? "" : '<div class="attack-defense-note bad">Poor attack,<br>poor defence</div>'}
+                        <div class="attack-defense-scale" style="left:${padLeft - 38}px;top:${padTop - 6}px">${minAgainst.toFixed(1)}</div>
+                        <div class="attack-defense-scale" style="left:${padLeft - 38}px;top:${padTop + innerHeight / 2 - 6}px">${midpointAgainst}</div>
+                        <div class="attack-defense-scale" style="left:${padLeft - 38}px;top:${padTop + innerHeight - 6}px">${maxAgainst.toFixed(1)}</div>
+                        <div class="attack-defense-scale" style="left:${padLeft - 6}px;bottom:${padBottom - 28}px">${minFor.toFixed(1)}</div>
+                        <div class="attack-defense-scale" style="left:${padLeft + innerWidth / 2 - 10}px;bottom:${padBottom - 28}px">${midpointFor}</div>
+                        <div class="attack-defense-scale" style="right:${padRight - 4}px;bottom:${padBottom - 28}px">${maxFor.toFixed(1)}</div>
+                        ${teams.map((team) => `
+                            <div class="attack-defense-point" style="left:${xPos(Number(team.points_for || 0)) - pointHalf}px;top:${yPos(Number(team.points_against || 0)) - pointHalf}px" title="${escapeHtml(team.team_name)} | PPG ${Number(team.points_for || 0).toFixed(1)} | Opp PPG ${Number(team.points_against || 0).toFixed(1)}">
+                                <img src="${escapeHtml(team.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
+                <div class="attack-defense-card pace-probe-card">
+                    <div class="attack-defense-title">近30天球队节奏与分差对比图</div>
+                    <div class="pace-probe-body">
+                        <div class="pace-probe-badge">数据源验证中</div>
+                        ${paceProbeLines.map((line) => `<div class="pace-probe-line">${escapeHtml(line)}</div>`).join("")}
+                    </div>
                 </div>
             </div>
         `;
