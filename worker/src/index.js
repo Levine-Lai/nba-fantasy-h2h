@@ -446,7 +446,7 @@ async function buildRecentFantasyMetricsMap(elementIds, elements) {
     const summaryRes = await fetchJsonSafe(`/element-summary/${elementId}/`, 1);
     if (summaryRes.ok && Array.isArray(summaryRes.data?.history) && summaryRes.data.history.length > 0) {
       const recent = summaryRes.data.history.slice(-5);
-      const total = recent.reduce((sum, row) => sum + Number(row?.total_points || 0), 0);
+      const total = recent.reduce((sum, row) => sum + Number(row?.total_points || 0) / 10, 0);
       average = recent.length ? total / recent.length : 0;
     }
     metricsById[elementId] = {
@@ -1941,7 +1941,9 @@ function buildResolvedWinProbabilitySummary(leftScore, rightScore) {
 function hasDetailedTransferTrendRows(transferTrends) {
   const sample = transferTrends?.overall?.top_in?.[0] || transferTrends?.global?.top_in?.[0] || null;
   if (!sample || typeof sample !== "object") return false;
-  return ["cost", "form", "value", "transfers"].every((key) => key in sample);
+  return ["cost", "form", "value", "transfers"].every((key) => key in sample)
+    && Number(sample.cost || 0) > 0
+    && (Number(sample.form || 0) > 0 || Number(sample.value || 0) > 0);
 }
 
 function buildOwnershipSummary(picksByUid) {

@@ -10,6 +10,9 @@
 3. 表格显示
    - `Weekly Transfers` 与 `Ownership Top 10` 的列对齐重新整理
    - 最后一列加粗，数值列改为更稳定的居中对齐和等宽数字显示
+4. `Form / Value`
+   - 最近 5 场 fantasy 分现在按官方 `element-summary.total_points / 10` 口径计算
+   - 若首页拿到的是“字段齐全但 form/value 仍为 0”的旧缓存，也会自动触发重算
 
 ## 2026-03-30 Other 子页、近30天攻防图与周报产出
 1. 新增导航子页 `其他`
