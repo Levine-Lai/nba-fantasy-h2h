@@ -802,17 +802,23 @@ const Render = {
 
         const pointsFor = teams.map((team) => Number(team.points_for || 0));
         const pointsAgainst = teams.map((team) => Number(team.points_against || 0));
+        const combinedPoints = teams.map((team) => Number(team.combined_points || 0));
+        const absMargins = teams.map((team) => Number(team.abs_margin || 0));
         const minFor = Math.min(...pointsFor);
         const maxFor = Math.max(...pointsFor);
         const minAgainst = Math.min(...pointsAgainst);
         const maxAgainst = Math.max(...pointsAgainst);
+        const minCombined = Math.min(...combinedPoints);
+        const maxCombined = Math.max(...combinedPoints);
+        const minAbsMargin = Math.min(...absMargins);
+        const maxAbsMargin = Math.max(...absMargins);
         const viewportWidth = Math.max(320, Math.min(window.innerWidth || 760, 760));
         const containerWidth = Math.max(280, Math.floor(container.getBoundingClientRect().width || viewportWidth));
         const compact = viewportWidth <= 768;
         const gridWidth = compact ? Math.max(260, containerWidth - 12) : Math.max(860, containerWidth - 24);
-        const cardWidth = compact ? gridWidth : Math.max(400, Math.floor((gridWidth - 20) / 2));
-        const plotWidth = compact ? cardWidth : Math.min(520, cardWidth);
-        const plotHeight = compact ? Math.round(plotWidth * 0.9) : 420;
+        const cardWidth = compact ? gridWidth : Math.max(360, Math.floor((gridWidth - 20) / 2));
+        const plotWidth = compact ? cardWidth : Math.min(460, cardWidth);
+        const plotHeight = compact ? Math.round(plotWidth * 0.9) : 360;
         const padLeft = compact ? 52 : 58;
         const padRight = compact ? 22 : 26;
         const padTop = compact ? 26 : 28;
@@ -826,11 +832,12 @@ const Render = {
         const yPos = (value) => padTop + (((value - minAgainst) / Math.max(1, maxAgainst - minAgainst))) * innerHeight;
         const midpointFor = ((minFor + maxFor) / 2).toFixed(1);
         const midpointAgainst = ((minAgainst + maxAgainst) / 2).toFixed(1);
-        const paceProbeLines = [
-            "官方 NBA team advanced stats 服务端请求当前返回 403。",
-            "ESPN 近30天 scoreboard / summary 目前没有稳定的 possessions / pace 总量字段。",
-            "为避免画出误导图表，这张图先保留数据位，等验证到可靠来源后再接入。"
-        ];
+        const paceAxisLabel = compact ? "Total PTS proxy" : "Pace proxy: combined points per game";
+        const marginAxisLabel = compact ? "Avg abs diff" : "Average absolute point differential";
+        const paceXPos = (value) => padLeft + (((value - minCombined) / Math.max(1, maxCombined - minCombined))) * innerWidth;
+        const paceYPos = (value) => padTop + (((value - minAbsMargin) / Math.max(1, maxAbsMargin - minAbsMargin))) * innerHeight;
+        const midpointCombined = ((minCombined + maxCombined) / 2).toFixed(1);
+        const midpointAbsMargin = ((minAbsMargin + maxAbsMargin) / 2).toFixed(1);
 
         container.innerHTML = `
             <div class="other-charts-grid">
@@ -860,11 +867,30 @@ const Render = {
                         `).join("")}
                     </div>
                 </div>
-                <div class="attack-defense-card pace-probe-card">
+                <div class="attack-defense-card">
                     <div class="attack-defense-title">近30天球队节奏与分差对比图</div>
-                    <div class="pace-probe-body">
-                        <div class="pace-probe-badge">数据源验证中</div>
-                        ${paceProbeLines.map((line) => `<div class="pace-probe-line">${escapeHtml(line)}</div>`).join("")}
+                    <div class="attack-defense-plot" style="--plot-w:${plotWidth}px;--plot-h:${plotHeight}px;">
+                        <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.25}px"></div>
+                        <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.5}px"></div>
+                        <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.75}px"></div>
+                        <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.25}px"></div>
+                        <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.5}px"></div>
+                        <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.75}px"></div>
+                        <div class="attack-defense-axis attack-defense-axis-left">${marginAxisLabel}</div>
+                        <div class="attack-defense-axis attack-defense-axis-bottom">${paceAxisLabel}</div>
+                        ${compact ? "" : '<div class="attack-defense-note good">Fast pace,<br>close games</div>'}
+                        ${compact ? "" : '<div class="attack-defense-note bad">Slow pace,<br>blowout risk</div>'}
+                        <div class="attack-defense-scale" style="left:${padLeft - 38}px;top:${padTop - 6}px">${minAbsMargin.toFixed(1)}</div>
+                        <div class="attack-defense-scale" style="left:${padLeft - 38}px;top:${padTop + innerHeight / 2 - 6}px">${midpointAbsMargin}</div>
+                        <div class="attack-defense-scale" style="left:${padLeft - 38}px;top:${padTop + innerHeight - 6}px">${maxAbsMargin.toFixed(1)}</div>
+                        <div class="attack-defense-scale" style="left:${padLeft - 6}px;bottom:${padBottom - 28}px">${minCombined.toFixed(1)}</div>
+                        <div class="attack-defense-scale" style="left:${padLeft + innerWidth / 2 - 10}px;bottom:${padBottom - 28}px">${midpointCombined}</div>
+                        <div class="attack-defense-scale" style="right:${padRight - 4}px;bottom:${padBottom - 28}px">${maxCombined.toFixed(1)}</div>
+                        ${teams.map((team) => `
+                            <div class="attack-defense-point" style="left:${paceXPos(Number(team.combined_points || 0)) - pointHalf}px;top:${paceYPos(Number(team.abs_margin || 0)) - pointHalf}px" title="${escapeHtml(team.team_name)} | Combined PTS ${Number(team.combined_points || 0).toFixed(1)} | Avg abs diff ${Number(team.abs_margin || 0).toFixed(1)}">
+                                <img src="${escapeHtml(team.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
+                            </div>
+                        `).join("")}
                     </div>
                 </div>
             </div>

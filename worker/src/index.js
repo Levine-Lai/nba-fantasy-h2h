@@ -2989,11 +2989,15 @@ async function fetchTeamAttackDefensePayload() {
             games_played: 0,
             total_points_for: 0,
             total_points_against: 0,
+            total_abs_margin: 0,
+            total_combined_points: 0,
           };
         }
         totalsByTeam[teamId].games_played += 1;
         totalsByTeam[teamId].total_points_for += Number(item.current?.score || 0);
         totalsByTeam[teamId].total_points_against += item.opponentScore;
+        totalsByTeam[teamId].total_abs_margin += Math.abs(Number(item.current?.score || 0) - item.opponentScore);
+        totalsByTeam[teamId].total_combined_points += Number(item.current?.score || 0) + item.opponentScore;
       }
     }
   });
@@ -3003,6 +3007,8 @@ async function fetchTeamAttackDefensePayload() {
       ...team,
       points_for: Number((team.total_points_for / Math.max(1, team.games_played)).toFixed(1)),
       points_against: Number((team.total_points_against / Math.max(1, team.games_played)).toFixed(1)),
+      combined_points: Number((team.total_combined_points / Math.max(1, team.games_played)).toFixed(1)),
+      abs_margin: Number((team.total_abs_margin / Math.max(1, team.games_played)).toFixed(1)),
     }))
     .sort((a, b) =>
       b.points_for - a.points_for ||
