@@ -1261,12 +1261,37 @@ async function buildFreshHomepageState(baseState) {
     ownership_top: ownershipSummary.top10,
     ownership_manager_count: ownershipSummary.manager_count,
   };
-  if (!hasDetailedTransferTrendRows(nextTransferTrends)) {
+  const needsLeagueTrendRefresh = !hasDetailedTrendList(nextTransferTrends?.league?.top_in);
+  const needsOverallTrendRefresh = !hasDetailedTransferTrendRows(nextTransferTrends);
+  if (needsLeagueTrendRefresh) {
+    const transfersByUid = {};
+    await mapLimit(UID_LIST, 4, async (uid) => {
+      const transfersRes = await fetchJsonSafe(`/entry/${uid}/transfers/`, 2);
+      transfersByUid[uid] = transfersRes.ok && Array.isArray(transfersRes.data) ? transfersRes.data : [];
+    });
+    const rebuiltTrends = await buildTransferTrends({
+      transfersByUid,
+      leagueUids: UID_LIST,
+      currentWeek,
+      eventMetaById,
+      elements,
+    });
+    nextTransferTrends = {
+      ...nextTransferTrends,
+      league: rebuiltTrends.league,
+      global: rebuiltTrends.global,
+      overall: rebuiltTrends.global?.top_in?.length || rebuiltTrends.global?.top_out?.length
+        ? rebuiltTrends.global
+        : rebuiltTrends.league,
+    };
+  } else if (needsOverallTrendRefresh) {
     const detailedOverall = await buildGlobalTransferTrends(elements);
     nextTransferTrends = {
       ...nextTransferTrends,
       global: detailedOverall,
-      overall: detailedOverall,
+      overall: detailedOverall?.top_in?.length || detailedOverall?.top_out?.length
+        ? detailedOverall
+        : (nextTransferTrends?.league || detailedOverall),
     };
   }
 
@@ -1942,6 +1967,14 @@ function hasDetailedTransferTrendRows(transferTrends) {
   const sample = transferTrends?.overall?.top_in?.[0] || transferTrends?.global?.top_in?.[0] || null;
   if (!sample || typeof sample !== "object") return false;
   return ["cost", "form", "value", "transfers"].every((key) => key in sample)
+    && Number(sample.cost || 0) > 0
+    && (Number(sample.form || 0) > 0 || Number(sample.value || 0) > 0);
+}
+
+function hasDetailedTrendList(rows) {
+  const sample = Array.isArray(rows) ? rows[0] : null;
+  if (!sample || typeof sample !== "object") return false;
+  return ["cost", "form", "value"].every((key) => key in sample)
     && Number(sample.cost || 0) > 0
     && (Number(sample.form || 0) > 0 || Number(sample.value || 0) > 0);
 }
