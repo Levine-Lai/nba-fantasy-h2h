@@ -26,6 +26,7 @@
                 <button class="nav-tab active" data-page="home">主页</button>
                 <button class="nav-tab" data-page="injuries">伤病信息</button>
                 <button class="nav-tab" data-page="reference">对阵参考</button>
+                <button class="nav-tab" data-page="other">其他</button>
             </div>
             <div class="status">
                 <span class="pulse"></span>
@@ -68,6 +69,7 @@
                 <div class="trend-table">
                     <div class="trend-table-head">
                         <span>Name</span>
+                        <span>Cost</span>
                         <span>Form</span>
                         <span>Value</span>
                         <span>Transfers</span>
@@ -75,7 +77,15 @@
                     <div id="trend-transfer-table" class="trend-table-body"></div>
                 </div>
                 <div class="trend-title">Ownership Top 10</div>
-                <div id="ownership-top" class="trend-list"></div>
+                <div class="trend-table">
+                    <div class="trend-table-head ownership-table-head">
+                        <span>Name</span>
+                        <span>Cost</span>
+                        <span>Held</span>
+                        <span>Ownership</span>
+                    </div>
+                    <div id="ownership-top" class="trend-table-body"></div>
+                </div>
             </div>
             <div class="col-header">
                 <div class="col-title">FDR Ranking</div>
@@ -136,6 +146,19 @@
                 <button class="btn reference-btn" id="reference-search-btn" type="button">开始查询</button>
             </div>
             <div class="reference-list" id="player-reference-list">
+                <div class="loading"><div class="spinner"></div>Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container page-view injury-layout" id="page-other">
+        <div class="column injury-column">
+            <div class="col-header">
+                <div class="col-title">其他</div>
+                <span class="col-badge" id="other-badge">近30天</span>
+            </div>
+            <div class="injury-subtitle" id="other-subtitle">点击导航后加载</div>
+            <div id="other-chart-wrap" class="other-chart-wrap">
                 <div class="loading"><div class="spinner"></div>Loading...</div>
             </div>
         </div>

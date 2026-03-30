@@ -4,6 +4,7 @@ const CACHE_KEY = "latest_state";
 const CACHE_CURSOR_KEY = "refresh_cursor";
 const INJURY_CACHE_KEY = "injury_state";
 const PLAYER_REFERENCE_CACHE_KEY = "player_reference_state";
+const TEAM_ATTACK_DEFENSE_CACHE_KEY = "team_attack_defense_state";
 const INJURY_CACHE_TTL_MS = 60 * 60 * 1000;
 const UID_CHUNK_SIZE = 6;
 const UID_LIST = [
@@ -436,28 +437,55 @@ function topListFromMap(counter, limit = 10) {
     .map(([name, count]) => ({ name, count }));
 }
 
-function topPlayerListFromCounter(counter, elements, limit = 10) {
+async function buildRecentFantasyMetricsMap(elementIds, elements) {
+  const metricsById = {};
+  await mapLimit([...new Set((elementIds || []).map((id) => Number(id || 0)).filter((id) => id > 0))], 4, async (elementId) => {
+    const elem = elements?.[elementId] || {};
+    const price = Number(elem.now_cost || 0) / 10;
+    let average = 0;
+    const summaryRes = await fetchJsonSafe(`/element-summary/${elementId}/`, 1);
+    if (summaryRes.ok && Array.isArray(summaryRes.data?.history) && summaryRes.data.history.length > 0) {
+      const recent = summaryRes.data.history.slice(-5);
+      const total = recent.reduce((sum, row) => sum + Number(row?.total_points || 0), 0);
+      average = recent.length ? total / recent.length : 0;
+    }
+    metricsById[elementId] = {
+      cost: Number(price.toFixed(1)),
+      form: Number(average.toFixed(1)),
+      value: Number((price > 0 ? average / price : 0).toFixed(1)),
+    };
+  });
+  return metricsById;
+}
+
+function topPlayerIdListFromCounter(counter, limit = 10) {
   return [...counter.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
-    .map(([rawId, transfers]) => {
-      const elementId = Number(rawId || 0);
+    .map(([rawId, transfers]) => ({
+      id: Number(rawId || 0),
+      transfers: Number(transfers || 0),
+    }));
+}
+
+function decoratePlayerLeaders(leaders, elements, metricsById = {}) {
+  return (leaders || [])
+    .map((leader) => {
+      const elementId = Number(leader?.id ?? 0);
       const elem = elements?.[elementId] || {};
-      const price = Number(elem.now_cost || 0) / 10;
-      const averageFantasy = Number(elem.points_per_game || 0);
-      const recentForm = Number(elem.form || 0);
-      const recentValue = price > 0 ? recentForm / price : 0;
+      const metrics = metricsById[elementId] || {};
       return {
         id: elementId,
         name: elem.name || `#${elementId}`,
-        transfers: Number(transfers || 0),
-        form: Number(averageFantasy.toFixed(1)),
-        value: Number(recentValue.toFixed(1)),
+        cost: Number(metrics.cost ?? (Number(elem.now_cost || 0) / 10).toFixed(1)),
+        form: Number(metrics.form ?? 0),
+        value: Number(metrics.value ?? 0),
+        transfers: Number(leader?.transfers ?? 0),
       };
     });
 }
 
-function buildTransferTrends({
+async function buildTransferTrends({
   transfersByUid,
   leagueUids,
   currentWeek,
@@ -491,13 +519,19 @@ function buildTransferTrends({
     }
   }
 
-  const global = buildGlobalTransferTrends(elements);
+  const global = await buildGlobalTransferTrends(elements);
+  const leagueInLeaders = topPlayerIdListFromCounter(inCounter, 10);
+  const leagueOutLeaders = topPlayerIdListFromCounter(outCounter, 10);
+  const metricsById = await buildRecentFantasyMetricsMap(
+    [...leagueInLeaders.map((item) => item.id), ...leagueOutLeaders.map((item) => item.id)],
+    elements
+  );
 
   return {
     league: {
       top_pairs: topListFromMap(pairCounter, 10),
-      top_in: topPlayerListFromCounter(inCounter, elements, 10),
-      top_out: topPlayerListFromCounter(outCounter, elements, 10),
+      top_in: decoratePlayerLeaders(leagueInLeaders, elements, metricsById),
+      top_out: decoratePlayerLeaders(leagueOutLeaders, elements, metricsById),
       top_managers: topListFromMap(managerCounter, 10),
     },
     global,
@@ -505,22 +539,29 @@ function buildTransferTrends({
   };
 }
 
-function buildGlobalTransferTrends(elements) {
+async function buildGlobalTransferTrends(elements) {
   const globalInCounter = new Map();
   const globalOutCounter = new Map();
-  for (const elem of Object.values(elements || {})) {
+  for (const [rawId, elem] of Object.entries(elements || {})) {
     if (!elem) continue;
-    const name = elem.name || "";
     const inCount = Number(elem.transfers_in_event || 0);
     const outCount = Number(elem.transfers_out_event || 0);
-    if (inCount > 0) globalInCounter.set(name, inCount);
-    if (outCount > 0) globalOutCounter.set(name, outCount);
+    const elementId = Number(rawId || 0);
+    if (inCount > 0) globalInCounter.set(elementId, inCount);
+    if (outCount > 0) globalOutCounter.set(elementId, outCount);
   }
+
+  const topIn = topPlayerIdListFromCounter(globalInCounter, 10);
+  const topOut = topPlayerIdListFromCounter(globalOutCounter, 10);
+  const metricsById = await buildRecentFantasyMetricsMap(
+    [...topIn.map((item) => item.id), ...topOut.map((item) => item.id)],
+    elements
+  );
 
   return {
     // 全服目前无法获得逐笔“谁换谁”数据，这里展示当前 Event 的全服热门转入/转出。
-    top_in: topListFromMap(globalInCounter, 10),
-    top_out: topListFromMap(globalOutCounter, 10),
+    top_in: decoratePlayerLeaders(topIn, elements, metricsById),
+    top_out: decoratePlayerLeaders(topOut, elements, metricsById),
   };
 }
 
@@ -573,6 +614,25 @@ async function fetchTextUrl(url, retries = 2) {
       });
       if (!res.ok) throw new Error(`fetch failed ${url}: ${res.status}`);
       return await res.text();
+    } catch (error) {
+      lastError = error;
+      if (i < retries) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * (i + 1)));
+      }
+    }
+  }
+  throw lastError || new Error(`fetch failed ${url}`);
+}
+
+async function fetchJsonUrl(url, retries = 2) {
+  let lastError = null;
+  for (let i = 0; i <= retries; i += 1) {
+    try {
+      const res = await fetch(url, {
+        headers: { "user-agent": "Mozilla/5.0" },
+      });
+      if (!res.ok) throw new Error(`fetch failed ${url}: ${res.status}`);
+      return await res.json();
     } catch (error) {
       lastError = error;
       if (i < retries) {
@@ -1877,6 +1937,7 @@ function buildOwnershipSummary(picksByUid) {
         holderMap[elementId] = {
           element_id: elementId,
           name: player?.name || `#${elementId}`,
+          cost: Number((Number(player?.now_cost || 0) / 10).toFixed(1)),
           holder_count: 0,
         };
       }
@@ -2615,7 +2676,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
 
   const isFullRefresh = uids.length === UID_LIST.length;
   const transferTrends = isFullRefresh
-      ? buildTransferTrends({
+      ? await buildTransferTrends({
           transfersByUid,
           leagueUids: uids,
           currentWeek,
@@ -2624,8 +2685,8 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
         })
     : {
         ...(previousState?.transfer_trends || { league: {}, global: {}, overall: {} }),
-        global: buildGlobalTransferTrends(elements),
-        overall: buildGlobalTransferTrends(elements),
+        global: await buildGlobalTransferTrends(elements),
+        overall: await buildGlobalTransferTrends(elements),
       };
   transferTrends.ownership_top = ownershipSummary.top10;
   transferTrends.ownership_manager_count = ownershipSummary.manager_count;
@@ -2803,6 +2864,114 @@ async function getPlayerReferenceCache(env) {
   } catch {
     return null;
   }
+}
+
+async function getTeamAttackDefenseCache(env) {
+  const raw = await env.NBA_CACHE.get(TEAM_ATTACK_DEFENSE_CACHE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function shiftDateKey(dateKey, deltaDays) {
+  const [year, month, day] = String(dateKey || "").split("-").map((part) => Number(part || 0));
+  const base = new Date(Date.UTC(year, Math.max(0, month - 1), day || 1));
+  base.setUTCDate(base.getUTCDate() + Number(deltaDays || 0));
+  return base.toISOString().slice(0, 10);
+}
+
+function buildLastDateKeys(count = 30, endDateKey = getBeijingDateKey()) {
+  const total = Math.max(1, Number(count || 0));
+  return Array.from({ length: total }, (_, index) => shiftDateKey(endDateKey, index - (total - 1)));
+}
+
+async function fetchTeamAttackDefensePayload() {
+  const endDate = getBeijingDateKey();
+  const dateKeys = buildLastDateKeys(30, endDate);
+  const totalsByTeam = {};
+
+  await mapLimit(dateKeys, 4, async (dateKey) => {
+    const scoreboard = await fetchJsonUrl(
+      `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${String(dateKey).replace(/-/g, "")}`,
+      1
+    );
+    for (const event of scoreboard?.events || []) {
+      const competition = event?.competitions?.[0];
+      if (!competition || event?.status?.type?.completed !== true) continue;
+      const competitors = Array.isArray(competition.competitors) ? competition.competitors : [];
+      if (competitors.length !== 2) continue;
+
+      const left = competitors[0];
+      const right = competitors[1];
+      const leftScore = Number(left?.score || 0);
+      const rightScore = Number(right?.score || 0);
+      const pair = [
+        { current: left, opponentScore: rightScore },
+        { current: right, opponentScore: leftScore },
+      ];
+
+      for (const item of pair) {
+        const team = item.current?.team || {};
+        const teamId = Number(team?.id || 0);
+        if (!teamId) continue;
+        if (!totalsByTeam[teamId]) {
+          const visual = getTeamVisualMeta(team.displayName || team.shortDisplayName || "");
+          totalsByTeam[teamId] = {
+            team_id: teamId,
+            team_name: team.displayName || team.shortDisplayName || `Team #${teamId}`,
+            team_abbrev: team.abbreviation || team.shortDisplayName || "",
+            team_color: visual.color,
+            logo_url: visual.logo_url,
+            games_played: 0,
+            total_points_for: 0,
+            total_points_against: 0,
+          };
+        }
+        totalsByTeam[teamId].games_played += 1;
+        totalsByTeam[teamId].total_points_for += Number(item.current?.score || 0);
+        totalsByTeam[teamId].total_points_against += item.opponentScore;
+      }
+    }
+  });
+
+  const teams = Object.values(totalsByTeam)
+    .map((team) => ({
+      ...team,
+      points_for: Number((team.total_points_for / Math.max(1, team.games_played)).toFixed(1)),
+      points_against: Number((team.total_points_against / Math.max(1, team.games_played)).toFixed(1)),
+    }))
+    .sort((a, b) =>
+      b.points_for - a.points_for ||
+      a.points_against - b.points_against ||
+      String(a.team_name || "").localeCompare(String(b.team_name || ""))
+    );
+
+  return {
+    period_label: "近30天",
+    start_date: dateKeys[0],
+    end_date: dateKeys[dateKeys.length - 1],
+    updated_at: new Date().toISOString(),
+    teams,
+  };
+}
+
+async function getTeamAttackDefensePayload(env, options = {}) {
+  const force = !!options.force;
+  const cached = await getTeamAttackDefenseCache(env);
+  const todayKey = getBeijingDateKey();
+  if (!force && cached?.end_date === todayKey && Array.isArray(cached?.teams) && cached.teams.length > 0) {
+    return cached;
+  }
+  const payload = await fetchTeamAttackDefensePayload();
+  try {
+    await env.NBA_CACHE.put(TEAM_ATTACK_DEFENSE_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    return payload;
+  }
+  return payload;
 }
 
 async function fetchPlayerReferencePayload(playerQuery = "nikola-jokic") {
@@ -3034,6 +3203,11 @@ export default {
           player,
         }));
       }
+      if (path === "/api/team-attack-defense") {
+        return jsonResponse(await getTeamAttackDefensePayload(env, {
+          force: url.searchParams.get("fresh") === "1",
+        }));
+      }
       if (path === "/api/player-options") {
         return jsonResponse(await fetchPlayerOptionsPayload());
       }
@@ -3112,6 +3286,7 @@ export default {
       ctx.waitUntil(getInjuriesPayload(env, { force: true }));
       if (bjHour === 16) {
         ctx.waitUntil(getPlayerReferencePayload(env, { force: true, player: "nikola-jokic" }));
+        ctx.waitUntil(getTeamAttackDefensePayload(env, { force: true }));
       }
     }
     if (!isBeijingRefreshWindow(scheduledAt)) return;

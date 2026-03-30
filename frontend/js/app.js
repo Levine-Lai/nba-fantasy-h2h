@@ -37,6 +37,10 @@ const API = {
         return (await this.fetch(`/api/player-reference?player=${encodeURIComponent(player)}`)).json();
     },
 
+    async getTeamAttackDefense() {
+        return (await this.fetch("/api/team-attack-defense")).json();
+    },
+
     async getPlayerOptions() {
         return (await this.fetch("/api/player-options")).json();
     },
@@ -258,8 +262,8 @@ const Render = {
             `).join("");
         };
 
-        const weeklyIn = data?.league?.top_in || [];
-        const weeklyOut = data?.league?.top_out || [];
+        const weeklyIn = data?.overall?.top_in || data?.global?.top_in || [];
+        const weeklyOut = data?.overall?.top_out || data?.global?.top_out || [];
         const ownershipTop = data?.ownership_top || [];
         const managerCount = Number(data?.ownership_manager_count || 26);
         const direction = App.transferDirection === "out" ? "out" : "in";
@@ -269,18 +273,23 @@ const Render = {
             ? activeItems.map((item) => `
                 <div class="trend-table-row">
                     <span class="trend-player-name">${escapeHtml(item.name)}</span>
+                    <span>${Number(item.cost || 0).toFixed(1)}</span>
                     <span>${Number(item.form || 0).toFixed(1)}</span>
                     <span>${Number(item.value || 0).toFixed(1)}</span>
-                    <span>${Number(item.transfers || item.count || 0)}</span>
+                    <span class="trend-number">${Number(item.transfers || item.count || 0)}</span>
                 </div>
             `).join("")
             : '<div class="trend-empty">No weekly transfer trend data</div>';
-        ownership.innerHTML = renderList(
-            ownershipTop,
-            "No ownership data",
-            (item) => `${escapeHtml(item.name)} (${item.holder_count}/${managerCount})`,
-            (item) => `${Number(item.ownership_percent || 0).toFixed(1)}%`
-        );
+        ownership.innerHTML = ownershipTop.length
+            ? ownershipTop.map((item) => `
+                <div class="trend-table-row ownership-row">
+                    <span class="trend-player-name">${escapeHtml(item.name)}</span>
+                    <span>${Number(item.cost || 0).toFixed(1)}</span>
+                    <span class="trend-number">${Number(item.holder_count || 0)}/${managerCount}</span>
+                    <span class="trend-number">${Number(item.ownership_percent || 0).toFixed(1)}%</span>
+                </div>
+            `).join("")
+            : '<div class="trend-empty">No ownership data</div>';
     },
 
     fdr(data) {
@@ -783,6 +792,71 @@ const Render = {
 
         body.innerHTML = createLineupSection(data, name);
     },
+
+    teamAttackDefense(data) {
+        const badge = document.getElementById("other-badge");
+        const subtitle = document.getElementById("other-subtitle");
+        const container = document.getElementById("other-chart-wrap");
+        if (!badge || !subtitle || !container) return;
+
+        const teams = Array.isArray(data?.teams) ? data.teams : [];
+        const periodLabel = data?.period_label || "近30天";
+        badge.textContent = periodLabel;
+        subtitle.textContent = `${periodLabel} · ${data?.start_date || "--"} 至 ${data?.end_date || "--"}`;
+
+        if (!teams.length) {
+            container.innerHTML = '<div class="trend-empty">No attack/defence data</div>';
+            return;
+        }
+
+        const pointsFor = teams.map((team) => Number(team.points_for || 0));
+        const pointsAgainst = teams.map((team) => Number(team.points_against || 0));
+        const minFor = Math.min(...pointsFor);
+        const maxFor = Math.max(...pointsFor);
+        const minAgainst = Math.min(...pointsAgainst);
+        const maxAgainst = Math.max(...pointsAgainst);
+        const plotWidth = 760;
+        const plotHeight = 620;
+        const padLeft = 86;
+        const padRight = 38;
+        const padTop = 34;
+        const padBottom = 72;
+        const innerWidth = plotWidth - padLeft - padRight;
+        const innerHeight = plotHeight - padTop - padBottom;
+        const xPos = (value) => padLeft + (1 - ((value - minAgainst) / Math.max(1, maxAgainst - minAgainst))) * innerWidth;
+        const yPos = (value) => padTop + (1 - ((value - minFor) / Math.max(1, maxFor - minFor))) * innerHeight;
+        const midpointFor = ((minFor + maxFor) / 2).toFixed(1);
+        const midpointAgainst = ((minAgainst + maxAgainst) / 2).toFixed(1);
+
+        container.innerHTML = `
+            <div class="attack-defense-card">
+                <div class="attack-defense-title">近30天球队攻防图</div>
+                <div class="attack-defense-plot" style="--plot-w:${plotWidth}px;--plot-h:${plotHeight}px;">
+                    <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.25}px"></div>
+                    <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.5}px"></div>
+                    <div class="attack-defense-grid v" style="left:${padLeft + innerWidth * 0.75}px"></div>
+                    <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.25}px"></div>
+                    <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.5}px"></div>
+                    <div class="attack-defense-grid h" style="top:${padTop + innerHeight * 0.75}px"></div>
+                    <div class="attack-defense-axis attack-defense-axis-left">Attack: points per game</div>
+                    <div class="attack-defense-axis attack-defense-axis-bottom">Defense: opponent points per game</div>
+                    <div class="attack-defense-note good">Great attack,<br>great defence</div>
+                    <div class="attack-defense-note bad">Poor attack,<br>poor defence</div>
+                    <div class="attack-defense-scale" style="left:${padLeft - 40}px;top:${padTop - 6}px">${maxFor.toFixed(1)}</div>
+                    <div class="attack-defense-scale" style="left:${padLeft - 40}px;top:${padTop + innerHeight / 2 - 6}px">${midpointFor}</div>
+                    <div class="attack-defense-scale" style="left:${padLeft - 40}px;top:${padTop + innerHeight - 6}px">${minFor.toFixed(1)}</div>
+                    <div class="attack-defense-scale" style="left:${padLeft - 8}px;bottom:${padBottom - 28}px">${maxAgainst.toFixed(1)}</div>
+                    <div class="attack-defense-scale" style="left:${padLeft + innerWidth / 2 - 10}px;bottom:${padBottom - 28}px">${midpointAgainst}</div>
+                    <div class="attack-defense-scale" style="right:${padRight - 4}px;bottom:${padBottom - 28}px">${minAgainst.toFixed(1)}</div>
+                    ${teams.map((team) => `
+                        <div class="attack-defense-point" style="left:${xPos(Number(team.points_against || 0)) - 18}px;top:${yPos(Number(team.points_for || 0)) - 18}px" title="${escapeHtml(team.team_name)} | PPG ${Number(team.points_for || 0).toFixed(1)} | Opp PPG ${Number(team.points_against || 0).toFixed(1)}">
+                            <img src="${escapeHtml(team.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+        `;
+    },
 };
 
 function setLineupMode(mode = "today") {
@@ -799,10 +873,12 @@ const App = {
     refreshTimer: null,
     injuriesLoaded: false,
     playerReferenceLoaded: false,
+    otherLoaded: false,
     playerOptionsLoaded: false,
     playerOptions: [],
     referencePositionFilter: "ALL",
     transferDirection: "in",
+    latestTransferTrends: null,
 
     async getLineupCached(uid) {
         const key = String(uid);
@@ -952,6 +1028,24 @@ const App = {
         }
     },
 
+    async loadOther(force = false) {
+        if (this.otherLoaded && !force) return;
+        const container = document.getElementById("other-chart-wrap");
+        if (container) {
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        }
+        try {
+            const data = await API.getTeamAttackDefense();
+            Render.teamAttackDefense(data);
+            this.otherLoaded = true;
+        } catch (error) {
+            console.error("Other page load error:", error);
+            if (container) {
+                container.innerHTML = '<div class="trend-empty">Load failed</div>';
+            }
+        }
+    },
+
     populateReferencePlayers(teamId, preferredPlayer = "") {
         const playerSelect = document.getElementById("reference-player-select");
         if (!playerSelect) return;
@@ -1026,6 +1120,8 @@ const App = {
                 } else if (page === "reference") {
                     this.loadPlayerOptions();
                     this.loadPlayerReference();
+                } else if (page === "other") {
+                    this.loadOther();
                 }
                 return;
             }

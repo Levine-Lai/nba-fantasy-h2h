@@ -1,5 +1,25 @@
 # nba-fantasy-h2h
 
+## 2026-03-30 Other 子页、近30天攻防图与周报产出
+1. 新增导航子页 `其他`
+   - 当前用于展示“近30天球队攻防图”
+   - 数据口径为最近 30 天内 ESPN scoreboard 已完赛比赛的场均得分 / 场均失分
+   - 页面只保留标题和图，不再显示额外摘要框
+   - 后端每天刷新一次，并在北京时间 16:00 的定时任务中强制更新缓存
+2. `Overall Weekly Transfers`
+   - 改为使用 overall / global 口径，而不是 league 内局部转会口径
+   - 新增 `Cost` 列
+   - `Form` = 最近 5 场 fantasy 场均分
+   - `Value` = 最近 5 场 fantasy 场均分 ÷ 当前身价
+   - 固定展示 Top 10，`Transfers` 数字居中显示
+3. `Ownership Top 10`
+   - 重做为与 transfers 同风格的表格
+   - 展示 `Name / Cost / Held / Ownership`
+4. 新增本地文件：
+   - `WEEKLY_REPORT_GW23.md`：GW23 完整周报草稿
+   - `TEAM_ATTACK_DEFENSE_PREVIEW.html`
+   - `TEAM_ATTACK_DEFENSE_PREVIEW.md`
+
 ## 2026-03-30 首页状态增强、Transfer 模块重做与本地攻防预览
 1. `Live H2H`
    - `Win%` 后面新增状态 emoji，按当前胜面高低显示不同情绪

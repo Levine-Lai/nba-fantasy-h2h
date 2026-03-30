@@ -1,6 +1,6 @@
 # Team Attack / Defense Preview
 
-????ESPN Team Stats?2025-26 Regular Season?
+Source: ESPN Team Stats preview export.
 
 | Team | GP | PPG | Opp PPG |
 | --- | ---: | ---: | ---: |
