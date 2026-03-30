@@ -806,14 +806,17 @@ const Render = {
         const maxFor = Math.max(...pointsFor);
         const minAgainst = Math.min(...pointsAgainst);
         const maxAgainst = Math.max(...pointsAgainst);
-        const plotWidth = 760;
-        const plotHeight = 620;
-        const padLeft = 86;
-        const padRight = 38;
-        const padTop = 34;
-        const padBottom = 72;
+        const viewportWidth = Math.max(320, Math.min(window.innerWidth || 760, 760));
+        const compact = viewportWidth <= 768;
+        const plotWidth = compact ? Math.max(320, viewportWidth - 34) : 760;
+        const plotHeight = compact ? Math.round(plotWidth * 0.9) : 620;
+        const padLeft = compact ? 58 : 86;
+        const padRight = compact ? 24 : 38;
+        const padTop = compact ? 28 : 34;
+        const padBottom = compact ? 56 : 72;
         const innerWidth = plotWidth - padLeft - padRight;
         const innerHeight = plotHeight - padTop - padBottom;
+        const pointHalf = compact ? 14 : 18;
         const xPos = (value) => padLeft + (1 - ((value - minAgainst) / Math.max(1, maxAgainst - minAgainst))) * innerWidth;
         const yPos = (value) => padTop + (1 - ((value - minFor) / Math.max(1, maxFor - minFor))) * innerHeight;
         const midpointFor = ((minFor + maxFor) / 2).toFixed(1);
@@ -840,7 +843,7 @@ const Render = {
                     <div class="attack-defense-scale" style="left:${padLeft + innerWidth / 2 - 10}px;bottom:${padBottom - 28}px">${midpointAgainst}</div>
                     <div class="attack-defense-scale" style="right:${padRight - 4}px;bottom:${padBottom - 28}px">${minAgainst.toFixed(1)}</div>
                     ${teams.map((team) => `
-                        <div class="attack-defense-point" style="left:${xPos(Number(team.points_against || 0)) - 18}px;top:${yPos(Number(team.points_for || 0)) - 18}px" title="${escapeHtml(team.team_name)} | PPG ${Number(team.points_for || 0).toFixed(1)} | Opp PPG ${Number(team.points_against || 0).toFixed(1)}">
+                        <div class="attack-defense-point" style="left:${xPos(Number(team.points_against || 0)) - pointHalf}px;top:${yPos(Number(team.points_for || 0)) - pointHalf}px" title="${escapeHtml(team.team_name)} | PPG ${Number(team.points_for || 0).toFixed(1)} | Opp PPG ${Number(team.points_against || 0).toFixed(1)}">
                             <img src="${escapeHtml(team.logo_url || "/nba-team-logos/_.png")}" alt="${escapeHtml(team.team_name)} logo" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
                         </div>
                     `).join("")}
