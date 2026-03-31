@@ -3582,10 +3582,17 @@ export default {
           const token = url.searchParams.get("token");
           if (token !== auth) return jsonResponse({ success: false, error: "unauthorized" }, 401);
         }
-        const mode = String(url.searchParams.get("mode") || "chunk").toLowerCase();
-        const state = mode === "meta"
-          ? await refreshManagerMetaState(env)
-          : await refreshState(env, { full: mode === "full" });
+        const rawMode = url.searchParams.get("mode");
+        const mode = String(rawMode || "chunk").toLowerCase();
+        let state;
+        if (mode === "meta") {
+          state = await refreshManagerMetaState(env);
+        } else if (mode === "full") {
+          state = await refreshState(env, { full: true });
+        } else {
+          await refreshManagerMetaState(env);
+          state = await refreshState(env, { full: false });
+        }
         return jsonResponse({
           success: true,
           mode: mode === "full" ? "full" : (mode === "meta" ? "meta" : "chunk"),

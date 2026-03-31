@@ -31,7 +31,10 @@
 - `meta` refresh:
   - refreshes all managers' `history` and `transfers`
   - updates chips, weekly transfer data, and `Chips Used`
-  - this is the preferred daily manual refresh
+  - this is the lightweight all-manager metadata refresh
+- default `/api/refresh?token=...`:
+  - now runs `meta` first, then the normal `chunk` refresh
+  - this is the preferred manual refresh entrypoint
 - `full` refresh:
   - expensive
   - should only be used when the whole cache must be rebuilt
@@ -45,7 +48,13 @@ cd F:\NBA\worker
 npx wrangler deploy
 ```
 
-### Refresh Daily Meta Cache
+### Default Manual Refresh
+
+```powershell
+Invoke-WebRequest -Method POST "https://nba-fantasy-api.nbafantasy.workers.dev/api/refresh?token=040517"
+```
+
+### Meta Only Refresh
 
 ```powershell
 Invoke-WebRequest -Method POST "https://nba-fantasy-api.nbafantasy.workers.dev/api/refresh?mode=meta&token=040517"
