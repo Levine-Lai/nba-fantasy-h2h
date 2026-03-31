@@ -1386,55 +1386,29 @@ async function refreshManagerMetaState(env, existingState = null) {
   const eventMetaById = buildEventMetaById(events);
   const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(currentEventName || previousState?.current_event_name || "");
   const currentWeek = currentMeta.gw || extractGwNumber(currentEventName) || extractGwNumber(currentEvent) || 22;
-  const elements = buildElementsMap(bootstrap);
   const previousPicksByUid = buildPreviousPicksByUid(previousState);
   const nextPicksByUid = { ...previousPicksByUid };
-  const transfersByUid = {};
-  const eventLiveCache = {};
 
-  await mapLimit(UID_LIST, 2, async (uid) => {
+  await mapLimit(UID_LIST, 4, async (uid) => {
     const uidNumber = uidToNumber(uid);
     const previous = previousPicksByUid[uid] || {};
 
-    let [transfersRes, historyRes] = await Promise.all([
-      fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 4),
-      fetchJsonSafe(`/entry/${uidNumber}/history/`, 4),
-    ]);
+    let historyRes = await fetchJsonSafe(`/entry/${uidNumber}/history/`, 4);
     if (!historyRes.ok) {
       await new Promise((resolve) => setTimeout(resolve, 250));
       historyRes = await fetchJsonSafe(`/entry/${uidNumber}/history/`, 4);
     }
-    if (!transfersRes.ok) {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      transfersRes = await fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 4);
-    }
 
-    const transfersData = transfersRes.ok && Array.isArray(transfersRes.data) ? transfersRes.data : [];
     const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : null;
     const hasHistoryData = !!historyData;
-    transfersByUid[uid] = transfersData;
 
-    const chipDayMap = hasHistoryData
-      ? getChipDayMapFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
-      : {};
     const wildcardDay = hasHistoryData
       ? getWildcardDayFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
       : Number(previous.wildcard_day || 0) || null;
-    const richDay = hasHistoryData
-      ? Object.entries(chipDayMap).find(([, value]) => value === "rich")?.[0] || null
+    const richEvent = hasHistoryData
+      ? getSeasonChipEvent(historyData, ["rich"])
       : Number(previous.rich_day || 0) || null;
-    const canRecomputePenalty = !!transfersRes.ok && hasHistoryData;
-    const transferSummary = canRecomputePenalty
-      ? buildWeeklyTransferSummary(transfersData, currentWeek, eventMetaById, elements, chipDayMap)
-      : {
-          records: Array.isArray(previous.transfer_records) ? previous.transfer_records : [],
-          total_transfer_count: Number(previous.transfer_count || 0),
-          penalty_transfer_count: Number(previous.penalty_transfer_count || previous.transfer_count || 0),
-          gd1_transfer_count: Number(previous.gd1_transfer_count || 0),
-          gd1_missing_penalty: Number(previous.gd1_missing_penalty || 0),
-          penalty_score: Number(previous.penalty_score || 0),
-        };
-    const gd1MissingPenalty = Number(transferSummary.gd1_missing_penalty || 0);
+    const gd1MissingPenalty = Number(previous.gd1_missing_penalty || 0);
     const historyWeek = hasHistoryData
       ? calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
       : null;
@@ -1447,7 +1421,7 @@ async function refreshManagerMetaState(env, existingState = null) {
         : historyWeek?.today_points || 0
     );
     const captainUsed = hasHistoryData
-      ? await buildCaptainUsageSummary(uidNumber, historyData, currentWeek, currentEvent, eventMetaById, elements, eventLiveCache)
+      ? buildCaptainUsageFromHistoryOnly(historyData, currentWeek, currentEvent, eventMetaById, previous.captain_used || null)
       : previous.captain_used || {
           used: false,
           label: "None",
@@ -1469,15 +1443,10 @@ async function refreshManagerMetaState(env, existingState = null) {
       team_name: previous.team_name || UID_MAP[uidNumber],
       current_event: currentEvent,
       current_event_name: currentEventName,
-      transfer_records: transferSummary.records,
-      transfer_count: Number(transferSummary.total_transfer_count || 0),
-      penalty_transfer_count: Number(transferSummary.penalty_transfer_count || 0),
-      gd1_transfer_count: Number(transferSummary.gd1_transfer_count || 0),
       gd1_missing_penalty: gd1MissingPenalty,
-      penalty_score: Number(transferSummary.penalty_score || 0),
-      wildcard_active: wildcardDay !== null,
+      wildcard_active: previous.wildcard_active,
       wildcard_day: wildcardDay,
-      rich_day: richDay ? Number(richDay) : null,
+      rich_day: richEvent ? Number(richEvent) : null,
       captain_used: captainUsed,
       chip_status: chipStatus,
       week_total_summary: weekTotalSummary,
@@ -1485,25 +1454,14 @@ async function refreshManagerMetaState(env, existingState = null) {
       fetch_status: {
         ...(previous.fetch_status || {}),
         history_ok: !!historyRes.ok,
-        transfers_ok: !!transfersRes.ok,
       },
     };
   });
 
   const ownershipSummary = buildOwnershipSummary(nextPicksByUid);
   const chipsUsedSummary = buildChipsUsedSummary(nextPicksByUid);
-  const rebuiltTrends = await buildTransferTrends({
-    transfersByUid,
-    leagueUids: UID_LIST,
-    currentWeek,
-    eventMetaById,
-    elements,
-  });
   const nextTransferTrends = {
     ...(previousState?.transfer_trends || {}),
-    league: rebuiltTrends.league,
-    global: rebuiltTrends.global,
-    overall: rebuiltTrends.overall,
     ownership_top: ownershipSummary.top10,
     ownership_manager_count: ownershipSummary.manager_count,
   };
@@ -1680,6 +1638,42 @@ function getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById
     };
   }
   return null;
+}
+
+function getSeasonChipEvent(historyData, names = []) {
+  const normalizedNames = new Set((names || []).map((name) => String(name || "").toLowerCase()).filter(Boolean));
+  if (!normalizedNames.size) return null;
+  for (const item of extractChipHistoryRecords(historyData)) {
+    const rawName = String(item?.name || "").toLowerCase();
+    if (!normalizedNames.has(rawName)) continue;
+    const itemEvent = Number(item?.event || 0);
+    if (itemEvent > 0) return itemEvent;
+  }
+  return null;
+}
+
+function buildCaptainUsageFromHistoryOnly(historyData, currentGw, currentEvent, eventMetaById, previousCaptainUsed = null) {
+  const chipEvent = getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById);
+  if (!chipEvent?.event) {
+    return previousCaptainUsed && previousCaptainUsed.used === false
+      ? previousCaptainUsed
+      : {
+          used: false,
+          label: "None",
+          day: null,
+          captain_name: null,
+          captain_points: null,
+        };
+  }
+
+  return {
+    ...(previousCaptainUsed || {}),
+    used: true,
+    day: Number(chipEvent.day || 0) || null,
+    label: chipEvent.day ? `DAY${chipEvent.day}` : "Used",
+    captain_name: previousCaptainUsed?.captain_name || null,
+    captain_points: previousCaptainUsed?.captain_points || null,
+  };
 }
 
 function buildChipStatusSummary(historyData, currentGw, currentEvent, eventMetaById, captainUsed = null) {
@@ -2662,7 +2656,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       ? getWildcardDayFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
       : Number(previous.wildcard_day || 0) || null;
     const richDay = hasHistoryData
-      ? Object.entries(chipDayMap).find(([, value]) => value === "rich")?.[0] || null
+      ? getSeasonChipEvent(historyData, ["rich"])
       : Number(previous.rich_day || 0) || null;
     const transferSummary = canRecomputePenalty
       ? buildWeeklyTransferSummary(transfersData, currentWeek, eventMetaById, elements, chipDayMap)
@@ -3583,19 +3577,18 @@ export default {
           if (token !== auth) return jsonResponse({ success: false, error: "unauthorized" }, 401);
         }
         const rawMode = url.searchParams.get("mode");
-        const mode = String(rawMode || "chunk").toLowerCase();
+        const mode = String(rawMode || "meta").toLowerCase();
         let state;
-        if (mode === "meta") {
+        if (!rawMode || mode === "meta") {
           state = await refreshManagerMetaState(env);
         } else if (mode === "full") {
           state = await refreshState(env, { full: true });
         } else {
-          await refreshManagerMetaState(env);
           state = await refreshState(env, { full: false });
         }
         return jsonResponse({
           success: true,
-          mode: mode === "full" ? "full" : (mode === "meta" ? "meta" : "chunk"),
+          mode: !rawMode ? "default" : (mode === "full" ? "full" : (mode === "meta" ? "meta" : "chunk")),
           current_event_name: state.current_event_name,
           refresh_meta: state.refresh_meta,
         });
@@ -3731,7 +3724,8 @@ export default {
         return;
       }
       if (shouldRefreshManagerMeta(state, scheduledAt)) {
-        state = await refreshManagerMetaState(env, state);
+        await refreshManagerMetaState(env, state);
+        return;
       }
       await refreshState(env);
     })());

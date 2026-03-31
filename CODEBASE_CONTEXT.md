@@ -29,11 +29,11 @@
   - updates a small UID batch
   - cheaper for normal scheduled refresh
 - `meta` refresh:
-  - refreshes all managers' `history` and `transfers`
-  - updates chips, weekly transfer data, and `Chips Used`
-  - this is the lightweight all-manager metadata refresh
+  - refreshes all managers' `history`
+  - updates chips and `Chips Used`
+  - this is the lightweight all-manager chip metadata refresh
 - default `/api/refresh?token=...`:
-  - now runs `meta` first, then the normal `chunk` refresh
+  - now defaults to the lightweight history-based chip refresh
   - this is the preferred manual refresh entrypoint
 - `full` refresh:
   - expensive
@@ -64,7 +64,7 @@ Invoke-WebRequest -Method POST "https://nba-fantasy-api.nbafantasy.workers.dev/a
 
 - `Weekly Transfers` should show league current-week transfer totals, not global event transfer trends.
 - `Chips Used` sits above `Ownership Top 10`.
-- `Chips Used` is derived from cached manager chip state and refreshed in daily meta refresh.
+- `Chips Used` is derived from official `/history/` chip state and refreshed in daily meta refresh.
 - Detail modal requests should avoid default `fresh=1` unless a real cache miss/event change happens.
 
 ## Recent Real-Data Sanity Checks
