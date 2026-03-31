@@ -1217,6 +1217,28 @@ function computeWeekTotalFromSummary(summary, todayScore) {
   return Math.max(0, Math.round(total));
 }
 
+function buildCaptainUsageFromHistoryOnly(historyData, currentGw, currentEvent, eventMetaById, previousCaptainUsed = null) {
+  const chipEvent = getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById);
+  if (!chipEvent?.event) {
+    return {
+      used: false,
+      label: "None",
+      day: null,
+      captain_name: null,
+      captain_points: null,
+    };
+  }
+  const previousDay = Number(previousCaptainUsed?.day || 0) || null;
+  const sameDay = previousDay !== null && previousDay === Number(chipEvent.day || 0);
+  return {
+    used: true,
+    label: chipEvent.day ? `DAY${chipEvent.day}` : "Used",
+    day: Number(chipEvent.day || 0) || null,
+    captain_name: sameDay ? previousCaptainUsed?.captain_name || null : null,
+    captain_points: sameDay ? previousCaptainUsed?.captain_points ?? null : null,
+  };
+}
+
 async function buildFreshHomepageState(baseState) {
   const matches = Array.isArray(baseState?.h2h) ? baseState.h2h : [];
   const currentEvent = Number(baseState?.current_event || 0);
@@ -1380,6 +1402,115 @@ async function buildFreshHomepageState(baseState) {
     picks_by_uid: nextPicksByUid,
     transfer_trends: nextTransferTrends,
   };
+}
+
+async function refreshManagerMetaState(env, previousState = null) {
+  const state = previousState || await getState(env);
+  if (!state) return refreshState(env, { full: true });
+
+  const bootstrap = await fetchJson("/bootstrap-static/", 1);
+  const events = bootstrap.events || [];
+  const elements = buildElementsMap(bootstrap);
+  const eventMetaById = buildEventMetaById(events);
+  const currentEvent = Number(state?.current_event || events.find((event) => event.is_current)?.id || events.find((event) => event.is_next)?.id || 0);
+  const currentEventName = state?.current_event_name || eventMetaById?.[currentEvent]?.name || "";
+  const currentWeek = Number(eventMetaById?.[currentEvent]?.gw || extractGwNumber(currentEventName) || 0);
+  const previousPicksByUid = buildPreviousPicksByUid(state);
+  const nextPicksByUid = { ...(state?.picks_by_uid || {}) };
+
+  await mapLimit(UID_LIST, 4, async (uid) => {
+    const previous = previousPicksByUid[uid] || nextPicksByUid[uid] || {};
+    const [transfersRes, historyRes] = await Promise.all([
+      fetchJsonSafe(`/entry/${uid}/transfers/`, 2),
+      fetchJsonSafe(`/entry/${uid}/history/`, 2),
+    ]);
+    const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : null;
+    const transfersData = transfersRes.ok && Array.isArray(transfersRes.data) ? transfersRes.data : [];
+    const chipDayMap = historyData ? getChipDayMapFromHistory(historyData, currentWeek, currentEvent, eventMetaById) : {};
+    const wildcardDay = historyData
+      ? getWildcardDayFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
+      : Number(previous?.wildcard_day || 0) || null;
+    const richDay = historyData
+      ? Number(Object.entries(chipDayMap).find(([, value]) => value === "rich")?.[0] || 0) || null
+      : Number(previous?.rich_day || 0) || null;
+    const captainUsed = historyData
+      ? buildCaptainUsageFromHistoryOnly(historyData, currentWeek, currentEvent, eventMetaById, previous?.captain_used || null)
+      : previous?.captain_used || { used: false, label: "None", day: null, captain_name: null, captain_points: null };
+    const chipStatus = historyData
+      ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
+      : previous?.chip_status || {
+        captain_used: !!previous?.captain_used?.used,
+        wildcard_used: !!previous?.wildcard_active,
+        all_stars_used: !!previous?.rich_day,
+      };
+    const transferSummary = historyData && transfersRes.ok
+      ? buildWeeklyTransferSummary(transfersData, currentWeek, eventMetaById, elements, chipDayMap)
+      : {
+          records: Array.isArray(previous?.transfer_records) ? previous.transfer_records : [],
+          total_transfer_count: Number(previous?.transfer_count || 0),
+          penalty_transfer_count: Number(previous?.penalty_transfer_count || previous?.transfer_count || 0),
+          gd1_transfer_count: Number(previous?.gd1_transfer_count || 0),
+          gd1_missing_penalty: Number(previous?.gd1_missing_penalty || 0),
+          penalty_score: Number(previous?.penalty_score || 0),
+        };
+
+    nextPicksByUid[uid] = {
+      ...previous,
+      uid: uidToNumber(uid),
+      team_name: UID_MAP[uidToNumber(uid)] || previous?.team_name || uid,
+      current_event: currentEvent,
+      current_event_name: currentEventName,
+      wildcard_active: wildcardDay !== null,
+      wildcard_day: wildcardDay,
+      rich_day: richDay,
+      transfer_records: transferSummary.records,
+      transfer_count: Number(transferSummary.total_transfer_count || 0),
+      penalty_transfer_count: Number(transferSummary.penalty_transfer_count || 0),
+      gd1_transfer_count: Number(transferSummary.gd1_transfer_count || 0),
+      gd1_missing_penalty: Number(transferSummary.gd1_missing_penalty || 0),
+      penalty_score: Number(transferSummary.penalty_score || previous?.penalty_score || 0),
+      captain_used: captainUsed,
+      chip_status: chipStatus,
+      fetch_status: {
+        ...(previous?.fetch_status || {}),
+        history_ok: !!historyRes.ok,
+        transfers_ok: !!transfersRes.ok,
+      },
+    };
+  });
+
+  const nextH2h = Array.isArray(state?.h2h)
+    ? state.h2h.map((match) => {
+        const uid1 = normalizeUid(match?.uid1);
+        const uid2 = normalizeUid(match?.uid2);
+        const left = nextPicksByUid[uid1] || {};
+        const right = nextPicksByUid[uid2] || {};
+        return {
+          ...match,
+          transfer_count1: Number(left?.transfer_count || match?.transfer_count1 || 0),
+          transfer_count2: Number(right?.transfer_count || match?.transfer_count2 || 0),
+          wildcard1: !!left?.wildcard_active,
+          wildcard2: !!right?.wildcard_active,
+          chip_status1: left?.chip_status || match?.chip_status1 || null,
+          chip_status2: right?.chip_status || match?.chip_status2 || null,
+        };
+      })
+    : [];
+
+  const nextState = {
+    ...state,
+    generated_at: new Date().toISOString(),
+    h2h: nextH2h,
+    picks_by_uid: nextPicksByUid,
+    refresh_meta: {
+      ...(state?.refresh_meta || {}),
+      meta_mode: "daily",
+      meta_updated_at: new Date().toISOString(),
+    },
+  };
+
+  await env.NBA_CACHE.put(CACHE_KEY, JSON.stringify(nextState));
+  return nextState;
 }
 
 function buildLeagueDailyAverages(picksByUid, teamsPlayingToday) {
@@ -2876,13 +3007,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
 
 async function refreshState(env, options = {}) {
   const previous = await getState(env);
-  const bjToday = getBeijingDateKey();
-  const previousRefreshDay = previous?.refresh_meta?.updated_at ? getBeijingDateKey(previous.refresh_meta.updated_at) : "";
-  const shouldForceDailyFullRefresh =
-    !options.full &&
-    !!previous &&
-    previousRefreshDay !== bjToday;
-  const full = !!options.full || shouldForceDailyFullRefresh;
+  const full = !!options.full;
   const rawCursor = full ? "0" : await env.NBA_CACHE.get(CACHE_CURSOR_KEY);
   const startIndex = Math.max(0, Number(rawCursor || 0) || 0);
   const safeStart = startIndex >= UID_LIST.length ? 0 : startIndex;
@@ -3406,10 +3531,12 @@ export default {
           if (token !== auth) return jsonResponse({ success: false, error: "unauthorized" }, 401);
         }
         const mode = String(url.searchParams.get("mode") || "chunk").toLowerCase();
-        const state = await refreshState(env, { full: mode === "full" });
+        const state = mode === "meta"
+          ? await refreshManagerMetaState(env)
+          : await refreshState(env, { full: mode === "full" });
         return jsonResponse({
           success: true,
-          mode: mode === "full" ? "full" : "chunk",
+          mode: mode === "full" ? "full" : mode === "meta" ? "meta" : "chunk",
           current_event_name: state.current_event_name,
           refresh_meta: state.refresh_meta,
         });
@@ -3423,7 +3550,7 @@ export default {
       if (!state) {
         state = await refreshState(env, { full: true });
       } else if (staleStateNeedsDailyRefresh) {
-        state = await refreshState(env, { full: true });
+        state = await refreshManagerMetaState(env, state);
       }
 
       if (path === "/api/state") {
