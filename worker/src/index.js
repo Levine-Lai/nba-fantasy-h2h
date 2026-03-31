@@ -1247,31 +1247,9 @@ async function buildFreshHomepageState(baseState) {
   const isWeekResolved = futureWeekEventIds.length === 0 && allCurrentFixturesFinished;
   const freshScoresByUid = {};
 
-  await mapLimit(targetUids, 2, async (uid) => {
+  await mapLimit(targetUids, 4, async (uid) => {
     const previous = baseState?.picks_by_uid?.[uid] || {};
-    const historyRes = await fetchJsonSafe(`/entry/${uid}/history/`, 5);
-    const picksRes = await fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 3);
-    const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : null;
-    const captainChipEvent = historyData
-      ? getCaptainChipEvent(historyData, currentWeek, currentEvent, eventMetaById)
-      : null;
-    const captainUsed = historyData
-      ? {
-          ...(previous?.captain_used || {}),
-          used: !!captainChipEvent,
-          day: Number(captainChipEvent?.day || 0) || null,
-          label: captainChipEvent?.day ? `DAY${captainChipEvent.day}` : (!!captainChipEvent ? "Used" : "None"),
-        }
-      : (previous?.captain_used || {
-          used: false,
-          label: "None",
-          day: null,
-          captain_name: null,
-          captain_points: null,
-        });
-    const chipStatus = historyData
-      ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
-      : (previous?.chip_status || null);
+    const picksRes = await fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 1);
     let picks = null;
     if (picksRes.ok && Array.isArray(picksRes.data?.picks)) {
       picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
@@ -1288,8 +1266,6 @@ async function buildFreshHomepageState(baseState) {
       freshScoresByUid[uid] = {
         total_live: Number(previous?.total_live || 0),
         event_total: Number(previous?.event_total || 0),
-        captain_used: captainUsed,
-        chip_status: chipStatus,
       };
       return;
     }
@@ -1297,19 +1273,6 @@ async function buildFreshHomepageState(baseState) {
     const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
     const freshToday = Number(effectiveScore || 0);
     let summary = previous?.week_total_summary || null;
-    if (!summary && historyData) {
-      const historyWeek = calculateWeekScoresFromHistory(
-        historyData,
-        currentWeek,
-        currentEvent,
-        eventMetaById
-      );
-      summary = buildWeekTotalSummary(
-        historyWeek,
-        currentEvent,
-        Number(previous?.gd1_missing_penalty || 0)
-      );
-    }
     const freshWeek =
       computeWeekTotalFromSummary(summary, freshToday) ??
       Math.max(
@@ -1321,8 +1284,6 @@ async function buildFreshHomepageState(baseState) {
       total_live: freshToday,
       event_total: freshWeek,
       week_total_summary: summary || null,
-      captain_used: captainUsed,
-      chip_status: chipStatus,
     };
   });
 
@@ -1336,8 +1297,6 @@ async function buildFreshHomepageState(baseState) {
       total_live: Number(fresh.total_live || 0),
       event_total: Number(fresh.event_total || 0),
       week_total_summary: fresh.week_total_summary || nextPicksByUid[uid].week_total_summary || null,
-      captain_used: fresh.captain_used || nextPicksByUid[uid].captain_used || null,
-      chip_status: fresh.chip_status || nextPicksByUid[uid].chip_status || null,
     };
   }
 
@@ -1412,8 +1371,6 @@ async function buildFreshHomepageState(baseState) {
       projected_total2: projectedTotal2,
       win_prob1: winProb.left,
       win_prob2: winProb.right,
-      chip_status1: nextPicksByUid[uid1]?.chip_status || match?.chip_status1 || null,
-      chip_status2: nextPicksByUid[uid2]?.chip_status || match?.chip_status2 || null,
     };
   });
 
@@ -2919,7 +2876,13 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
 
 async function refreshState(env, options = {}) {
   const previous = await getState(env);
-  const full = !!options.full;
+  const bjToday = getBeijingDateKey();
+  const previousRefreshDay = previous?.refresh_meta?.updated_at ? getBeijingDateKey(previous.refresh_meta.updated_at) : "";
+  const shouldForceDailyFullRefresh =
+    !options.full &&
+    !!previous &&
+    previousRefreshDay !== bjToday;
+  const full = !!options.full || shouldForceDailyFullRefresh;
   const rawCursor = full ? "0" : await env.NBA_CACHE.get(CACHE_CURSOR_KEY);
   const startIndex = Math.max(0, Number(rawCursor || 0) || 0);
   const safeStart = startIndex >= UID_LIST.length ? 0 : startIndex;
@@ -3453,7 +3416,13 @@ export default {
       }
 
       let state = await getState(env);
+      const staleStateNeedsDailyRefresh =
+        !!state &&
+        isBeijingRefreshWindow(Date.now()) &&
+        getBeijingDateKey(state?.refresh_meta?.updated_at || state?.generated_at || 0) !== getBeijingDateKey();
       if (!state) {
+        state = await refreshState(env, { full: true });
+      } else if (staleStateNeedsDailyRefresh) {
         state = await refreshState(env, { full: true });
       }
 

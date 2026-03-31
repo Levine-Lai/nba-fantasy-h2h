@@ -26,7 +26,7 @@ const API = {
     },
 
     async getLineup(uid) {
-        return (await this.fetch(`/api/picks/${uid}?fresh=1`)).json();
+        return (await this.fetch(`/api/picks/${uid}`)).json();
     },
 
     async getInjuries() {
@@ -991,7 +991,11 @@ const App = {
     async getLineupCached(uid) {
         const key = String(uid);
         if (!this.lineupCache.has(key)) {
-            this.lineupCache.set(key, API.getLineup(uid));
+            const request = API.getLineup(uid).catch((error) => {
+                this.lineupCache.delete(key);
+                throw error;
+            });
+            this.lineupCache.set(key, request);
         }
         return this.lineupCache.get(key);
     },
@@ -1015,6 +1019,7 @@ const App = {
 
     async loadAll() {
         try {
+            this.lineupCache.clear();
             const state = await API.getState();
             this.latestTransferTrends = state?.transfer_trends || {};
             Render.eventInfo(state?.current_event_name || "Loading...");
