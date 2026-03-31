@@ -765,13 +765,13 @@ const Render = {
                 `;
             }
 
-            const columnStyle = `style="grid-template-columns:minmax(82px, 0.94fr) repeat(${days.length}, minmax(30px, 1fr));"`;
-            const tableMinWidth = Math.max(316, 96 + days.length * 34);
+            const columnStyle = `style="grid-template-columns:minmax(116px, 1.06fr) repeat(${days.length}, minmax(46px, 1fr));"`;
+            const tableMinWidth = Math.max(438, 128 + days.length * 50);
             return `
                 <div class="future-schedule-panel">
                     <div class="future-team-header">
                         <div class="future-team-name">${escapeHtml(teamName)}</div>
-                        <div class="future-team-sub">当前阵容未来 7 天赛程</div>
+                        <div class="future-team-sub">当前阵容未来 7 天赛程 · 左右滑动查看</div>
                     </div>
                     <div class="future-schedule-scroll">
                         <div class="future-schedule-matrix" style="min-width:${tableMinWidth}px;">

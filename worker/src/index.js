@@ -1482,10 +1482,8 @@ function buildChipStatusSummary(historyData, currentGw, currentEvent, eventMetaB
     const eventMeta = eventMetaById?.[itemEvent] || {};
     const itemGw = Number(item?.gw || item?.gameweek || eventMeta.gw || extractGwNumber(itemEvent) || 0);
 
-    if (!wildcardUsed && (rawName === "wildcard" || rawName === "wild_card")) {
-      if (itemGw >= 17 || (currentGw >= 17 && itemEvent === Number(currentEvent || 0))) {
-        wildcardUsed = true;
-      }
+    if (!wildcardUsed && (rawName === "wildcard" || rawName === "wild_card") && itemGw >= 17) {
+      wildcardUsed = true;
     }
     if (!allStarsUsed && rawName === "rich") {
       allStarsUsed = true;

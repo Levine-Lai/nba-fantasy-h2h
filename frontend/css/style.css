@@ -1158,8 +1158,8 @@ body {
 }
 
 .future-compare-board .future-schedule-scroll {
-    overflow-x: hidden;
-    overflow-y: visible;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .future-team-header {
@@ -1199,8 +1199,8 @@ body {
 
 .future-head-player,
 .future-head-day {
-    padding: 6px 4px;
-    font-size: 9px;
+    padding: 7px 6px;
+    font-size: 10px;
     font-weight: 900;
     color: #334155;
     text-align: center;
@@ -1209,7 +1209,7 @@ body {
 
 .future-head-player {
     text-align: left;
-    padding-left: 10px;
+    padding-left: 12px;
 }
 
 .future-head-day:last-child {
@@ -1230,7 +1230,7 @@ body {
 }
 
 .future-summary-label {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 900;
     color: #334155;
     display: flex;
@@ -1247,14 +1247,14 @@ body {
 }
 
 .future-summary-top {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 900;
     color: #0f172a;
     line-height: 1;
 }
 
 .future-summary-bottom {
-    font-size: 8px;
+    font-size: 9px;
     color: #64748b;
     margin-top: 3px;
     font-weight: 700;
@@ -1265,8 +1265,8 @@ body {
 }
 
 .future-group-title {
-    padding: 6px 8px;
-    font-size: 10px;
+    padding: 7px 10px;
+    font-size: 11px;
     font-weight: 900;
     color: #fff;
     border-radius: 12px 12px 0 0;
@@ -1299,7 +1299,7 @@ body {
 
 .future-player-cell,
 .future-match-cell {
-    min-height: 40px;
+    min-height: 48px;
     border-right: 1px solid #e3ebf4;
 }
 
@@ -1307,7 +1307,7 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 5px 6px;
+    padding: 7px 8px;
     background: #fff;
 }
 
@@ -1316,7 +1316,7 @@ body {
 }
 
 .future-player-name {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 800;
     color: #0f172a;
     line-height: 1.2;
@@ -1324,7 +1324,7 @@ body {
 
 .future-player-meta {
     margin-top: 3px;
-    font-size: 8px;
+    font-size: 9px;
     font-weight: 700;
     color: #64748b;
 }
@@ -1334,7 +1334,7 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     background: #fff;
 }
 
@@ -1343,19 +1343,19 @@ body {
 }
 
 .future-match-cell.empty {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 900;
     color: #94a3b8;
 }
 
 .future-match-logo {
-    width: 14px;
-    height: 14px;
+    width: 18px;
+    height: 18px;
     object-fit: contain;
 }
 
 .future-match-venue {
-    font-size: 7px;
+    font-size: 8px;
     font-weight: 900;
     color: #64748b;
 }
@@ -1591,17 +1591,17 @@ body {
     .future-head-player,
     .future-summary-label,
     .future-player-cell {
-        min-width: 108px;
+        min-width: 132px;
     }
 
     .future-head-day,
     .future-summary-cell,
     .future-match-cell {
-        min-width: 32px;
+        min-width: 52px;
     }
 
     .future-schedule-panel {
-        padding: 9px;
+        padding: 10px;
     }
 
     .future-compare-board {
