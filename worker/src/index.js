@@ -753,6 +753,15 @@ function extractHistoryRecords(historyData) {
   return [];
 }
 
+function extractChipHistoryRecords(historyData) {
+  if (!historyData || typeof historyData !== "object") return [];
+  if (Array.isArray(historyData.chips)) return historyData.chips;
+  for (const key of ["card_history", "cards", "events", "results", "history"]) {
+    if (Array.isArray(historyData[key])) return historyData[key];
+  }
+  return [];
+}
+
 function parseEventMetaFromName(eventName) {
   const text = String(eventName || "");
   // 尝试匹配 "Gameweek 22 - Day 7" 格式
@@ -820,7 +829,7 @@ function resolveTransferGwDay(transfer, eventMetaById) {
 }
 
 function getWildcardDayFromHistory(historyData, currentGw, currentEvent, eventMetaById) {
-  for (const item of extractHistoryRecords(historyData)) {
+  for (const item of extractChipHistoryRecords(historyData)) {
     const name = String(item?.name || "").toLowerCase();
     if (name !== "wildcard" && name !== "wild_card") continue;
     const itemEvent = item?.event;
@@ -838,7 +847,7 @@ function getWildcardDayFromHistory(historyData, currentGw, currentEvent, eventMe
 
 function getChipDayMapFromHistory(historyData, currentGw, currentEvent, eventMetaById) {
   const chipDayMap = {};
-  for (const item of extractHistoryRecords(historyData)) {
+  for (const item of extractChipHistoryRecords(historyData)) {
     const rawName = String(item?.name || "").toLowerCase();
     if (!rawName) continue;
     const itemEvent = item?.event;
@@ -1485,7 +1494,7 @@ function buildLineupEconomySummary(players) {
 }
 
 function getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById) {
-  for (const item of extractHistoryRecords(historyData)) {
+  for (const item of extractChipHistoryRecords(historyData)) {
     const name = String(item?.name || "").toLowerCase();
     if (name !== "phcapt") continue;
     const itemEvent = Number(item?.event || 0);
@@ -1504,7 +1513,7 @@ function buildChipStatusSummary(historyData, currentGw, currentEvent, eventMetaB
   let wildcardUsed = false;
   let allStarsUsed = false;
 
-  for (const item of extractHistoryRecords(historyData)) {
+  for (const item of extractChipHistoryRecords(historyData)) {
     const rawName = String(item?.name || "").toLowerCase();
     if (!rawName) continue;
     const itemEvent = Number(item?.event || 0);
