@@ -501,6 +501,7 @@ async function buildTransferTrends({
   const inCounter = new Map();
   const outCounter = new Map();
   const managerCounter = new Map();
+  let totalTransfers = 0;
 
   for (const uid of leagueUids || []) {
     const transfers = transfersByUid?.[uid] || [];
@@ -509,6 +510,7 @@ async function buildTransferTrends({
       const { gw } = resolveTransferGwDay(transfer, eventMetaById);
       if (gw !== currentWeek) continue;
       managerTransfers += 1;
+      totalTransfers += 1;
 
       const inId = Number(transfer?.element_in || 0);
       const outId = Number(transfer?.element_out || 0);
@@ -534,13 +536,24 @@ async function buildTransferTrends({
 
   return {
     league: {
+      scope: "league_current_week",
+      gw: Number(currentWeek || 0),
+      total_transfers: Number(totalTransfers || 0),
       top_pairs: topListFromMap(pairCounter, 10),
       top_in: decoratePlayerLeaders(leagueInLeaders, elements, metricsById),
       top_out: decoratePlayerLeaders(leagueOutLeaders, elements, metricsById),
       top_managers: topListFromMap(managerCounter, 10),
     },
     global,
-    overall: global,
+    overall: {
+      scope: "league_current_week",
+      gw: Number(currentWeek || 0),
+      total_transfers: Number(totalTransfers || 0),
+      top_pairs: topListFromMap(pairCounter, 10),
+      top_in: decoratePlayerLeaders(leagueInLeaders, elements, metricsById),
+      top_out: decoratePlayerLeaders(leagueOutLeaders, elements, metricsById),
+      top_managers: topListFromMap(managerCounter, 10),
+    },
   };
 }
 
@@ -2034,7 +2047,11 @@ function buildResolvedWinProbabilitySummary(leftScore, rightScore) {
 }
 
 function hasDetailedTransferTrendRows(transferTrends) {
-  const sample = transferTrends?.overall?.top_in?.[0] || transferTrends?.global?.top_in?.[0] || null;
+  const sample =
+    transferTrends?.league?.top_in?.[0] ||
+    transferTrends?.overall?.top_in?.[0] ||
+    transferTrends?.global?.top_in?.[0] ||
+    null;
   if (!sample || typeof sample !== "object") return false;
   return ["cost", "form", "value", "transfers"].every((key) => key in sample)
     && Number(sample.cost || 0) > 0
@@ -2830,7 +2847,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     : {
         ...(previousState?.transfer_trends || { league: {}, global: {}, overall: {} }),
         global: await buildGlobalTransferTrends(elements),
-        overall: await buildGlobalTransferTrends(elements),
+        overall: previousState?.transfer_trends?.league || previousState?.transfer_trends?.overall || {},
       };
   transferTrends.ownership_top = ownershipSummary.top10;
   transferTrends.ownership_manager_count = ownershipSummary.manager_count;

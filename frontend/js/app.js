@@ -310,8 +310,8 @@ const Render = {
             return Number.isFinite(num) && num > 0 ? num.toFixed(1) : "--";
         };
 
-        const weeklyIn = data?.overall?.top_in || data?.global?.top_in || [];
-        const weeklyOut = data?.overall?.top_out || data?.global?.top_out || [];
+        const weeklyIn = data?.league?.top_in || data?.overall?.top_in || [];
+        const weeklyOut = data?.league?.top_out || data?.overall?.top_out || [];
         const ownershipTop = data?.ownership_top || [];
         const managerCount = Number(data?.ownership_manager_count || 26);
         const direction = App.transferDirection === "out" ? "out" : "in";
