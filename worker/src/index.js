@@ -1249,10 +1249,8 @@ async function buildFreshHomepageState(baseState) {
 
   await mapLimit(targetUids, 2, async (uid) => {
     const previous = baseState?.picks_by_uid?.[uid] || {};
-    const [picksRes, historyRes] = await Promise.all([
-      fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 3),
-      fetchJsonSafe(`/entry/${uid}/history/`, 3),
-    ]);
+    const historyRes = await fetchJsonSafe(`/entry/${uid}/history/`, 5);
+    const picksRes = await fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 3);
     const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : null;
     const captainChipEvent = historyData
       ? getCaptainChipEvent(historyData, currentWeek, currentEvent, eventMetaById)
