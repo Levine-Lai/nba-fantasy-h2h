@@ -2438,14 +2438,15 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     debugUid("trend_data", uid, null);
     debugUid("avatar_data", uid, null);
 
-    const canRecomputePenalty = !!transfersRes.ok && !!historyRes.ok;
-    const chipDayMap = canRecomputePenalty
+    const hasHistoryData = !!historyRes.ok;
+    const canRecomputePenalty = !!transfersRes.ok && hasHistoryData;
+    const chipDayMap = hasHistoryData
       ? getChipDayMapFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
       : {};
-    const wildcardDay = canRecomputePenalty
+    const wildcardDay = hasHistoryData
       ? getWildcardDayFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
       : Number(previous.wildcard_day || 0) || null;
-    const richDay = canRecomputePenalty
+    const richDay = hasHistoryData
       ? Object.entries(chipDayMap).find(([, value]) => value === "rich")?.[0] || null
       : Number(previous.rich_day || 0) || null;
     const transferSummary = canRecomputePenalty
@@ -2464,10 +2465,10 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     const wildcardActive = wildcardDay !== null;
     const penaltyScore = Number(transferSummary.penalty_score || 0);
     const historyWeek = calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
-    const captainUsed = canRecomputePenalty
+    const captainUsed = hasHistoryData
       ? await buildCaptainUsageSummary(uidNumber, historyData, currentWeek, currentEvent, eventMetaById, elements, eventLiveCache)
       : previous.captain_used || { used: false, label: "None", day: null, captain_name: null, captain_points: null };
-    const chipStatus = canRecomputePenalty
+    const chipStatus = hasHistoryData
       ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
       : previous.chip_status || {
         captain_used: !!previous?.captain_used?.used,
