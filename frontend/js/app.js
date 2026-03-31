@@ -88,6 +88,24 @@ function getWinMoodEmoji(probability) {
     return "😭";
 }
 
+function renderChipStatusCards(status) {
+    const chips = [
+        { label: "Captain", used: !!status?.captain_used },
+        { label: "WC", used: !!status?.wildcard_used },
+        { label: "AS", used: !!status?.all_stars_used },
+    ];
+    return `
+        <div class="score-chip-row">
+            ${chips.map((chip) => `
+                <span class="score-chip-status ${chip.used ? "used" : "unused"}">
+                    <span class="score-chip-label">${chip.label}</span>
+                    <span class="score-chip-icon">${chip.used ? "✕" : "✓"}</span>
+                </span>
+            `).join("")}
+        </div>
+    `;
+}
+
 function sortInjuriesForView(items) {
     const order = {
         available: 0,
@@ -520,6 +538,8 @@ const Render = {
             const rightWinProb = Number(match.win_prob2 ?? 50);
             const leftMood = getWinMoodEmoji(leftWinProb);
             const rightMood = getWinMoodEmoji(rightWinProb);
+            const leftChipStatus = match.chip_status1 || {};
+            const rightChipStatus = match.chip_status2 || {};
 
             return `
                 <div class="match-block">
@@ -535,6 +555,7 @@ const Render = {
                             <div class="score-main ${leftClass}">${leftScore}</div>
                             <div class="score-sub">Today ${match.today1}</div>
                             <div class="score-prob">Win ${leftWinProb}% <span class="score-mood">${leftMood}</span></div>
+                            ${renderChipStatusCards(leftChipStatus)}
                         </div>
                         <div class="vs-divider js-open-lineup" data-uid1="${match.uid1}" data-name1="${escapeHtml(match.t1)}" data-uid2="${match.uid2}" data-name2="${escapeHtml(match.t2)}">
                             <div class="vs-text">VS</div>
@@ -551,6 +572,7 @@ const Render = {
                             <div class="score-main ${rightClass}">${rightScore}</div>
                             <div class="score-sub">Today ${match.today2}</div>
                             <div class="score-prob">Win ${rightWinProb}% <span class="score-mood">${rightMood}</span></div>
+                            ${renderChipStatusCards(rightChipStatus)}
                         </div>
                     </div>
                     <div class="match-transfer-wrap">
@@ -736,20 +758,20 @@ const Render = {
                     <div class="future-schedule-panel">
                         <div class="future-team-header">
                             <div class="future-team-name">${escapeHtml(teamName)}</div>
-                            <div class="future-team-sub">当前阵容未来 5 天赛程</div>
+                            <div class="future-team-sub">当前阵容未来 7 天赛程</div>
                         </div>
                         <div class="trend-empty">No future schedule data</div>
                     </div>
                 `;
             }
 
-            const columnStyle = `style="grid-template-columns:minmax(92px, 1.02fr) repeat(${days.length}, minmax(34px, 1fr));"`;
-            const tableMinWidth = Math.max(300, 112 + days.length * 40);
+            const columnStyle = `style="grid-template-columns:minmax(82px, 0.94fr) repeat(${days.length}, minmax(30px, 1fr));"`;
+            const tableMinWidth = Math.max(316, 96 + days.length * 34);
             return `
                 <div class="future-schedule-panel">
                     <div class="future-team-header">
                         <div class="future-team-name">${escapeHtml(teamName)}</div>
-                        <div class="future-team-sub">当前阵容未来 5 天赛程</div>
+                        <div class="future-team-sub">当前阵容未来 7 天赛程</div>
                     </div>
                     <div class="future-schedule-scroll">
                         <div class="future-schedule-matrix" style="min-width:${tableMinWidth}px;">
@@ -800,7 +822,7 @@ const Render = {
             body.innerHTML = `
                 <div class="lineup-view-switch">
                     <button class="lineup-mode-btn active" data-lineup-mode="today" type="button" onclick="setLineupMode('today')">今日阵容</button>
-                    <button class="lineup-mode-btn" data-lineup-mode="future" type="button" onclick="setLineupMode('future')">未来 5 天</button>
+                    <button class="lineup-mode-btn" data-lineup-mode="future" type="button" onclick="setLineupMode('future')">未来 7 天</button>
                 </div>
                 <div class="lineup-mode-panel active" data-lineup-panel="today">
                     <div class="dual-lineup-container">
@@ -962,6 +984,7 @@ const App = {
     playerOptionsLoaded: false,
     playerOptions: [],
     referencePositionFilter: "ALL",
+    referenceSearchQuery: "",
     transferDirection: "in",
     latestTransferTrends: null,
 
@@ -1150,6 +1173,73 @@ const App = {
         } else if (players[0]) {
             playerSelect.value = String(players[0].id);
         }
+        this.renderReferenceSearchResults();
+    },
+
+    getReferenceSearchMatches(query) {
+        const keyword = String(query || "").trim().toLowerCase();
+        if (!keyword) return [];
+        const matches = [];
+        for (const team of this.playerOptions || []) {
+            for (const player of team?.players || []) {
+                const position = String(player?.position_name || "");
+                if (this.referencePositionFilter !== "ALL" && position !== this.referencePositionFilter) continue;
+                const name = String(player?.name || player?.web_name || "").trim();
+                const searchText = `${name} ${player?.web_name || ""} ${team?.name || ""}`.toLowerCase();
+                if (!searchText.includes(keyword)) continue;
+                matches.push({
+                    team_id: team.id,
+                    team_name: team.name,
+                    player_id: player.id,
+                    name,
+                    position_name: position,
+                    now_cost: Number(player?.now_cost || 0),
+                });
+            }
+        }
+        return matches
+            .sort((a, b) =>
+                a.name.localeCompare(b.name) ||
+                b.now_cost - a.now_cost
+            )
+            .slice(0, 8);
+    },
+
+    renderReferenceSearchResults() {
+        const input = document.getElementById("reference-player-search");
+        const results = document.getElementById("reference-search-results");
+        if (!input || !results) return;
+        const matches = this.getReferenceSearchMatches(input.value);
+        if (!matches.length) {
+            results.innerHTML = "";
+            results.classList.remove("active");
+            return;
+        }
+        results.innerHTML = matches.map((item) => `
+            <button class="reference-search-item" type="button"
+                data-team-id="${escapeHtml(item.team_id)}"
+                data-player-id="${escapeHtml(item.player_id)}"
+                data-player-name="${escapeHtml(item.name)}">
+                <span class="reference-search-name">${escapeHtml(item.name)}</span>
+                <span class="reference-search-meta">${escapeHtml(item.team_name)} · ${escapeHtml(item.position_name)} · $${(Number(item.now_cost || 0) / 10).toFixed(1)}</span>
+            </button>
+        `).join("");
+        results.classList.add("active");
+    },
+
+    applyReferenceSearchSelection(teamId, playerId, playerName = "") {
+        const teamSelect = document.getElementById("reference-team-select");
+        const playerSelect = document.getElementById("reference-player-select");
+        const input = document.getElementById("reference-player-search");
+        const results = document.getElementById("reference-search-results");
+        if (teamSelect) teamSelect.value = String(teamId);
+        this.populateReferencePlayers(teamId, playerId);
+        if (playerSelect) playerSelect.value = String(playerId);
+        if (input) input.value = playerName;
+        if (results) {
+            results.innerHTML = "";
+            results.classList.remove("active");
+        }
     },
 
     renderReferencePlayerButtons(players) {
@@ -1173,6 +1263,7 @@ const App = {
                 this.populateReferencePlayers(defaultTeam.id, defaultPlayer?.id || "");
             }
             this.playerOptionsLoaded = true;
+            this.renderReferenceSearchResults();
         } catch (error) {
             console.error("Player options load error:", error);
         }
@@ -1216,6 +1307,16 @@ const App = {
 
             if (event.target.closest("#reference-search-btn")) {
                 this.searchPlayerReference();
+                return;
+            }
+
+            const searchItem = event.target.closest(".reference-search-item");
+            if (searchItem) {
+                this.applyReferenceSearchSelection(
+                    searchItem.dataset.teamId,
+                    searchItem.dataset.playerId,
+                    searchItem.dataset.playerName || ""
+                );
                 return;
             }
 
@@ -1279,6 +1380,12 @@ const App = {
         document.addEventListener("change", (event) => {
             if (event.target?.id === "reference-team-select") {
                 this.populateReferencePlayers(event.target.value);
+            }
+        });
+
+        document.addEventListener("input", (event) => {
+            if (event.target?.id === "reference-player-search") {
+                this.renderReferenceSearchResults();
             }
         });
 

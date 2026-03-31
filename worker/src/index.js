@@ -259,19 +259,20 @@ function buildPreviousPicksByUid(previousState) {
     if (!standing || (Object.keys(standing).length === 0 && (!Array.isArray(players) || players.length === 0))) {
       continue;
     }
-    migrated[uid] = {
-      uid: uidToNumber(uid),
-      team_name: UID_MAP[uidToNumber(uid)],
-      total_live: Number(standing?.today_live || 0),
-      raw_total_live: Number(standing?.raw_today_live ?? standing?.today_live ?? 0),
+      migrated[uid] = {
+        uid: uidToNumber(uid),
+        team_name: UID_MAP[uidToNumber(uid)],
+        total_live: Number(standing?.today_live || 0),
+        raw_total_live: Number(standing?.raw_today_live ?? standing?.today_live ?? 0),
       penalty_score: Number(standing?.penalty_score || 0),
       transfer_count: Number(standing?.transfer_count || 0),
-      gd1_transfer_count: Number(standing?.gd1_transfer_count || 0),
-      gd1_missing_penalty: Number(standing?.gd1_missing_penalty || 0),
-      wildcard_active: !!standing?.wildcard_active,
-      event_total: Number(standing?.total || 0),
-      players: Array.isArray(players) ? players : [],
-    };
+        gd1_transfer_count: Number(standing?.gd1_transfer_count || 0),
+        gd1_missing_penalty: Number(standing?.gd1_missing_penalty || 0),
+        wildcard_active: !!standing?.wildcard_active,
+        chip_status: standing?.chip_status || null,
+        event_total: Number(standing?.total || 0),
+        players: Array.isArray(players) ? players : [],
+      };
   }
 
   return migrated;
@@ -1470,6 +1471,35 @@ function getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById
   return null;
 }
 
+function buildChipStatusSummary(historyData, currentGw, currentEvent, eventMetaById, captainUsed = null) {
+  let wildcardUsed = false;
+  let allStarsUsed = false;
+
+  for (const item of extractHistoryRecords(historyData)) {
+    const rawName = String(item?.name || "").toLowerCase();
+    if (!rawName) continue;
+    const itemEvent = Number(item?.event || 0);
+    const eventMeta = eventMetaById?.[itemEvent] || {};
+    const itemGw = Number(item?.gw || item?.gameweek || eventMeta.gw || extractGwNumber(itemEvent) || 0);
+
+    if (!wildcardUsed && (rawName === "wildcard" || rawName === "wild_card")) {
+      if (itemGw >= 17 || (currentGw >= 17 && itemEvent === Number(currentEvent || 0))) {
+        wildcardUsed = true;
+      }
+    }
+    if (!allStarsUsed && rawName === "rich") {
+      allStarsUsed = true;
+    }
+    if (wildcardUsed && allStarsUsed) break;
+  }
+
+  return {
+    captain_used: !!captainUsed?.used,
+    wildcard_used: wildcardUsed,
+    all_stars_used: allStarsUsed,
+  };
+}
+
 async function buildCaptainUsageSummary(uidNumber, historyData, currentGw, currentEvent, eventMetaById, elements, eventLiveCache) {
   const chipEvent = getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById);
   if (!chipEvent?.event) {
@@ -1532,7 +1562,7 @@ function buildWeekEventIds(events, currentWeek, currentEvent) {
     .sort((a, b) => a - b);
 }
 
-function buildUpcomingEventIds(events, currentEvent, limit = 5) {
+function buildUpcomingEventIds(events, currentEvent, limit = 7) {
   const currentId = Number(currentEvent || 0);
   return (events || [])
     .map((event) => Number(event?.id || 0))
@@ -2217,7 +2247,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     fetchAllStandings(1),
     weeklyStandingsPhase ? fetchAllStandings(weeklyStandingsPhase) : Promise.resolve([]),
   ]);
-  const upcomingEventIds = buildUpcomingEventIds(events, currentEvent, 5);
+  const upcomingEventIds = buildUpcomingEventIds(events, currentEvent, 7);
   const fixturesByEvent = {
     [currentEvent]: fixturesRaw || [],
   };
@@ -2439,6 +2469,13 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     const captainUsed = canRecomputePenalty
       ? await buildCaptainUsageSummary(uidNumber, historyData, currentWeek, currentEvent, eventMetaById, elements, eventLiveCache)
       : previous.captain_used || { used: false, label: "None", day: null, captain_name: null, captain_points: null };
+    const chipStatus = canRecomputePenalty
+      ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
+      : previous.chip_status || {
+        captain_used: !!previous?.captain_used?.used,
+        wildcard_used: !!previous?.wildcard_active,
+        all_stars_used: !!previous?.rich_day,
+      };
 
     standingsByUid[uid].penalty_score = penaltyScore;
     standingsByUid[uid].transfer_count = transferCount;
@@ -2450,6 +2487,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     standingsByUid[uid].rich_day = richDay ? Number(richDay) : null;
     standingsByUid[uid].transfer_records = transferSummary.records;
     standingsByUid[uid].captain_used = captainUsed;
+    standingsByUid[uid].chip_status = chipStatus;
     standingsByUid[uid].week_total_summary = buildWeekTotalSummary(historyWeek, currentEvent, gd1MissingPenalty);
     if (historyWeek.has_week_rows) {
       const previewTodayScore = historyWeek.today_points !== null
@@ -2584,6 +2622,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     standingsByUid[uid].picks = picks;
     standingsByUid[uid].lineup_economy = lineupEconomy;
     standingsByUid[uid].captain_used = captainUsed;
+    standingsByUid[uid].chip_status = chipStatus;
     standingsByUid[uid].fetch_status = {
       profile_ok: classicRank > 0,
       picks_ok: true,
@@ -2674,6 +2713,11 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
         captain_name: null,
         captain_points: null,
       },
+      chip_status: s.chip_status || {
+        captain_used: !!s?.captain_used?.used,
+        wildcard_used: !!s.wildcard_active,
+        all_stars_used: !!s.rich_day,
+      },
       lineup_economy: s.lineup_economy || {
         effective_total_cost: 0,
         breakeven_line: 0,
@@ -2732,6 +2776,8 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       captain_bonus2: Number(rightProjection.captain_bonus || 0),
       win_prob1: winProb.left,
       win_prob2: winProb.right,
+      chip_status1: picksByUid[uid1]?.chip_status || null,
+      chip_status2: picksByUid[uid2]?.chip_status || null,
     };
   });
 
