@@ -26,7 +26,7 @@ const API = {
     },
 
     async getLineup(uid) {
-        return (await this.fetch(`/api/picks/${uid}?fresh=1`)).json();
+        return (await this.fetch(`/api/picks/${uid}`)).json();
     },
 
     async getInjuries() {
@@ -338,6 +338,34 @@ const Render = {
                 </div>
             `).join("")
             : '<div class="trend-empty">No ownership data</div>';
+    },
+
+    chipsUsed(items) {
+        const container = document.getElementById("chips-used-summary");
+        if (!container) return;
+
+        const rows = Array.isArray(items) ? items : [];
+        container.innerHTML = rows.length
+            ? rows.map((item, index) => {
+                const usedCount = Number(item?.used_count || 0);
+                const totalCount = Math.max(1, Number(item?.total_count || 0));
+                const percent = Math.max(0, Math.min(100, Number(item?.used_percent || ((usedCount / totalCount) * 100))));
+                return `
+                    <div class="chips-summary-row ${index < rows.length - 1 ? "with-divider" : ""}">
+                        <div class="chips-summary-copy">
+                            <div class="chips-summary-label">${escapeHtml(item?.label || "-")}</div>
+                            <div class="chips-summary-note">${escapeHtml(item?.note || "")}</div>
+                        </div>
+                        <div class="chips-summary-bar-wrap">
+                            <div class="chips-summary-bar">
+                                <div class="chips-summary-fill" style="width:${percent.toFixed(1)}%"></div>
+                            </div>
+                            <div class="chips-summary-count">${usedCount}/${totalCount}</div>
+                        </div>
+                    </div>
+                `;
+            }).join("")
+            : '<div class="trend-empty">No chips usage data</div>';
     },
 
     fdr(data) {
@@ -991,7 +1019,10 @@ const App = {
     async getLineupCached(uid) {
         const key = String(uid);
         if (!this.lineupCache.has(key)) {
-            this.lineupCache.set(key, API.getLineup(uid));
+            this.lineupCache.set(key, API.getLineup(uid).catch((error) => {
+                this.lineupCache.delete(key);
+                throw error;
+            }));
         }
         return this.lineupCache.get(key);
     },
@@ -1015,6 +1046,7 @@ const App = {
 
     async loadAll() {
         try {
+            this.lineupCache.clear();
             const state = await API.getState();
             this.latestTransferTrends = state?.transfer_trends || {};
             Render.eventInfo(state?.current_event_name || "Loading...");
@@ -1023,6 +1055,7 @@ const App = {
             Render.matchCount(Array.isArray(state?.h2h) ? state.h2h.length : 0);
             Render.h2hList(state?.h2h || []);
             Render.transferTrends(this.latestTransferTrends);
+            Render.chipsUsed(state?.chips_used_summary || []);
             Render.fdr(state?.fdr || {
                 weeks: [],
                 html: '<tr><td colspan="5" style="text-align:center;padding:20px;">Load failed</td></tr>',
