@@ -26,7 +26,7 @@ const API = {
     },
 
     async getLineup(uid) {
-        return (await this.fetch(`/api/picks/${uid}?fresh=1`)).json();
+        return (await this.fetch(`/api/picks/${uid}`)).json();
     },
 
     async getInjuries() {
@@ -310,8 +310,8 @@ const Render = {
             return Number.isFinite(num) && num > 0 ? num.toFixed(1) : "--";
         };
 
-        const weeklyIn = data?.overall?.top_in || data?.global?.top_in || [];
-        const weeklyOut = data?.overall?.top_out || data?.global?.top_out || [];
+        const weeklyIn = data?.league?.top_in || data?.overall?.top_in || data?.global?.top_in || [];
+        const weeklyOut = data?.league?.top_out || data?.overall?.top_out || data?.global?.top_out || [];
         const ownershipTop = data?.ownership_top || [];
         const managerCount = Number(data?.ownership_manager_count || 26);
         const direction = App.transferDirection === "out" ? "out" : "in";
@@ -991,7 +991,10 @@ const App = {
     async getLineupCached(uid) {
         const key = String(uid);
         if (!this.lineupCache.has(key)) {
-            this.lineupCache.set(key, API.getLineup(uid));
+            this.lineupCache.set(key, API.getLineup(uid).catch((error) => {
+                this.lineupCache.delete(key);
+                throw error;
+            }));
         }
         return this.lineupCache.get(key);
     },
@@ -1015,6 +1018,7 @@ const App = {
 
     async loadAll() {
         try {
+            this.lineupCache.clear();
             const state = await API.getState();
             this.latestTransferTrends = state?.transfer_trends || {};
             Render.eventInfo(state?.current_event_name || "Loading...");

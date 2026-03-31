@@ -1143,6 +1143,17 @@ function getBeijingHour(value = Date.now()) {
   }).format(date));
 }
 
+function shouldRefreshManagerMeta(state, value = Date.now()) {
+  if (!state || typeof state !== "object") return true;
+  if (!state?.refresh_meta?.meta_updated_at) return true;
+  if (!hasDetailedTrendList(state?.transfer_trends?.league?.top_in)) return true;
+  if (!Array.isArray(state?.h2h) || state.h2h.length === 0) return true;
+  if (!state?.picks_by_uid || typeof state.picks_by_uid !== "object") return true;
+
+  if (!isBeijingRefreshWindow(value)) return false;
+  return getBeijingDateKey(state.refresh_meta.meta_updated_at) !== getBeijingDateKey(value);
+}
+
 function buildWeekTotalSummary(historyWeek, currentEvent, gd1MissingPenalty) {
   if (!historyWeek?.has_week_rows) return null;
   const currentEventId = Number(currentEvent || 0);
@@ -1183,67 +1194,45 @@ function computeWeekTotalFromSummary(summary, todayScore) {
 
 async function buildFreshHomepageState(baseState) {
   const matches = Array.isArray(baseState?.h2h) ? baseState.h2h : [];
-  const currentEvent = Number(baseState?.current_event || 0);
-  if (!matches.length || !currentEvent) return baseState;
+  if (!matches.length) return baseState;
 
   const targetUids = [...new Set(
     matches.flatMap((match) => [normalizeUid(match?.uid1), normalizeUid(match?.uid2)]).filter(Boolean)
   )];
   if (!targetUids.length) return baseState;
 
-  const [bootstrap, liveRaw] = await Promise.all([
-    fetchJson("/bootstrap-static/", 1),
-    fetchJson(`/event/${currentEvent}/live/`, 1),
-  ]);
+  const bootstrap = await fetchJson("/bootstrap-static/", 1);
   const events = bootstrap.events || [];
+  const [currentEvent, currentEventName] = getCurrentEvent(events);
+  if (!currentEvent) return baseState;
+
+  const [liveRaw, fixturesRaw] = await Promise.all([
+    fetchJson(`/event/${currentEvent}/live/`, 1),
+    fetchJson(`/fixtures/?event=${currentEvent}`, 1),
+  ]);
   const eventMetaById = buildEventMetaById(events);
-  const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(baseState?.current_event_name || "");
-  const currentWeek = currentMeta.gw || extractGwNumber(baseState?.current_event_name) || extractGwNumber(currentEvent) || 22;
+  const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(currentEventName || baseState?.current_event_name || "");
+  const currentWeek = currentMeta.gw || extractGwNumber(currentEventName) || extractGwNumber(currentEvent) || 22;
   const futureWeekEventIds = buildWeekEventIds(events, currentWeek, currentEvent);
   const elements = buildElementsMap(bootstrap);
   const teamsMetaById = buildTeamsMetaMap(bootstrap);
   const liveElements = buildLiveElementsMap(liveRaw);
-  const teamsPlayingToday = buildTeamsPlayingToday(baseState?.fixtures?.games || []);
+  const currentFixtures = Array.isArray(fixturesRaw) ? fixturesRaw : [];
+  const teamsPlayingToday = buildTeamsPlayingToday(currentFixtures);
   const allCurrentFixturesFinished =
-    Array.isArray(baseState?.fixtures?.games) &&
-    baseState.fixtures.games.length > 0 &&
-    baseState.fixtures.games.every((game) => !!game?.finished);
+    currentFixtures.length > 0 &&
+    currentFixtures.every((fixture) => resolveFixtureStatus(fixture).code === "finished");
   const isWeekResolved = futureWeekEventIds.length === 0 && allCurrentFixturesFinished;
   const freshScoresByUid = {};
+  const nextPicksByUid = { ...(baseState?.picks_by_uid || {}) };
 
   await mapLimit(targetUids, 4, async (uid) => {
-    const previous = baseState?.picks_by_uid?.[uid] || {};
-    const [picksRes, historyRes] = await Promise.all([
-      fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 1),
-      fetchJsonSafe(`/entry/${uid}/history/`, 1),
-    ]);
-    const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : null;
-    const captainChipEvent = historyData
-      ? getCaptainChipEvent(historyData, currentWeek, currentEvent, eventMetaById)
-      : null;
-    const captainUsed = historyData
-      ? {
-          ...(previous?.captain_used || {}),
-          used: !!captainChipEvent,
-          day: Number(captainChipEvent?.day || 0) || null,
-          label: captainChipEvent?.day ? `DAY${captainChipEvent.day}` : (!!captainChipEvent ? "Used" : "None"),
-        }
-      : (previous?.captain_used || {
-          used: false,
-          label: "None",
-          day: null,
-          captain_name: null,
-          captain_points: null,
-        });
-    const chipStatus = historyData
-      ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
-      : (previous?.chip_status || null);
+    const previous = nextPicksByUid[uid] || {};
+    const picksRes = await fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 2);
     if (!picksRes.ok || !Array.isArray(picksRes.data?.picks)) {
       freshScoresByUid[uid] = {
         total_live: Number(previous?.total_live || 0),
         event_total: Number(previous?.event_total || 0),
-        captain_used: captainUsed,
-        chip_status: chipStatus,
       };
       return;
     }
@@ -1251,88 +1240,32 @@ async function buildFreshHomepageState(baseState) {
     const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
     const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
     const freshToday = Number(effectiveScore || 0);
-    let summary = previous?.week_total_summary || null;
-    if (!summary && historyData) {
-      const historyWeek = calculateWeekScoresFromHistory(
-        historyData,
-        currentWeek,
-        currentEvent,
-        eventMetaById
-      );
-      summary = buildWeekTotalSummary(
-        historyWeek,
-        currentEvent,
-        Number(previous?.gd1_missing_penalty || 0)
-      );
-    }
-    const freshWeek =
-      computeWeekTotalFromSummary(summary, freshToday) ??
-      Math.max(
-        0,
-        Number(previous?.event_total || 0) - Number(previous?.total_live || 0) + freshToday
-      );
+    const summary = previous?.week_total_summary || null;
+    const sameEvent = Number(previous?.current_event || 0) === Number(currentEvent);
+    const fallbackWeek = sameEvent
+      ? Math.max(
+          0,
+          Number(previous?.event_total || 0) - Number(previous?.total_live || 0) + freshToday
+        )
+      : Math.max(0, freshToday);
+    const freshWeek = computeWeekTotalFromSummary(summary, freshToday) ?? fallbackWeek;
 
     freshScoresByUid[uid] = {
       total_live: freshToday,
       event_total: freshWeek,
-      week_total_summary: summary || null,
-      captain_used: captainUsed,
-      chip_status: chipStatus,
     };
   });
 
-  const nextPicksByUid = { ...(baseState?.picks_by_uid || {}) };
   for (const uid of targetUids) {
     if (!nextPicksByUid[uid]) continue;
     const fresh = freshScoresByUid[uid];
     if (!fresh) continue;
     nextPicksByUid[uid] = {
       ...nextPicksByUid[uid],
+      current_event: currentEvent,
+      current_event_name: currentEventName,
       total_live: Number(fresh.total_live || 0),
       event_total: Number(fresh.event_total || 0),
-      week_total_summary: fresh.week_total_summary || nextPicksByUid[uid].week_total_summary || null,
-      captain_used: fresh.captain_used || nextPicksByUid[uid].captain_used || null,
-      chip_status: fresh.chip_status || nextPicksByUid[uid].chip_status || null,
-    };
-  }
-
-  const ownershipSummary = buildOwnershipSummary(nextPicksByUid);
-  let nextTransferTrends = {
-    ...(baseState?.transfer_trends || {}),
-    ownership_top: ownershipSummary.top10,
-    ownership_manager_count: ownershipSummary.manager_count,
-  };
-  const needsLeagueTrendRefresh = !hasDetailedTrendList(nextTransferTrends?.league?.top_in);
-  const needsOverallTrendRefresh = !hasDetailedTransferTrendRows(nextTransferTrends);
-  if (needsLeagueTrendRefresh) {
-    const transfersByUid = {};
-    await mapLimit(UID_LIST, 4, async (uid) => {
-      const transfersRes = await fetchJsonSafe(`/entry/${uid}/transfers/`, 2);
-      transfersByUid[uid] = transfersRes.ok && Array.isArray(transfersRes.data) ? transfersRes.data : [];
-    });
-    const rebuiltTrends = await buildTransferTrends({
-      transfersByUid,
-      leagueUids: UID_LIST,
-      currentWeek,
-      eventMetaById,
-      elements,
-    });
-    nextTransferTrends = {
-      ...nextTransferTrends,
-      league: rebuiltTrends.league,
-      global: rebuiltTrends.global,
-      overall: rebuiltTrends.global?.top_in?.length || rebuiltTrends.global?.top_out?.length
-        ? rebuiltTrends.global
-        : rebuiltTrends.league,
-    };
-  } else if (needsOverallTrendRefresh) {
-    const detailedOverall = await buildGlobalTransferTrends(elements);
-    nextTransferTrends = {
-      ...nextTransferTrends,
-      global: detailedOverall,
-      overall: detailedOverall?.top_in?.length || detailedOverall?.top_out?.length
-        ? detailedOverall
-        : (nextTransferTrends?.league || detailedOverall),
     };
   }
 
@@ -1369,15 +1302,199 @@ async function buildFreshHomepageState(baseState) {
       win_prob2: winProb.right,
       chip_status1: nextPicksByUid[uid1]?.chip_status || match?.chip_status1 || null,
       chip_status2: nextPicksByUid[uid2]?.chip_status || match?.chip_status2 || null,
+      penalty1: Number(nextPicksByUid[uid1]?.penalty_score ?? match?.penalty1 ?? 0),
+      penalty2: Number(nextPicksByUid[uid2]?.penalty_score ?? match?.penalty2 ?? 0),
+      transfer_count1: Number(nextPicksByUid[uid1]?.transfer_count ?? match?.transfer_count1 ?? 0),
+      transfer_count2: Number(nextPicksByUid[uid2]?.transfer_count ?? match?.transfer_count2 ?? 0),
+      wildcard1: !!(nextPicksByUid[uid1]?.wildcard_active ?? match?.wildcard1),
+      wildcard2: !!(nextPicksByUid[uid2]?.wildcard_active ?? match?.wildcard2),
     };
   });
 
   return {
     ...baseState,
+    current_event: currentEvent,
+    current_event_name: currentEventName || baseState?.current_event_name,
+    h2h: nextMatches,
+    picks_by_uid: nextPicksByUid,
+  };
+}
+
+async function refreshManagerMetaState(env, existingState = null) {
+  const previousState = existingState || await getState(env);
+  if (!previousState) {
+    return refreshState(env, { full: true });
+  }
+
+  const bootstrap = await fetchJson("/bootstrap-static/");
+  const events = bootstrap.events || [];
+  const [currentEvent, currentEventName] = getCurrentEvent(events);
+  const eventMetaById = buildEventMetaById(events);
+  const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(currentEventName || previousState?.current_event_name || "");
+  const currentWeek = currentMeta.gw || extractGwNumber(currentEventName) || extractGwNumber(currentEvent) || 22;
+  const elements = buildElementsMap(bootstrap);
+  const previousPicksByUid = buildPreviousPicksByUid(previousState);
+  const nextPicksByUid = { ...previousPicksByUid };
+  const transfersByUid = {};
+  const eventLiveCache = {};
+
+  await mapLimit(UID_LIST, 2, async (uid) => {
+    const uidNumber = uidToNumber(uid);
+    const previous = previousPicksByUid[uid] || {};
+
+    let [transfersRes, historyRes] = await Promise.all([
+      fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 4),
+      fetchJsonSafe(`/entry/${uidNumber}/history/`, 4),
+    ]);
+    if (!historyRes.ok) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      historyRes = await fetchJsonSafe(`/entry/${uidNumber}/history/`, 4);
+    }
+    if (!transfersRes.ok) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      transfersRes = await fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 4);
+    }
+
+    const transfersData = transfersRes.ok && Array.isArray(transfersRes.data) ? transfersRes.data : [];
+    const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : null;
+    const hasHistoryData = !!historyData;
+    transfersByUid[uid] = transfersData;
+
+    const chipDayMap = hasHistoryData
+      ? getChipDayMapFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
+      : {};
+    const wildcardDay = hasHistoryData
+      ? getWildcardDayFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
+      : Number(previous.wildcard_day || 0) || null;
+    const richDay = hasHistoryData
+      ? Object.entries(chipDayMap).find(([, value]) => value === "rich")?.[0] || null
+      : Number(previous.rich_day || 0) || null;
+    const canRecomputePenalty = !!transfersRes.ok && hasHistoryData;
+    const transferSummary = canRecomputePenalty
+      ? buildWeeklyTransferSummary(transfersData, currentWeek, eventMetaById, elements, chipDayMap)
+      : {
+          records: Array.isArray(previous.transfer_records) ? previous.transfer_records : [],
+          total_transfer_count: Number(previous.transfer_count || 0),
+          penalty_transfer_count: Number(previous.penalty_transfer_count || previous.transfer_count || 0),
+          gd1_transfer_count: Number(previous.gd1_transfer_count || 0),
+          gd1_missing_penalty: Number(previous.gd1_missing_penalty || 0),
+          penalty_score: Number(previous.penalty_score || 0),
+        };
+    const gd1MissingPenalty = Number(transferSummary.gd1_missing_penalty || 0);
+    const historyWeek = hasHistoryData
+      ? calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
+      : null;
+    const weekTotalSummary = historyWeek?.has_week_rows
+      ? buildWeekTotalSummary(historyWeek, currentEvent, gd1MissingPenalty)
+      : (previous.week_total_summary || null);
+    const previewTodayScore = Number(
+      Number(previous.current_event || 0) === Number(currentEvent)
+        ? previous.total_live || historyWeek?.today_points || 0
+        : historyWeek?.today_points || 0
+    );
+    const captainUsed = hasHistoryData
+      ? await buildCaptainUsageSummary(uidNumber, historyData, currentWeek, currentEvent, eventMetaById, elements, eventLiveCache)
+      : previous.captain_used || {
+          used: false,
+          label: "None",
+          day: null,
+          captain_name: null,
+          captain_points: null,
+        };
+    const chipStatus = hasHistoryData
+      ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
+      : previous.chip_status || {
+          captain_used: !!previous?.captain_used?.used,
+          wildcard_used: !!previous?.wildcard_active,
+          all_stars_used: !!previous?.rich_day,
+        };
+
+    nextPicksByUid[uid] = {
+      ...previous,
+      uid: uidNumber,
+      team_name: previous.team_name || UID_MAP[uidNumber],
+      current_event: currentEvent,
+      current_event_name: currentEventName,
+      transfer_records: transferSummary.records,
+      transfer_count: Number(transferSummary.total_transfer_count || 0),
+      penalty_transfer_count: Number(transferSummary.penalty_transfer_count || 0),
+      gd1_transfer_count: Number(transferSummary.gd1_transfer_count || 0),
+      gd1_missing_penalty: gd1MissingPenalty,
+      penalty_score: Number(transferSummary.penalty_score || 0),
+      wildcard_active: wildcardDay !== null,
+      wildcard_day: wildcardDay,
+      rich_day: richDay ? Number(richDay) : null,
+      captain_used: captainUsed,
+      chip_status: chipStatus,
+      week_total_summary: weekTotalSummary,
+      event_total: computeWeekTotalFromSummary(weekTotalSummary, previewTodayScore) ?? Number(previous.event_total || 0),
+      fetch_status: {
+        ...(previous.fetch_status || {}),
+        history_ok: !!historyRes.ok,
+        transfers_ok: !!transfersRes.ok,
+      },
+    };
+  });
+
+  const ownershipSummary = buildOwnershipSummary(nextPicksByUid);
+  const rebuiltTrends = await buildTransferTrends({
+    transfersByUid,
+    leagueUids: UID_LIST,
+    currentWeek,
+    eventMetaById,
+    elements,
+  });
+  const nextTransferTrends = {
+    ...(previousState?.transfer_trends || {}),
+    league: rebuiltTrends.league,
+    global: rebuiltTrends.global,
+    overall: rebuiltTrends.league,
+    ownership_top: ownershipSummary.top10,
+    ownership_manager_count: ownershipSummary.manager_count,
+  };
+  if (Array.isArray(previousState?.transfer_trends?.today_value_top)) {
+    nextTransferTrends.today_value_top = previousState.transfer_trends.today_value_top;
+  }
+
+  const nextMatches = (Array.isArray(previousState?.h2h) ? previousState.h2h : []).map((match) => {
+    const uid1 = normalizeUid(match?.uid1);
+    const uid2 = normalizeUid(match?.uid2);
+    const left = nextPicksByUid[uid1] || {};
+    const right = nextPicksByUid[uid2] || {};
+    const total1 = Number(left.event_total ?? match?.total1 ?? 0);
+    const total2 = Number(right.event_total ?? match?.total2 ?? 0);
+    return {
+      ...match,
+      total1,
+      total2,
+      diff: Math.abs(total1 - total2),
+      penalty1: Number(left.penalty_score ?? match?.penalty1 ?? 0),
+      penalty2: Number(right.penalty_score ?? match?.penalty2 ?? 0),
+      transfer_count1: Number(left.transfer_count ?? match?.transfer_count1 ?? 0),
+      transfer_count2: Number(right.transfer_count ?? match?.transfer_count2 ?? 0),
+      wildcard1: !!(left.wildcard_active ?? match?.wildcard1),
+      wildcard2: !!(right.wildcard_active ?? match?.wildcard2),
+      chip_status1: left.chip_status || match?.chip_status1 || null,
+      chip_status2: right.chip_status || match?.chip_status2 || null,
+    };
+  });
+
+  const nextState = {
+    ...previousState,
+    current_event: currentEvent,
+    current_event_name: currentEventName,
     h2h: nextMatches,
     picks_by_uid: nextPicksByUid,
     transfer_trends: nextTransferTrends,
+    refresh_meta: {
+      ...(previousState?.refresh_meta || {}),
+      meta_updated_at: new Date().toISOString(),
+      meta_mode: "daily",
+    },
   };
+
+  await env.NBA_CACHE.put(CACHE_KEY, JSON.stringify(nextState));
+  return nextState;
 }
 
 function buildLeagueDailyAverages(picksByUid, teamsPlayingToday) {
@@ -2881,14 +2998,20 @@ async function refreshState(env, options = {}) {
   const targetUids = full ? [...UID_LIST] : UID_LIST.slice(safeStart, safeStart + UID_CHUNK_SIZE);
   const state = await buildState(previous, targetUids);
   const nextIndex = full || safeStart + UID_CHUNK_SIZE >= UID_LIST.length ? 0 : safeStart + UID_CHUNK_SIZE;
+  const updatedAt = new Date().toISOString();
   state.refresh_meta = {
+    ...(previous?.refresh_meta || {}),
     mode: full ? "full" : "chunk",
     chunk_size: full ? UID_LIST.length : UID_CHUNK_SIZE,
     start_index: safeStart,
     next_index: nextIndex,
     processed_uids: targetUids,
     complete_cycle: nextIndex === 0,
-    updated_at: new Date().toISOString(),
+    updated_at: updatedAt,
+    ...(full ? {
+      meta_updated_at: updatedAt,
+      meta_mode: "full",
+    } : {}),
   };
   await env.NBA_CACHE.put(CACHE_KEY, JSON.stringify(state));
   await env.NBA_CACHE.put(CACHE_CURSOR_KEY, String(nextIndex));
@@ -3398,10 +3521,12 @@ export default {
           if (token !== auth) return jsonResponse({ success: false, error: "unauthorized" }, 401);
         }
         const mode = String(url.searchParams.get("mode") || "chunk").toLowerCase();
-        const state = await refreshState(env, { full: mode === "full" });
+        const state = mode === "meta"
+          ? await refreshManagerMetaState(env)
+          : await refreshState(env, { full: mode === "full" });
         return jsonResponse({
           success: true,
-          mode: mode === "full" ? "full" : "chunk",
+          mode: mode === "full" ? "full" : (mode === "meta" ? "meta" : "chunk"),
           current_event_name: state.current_event_name,
           refresh_meta: state.refresh_meta,
         });
@@ -3410,6 +3535,17 @@ export default {
       let state = await getState(env);
       if (!state) {
         state = await refreshState(env, { full: true });
+      }
+      const needsManagerMetaRefresh = shouldRefreshManagerMeta(state);
+      const shouldRefreshMetaOnDemand =
+        needsManagerMetaRefresh &&
+        (
+          path === "/api/state" ||
+          path === "/api/trends/transfers" ||
+          path.startsWith("/api/picks/")
+        );
+      if (shouldRefreshMetaOnDemand) {
+        state = await refreshManagerMetaState(env, state);
       }
 
       if (path === "/api/state") {
@@ -3449,7 +3585,8 @@ export default {
         const uid = normalizeUid(Number(path.split("/").pop()));
         let payload = state.picks_by_uid[uid] || {};
         const forceFresh = url.searchParams.get("fresh") === "1";
-        if (forceFresh || !payload.players || payload.players.length === 0) {
+        const eventChanged = Number(payload?.current_event || 0) !== Number(state?.current_event || 0);
+        if (forceFresh || eventChanged || !payload.players || payload.players.length === 0) {
           const freshState = await buildState(state, [uid]);
           payload = freshState.picks_by_uid[uid] || {};
         }
@@ -3518,6 +3655,16 @@ export default {
       }
     }
     if (!isBeijingRefreshWindow(scheduledAt)) return;
-    ctx.waitUntil(refreshState(env));
+    ctx.waitUntil((async () => {
+      let state = await getState(env);
+      if (!state) {
+        await refreshState(env, { full: true });
+        return;
+      }
+      if (shouldRefreshManagerMeta(state, scheduledAt)) {
+        state = await refreshManagerMetaState(env, state);
+      }
+      await refreshState(env);
+    })());
   },
 };
