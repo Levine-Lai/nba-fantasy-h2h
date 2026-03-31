@@ -1341,19 +1341,19 @@ function buildChipsUsedSummary(picksByUid) {
       key: "captain",
       label: "Captain",
       note: "this week",
-      isUsed: (payload) => !!payload?.chip_status?.captain_used,
+      isUsed: (payload) => !!(payload?.chip_status?.captain_used || payload?.captain_used?.used),
     },
     {
       key: "all_stars",
       label: "All-Stars",
       note: "season",
-      isUsed: (payload) => !!payload?.chip_status?.all_stars_used,
+      isUsed: (payload) => !!(payload?.chip_status?.all_stars_used || payload?.rich_day),
     },
     {
       key: "wildcard",
       label: "Wildcard",
       note: "GW17+",
-      isUsed: (payload) => !!payload?.chip_status?.wildcard_used,
+      isUsed: (payload) => !!(payload?.chip_status?.wildcard_used || payload?.wildcard_active || payload?.wildcard_day),
     },
   ];
 
