@@ -1124,6 +1124,42 @@ function buildLivePicksFromPicksData(picksData, elements, liveElements, teamsMet
   });
 }
 
+function buildLivePicksFromStoredPlayers(players, elements, liveElements, teamsMetaById = {}) {
+  return (players || []).map((player) => {
+    const elementId = Number(player?.element_id || 0);
+    const elem = elements[elementId] || {};
+    const teamMeta = teamsMetaById[Number(elem.team || player?.team_id || 0)] || {};
+    const stats = getPlayerStats(elementId, liveElements, elements);
+    const base = Number(stats?.fantasy || 0);
+    const isCaptain = !!player?.is_captain;
+    const multiplier = Number(player?.multiplier || 1) || 1;
+    const finalPoints = isCaptain ? base * multiplier : base;
+    return {
+      element_id: elementId,
+      name: elem.name || player?.name || `#${elementId}`,
+      position_type: elem.position || Number(player?.position_type || 0),
+      position_name: elem.position_name || player?.position_name || "UNK",
+      now_cost: Number(elem.now_cost || player?.now_cost || 0),
+      form: Number(elem.form || player?.form || 0),
+      points_per_game: Number(elem.points_per_game || player?.points_per_game || 0),
+      ep_next: Number(elem.ep_next || player?.ep_next || 0),
+      lineup_position: Number(player?.lineup_position || 0),
+      is_captain: isCaptain,
+      is_vice: !!player?.is_vice,
+      multiplier,
+      base_points: base,
+      final_points: finalPoints,
+      stats,
+      injury: parseInjuryStatus(elem),
+      team_id: elem.team || player?.team_id || 0,
+      team_name: teamMeta?.name || player?.team_name || "",
+      team_short: teamMeta?.short_name || player?.team_short || "",
+      team_logo_url: teamMeta?.logo_url || player?.team_logo_url || "/nba-team-logos/_.png",
+      is_effective: false,
+    };
+  });
+}
+
 function getBeijingDateKey(value = Date.now()) {
   const date = value instanceof Date ? value : new Date(value);
   return new Intl.DateTimeFormat("en-CA", {
@@ -1211,11 +1247,11 @@ async function buildFreshHomepageState(baseState) {
   const isWeekResolved = futureWeekEventIds.length === 0 && allCurrentFixturesFinished;
   const freshScoresByUid = {};
 
-  await mapLimit(targetUids, 4, async (uid) => {
+  await mapLimit(targetUids, 2, async (uid) => {
     const previous = baseState?.picks_by_uid?.[uid] || {};
     const [picksRes, historyRes] = await Promise.all([
-      fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 1),
-      fetchJsonSafe(`/entry/${uid}/history/`, 1),
+      fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 3),
+      fetchJsonSafe(`/entry/${uid}/history/`, 3),
     ]);
     const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : null;
     const captainChipEvent = historyData
@@ -1238,7 +1274,19 @@ async function buildFreshHomepageState(baseState) {
     const chipStatus = historyData
       ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
       : (previous?.chip_status || null);
-    if (!picksRes.ok || !Array.isArray(picksRes.data?.picks)) {
+    let picks = null;
+    if (picksRes.ok && Array.isArray(picksRes.data?.picks)) {
+      picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
+    } else if (
+      Array.isArray(previous?.players) &&
+      previous.players.length > 0 &&
+      Number(previous?.current_event || 0) === currentEvent &&
+      previous?.fetch_status?.picks_ok === true
+    ) {
+      picks = buildLivePicksFromStoredPlayers(previous.players, elements, liveElements, teamsMetaById);
+    }
+
+    if (!Array.isArray(picks) || !picks.length) {
       freshScoresByUid[uid] = {
         total_live: Number(previous?.total_live || 0),
         event_total: Number(previous?.event_total || 0),
@@ -1248,7 +1296,6 @@ async function buildFreshHomepageState(baseState) {
       return;
     }
 
-    const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
     const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
     const freshToday = Number(effectiveScore || 0);
     let summary = previous?.week_total_summary || null;
