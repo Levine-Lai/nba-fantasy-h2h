@@ -3150,7 +3150,7 @@ async function fetchSeasonPaceDiffTeams() {
           logo_url: visual.logo_url,
           pace: Number(pace.toFixed(1)),
           n_rtg: Number(nRtg.toFixed(1)),
-          abs_n_rtg: Number(Math.abs(nRtg).toFixed(1)),
+          abs_n_rtg: Number(-Math.abs(nRtg).toFixed(1)),
         };
       })
       .filter(Boolean)
