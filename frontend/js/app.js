@@ -368,6 +368,75 @@ const Render = {
             : '<div class="trend-empty">No chips usage data</div>';
     },
 
+    specialGuy(picksByUid) {
+        const container = document.getElementById("special-guy-summary");
+        if (!container) return;
+
+        const managerEntries = Object.values(picksByUid || {}).filter((payload) => Array.isArray(payload?.players) && payload.players.length > 0);
+        const managerCount = Math.max(1, managerEntries.length);
+        const holderCountByElement = {};
+
+        managerEntries.forEach((payload) => {
+            const seen = new Set();
+            payload.players.forEach((player) => {
+                const elementId = Number(player?.element_id || 0);
+                if (!elementId || seen.has(elementId)) return;
+                seen.add(elementId);
+                holderCountByElement[elementId] = Number(holderCountByElement[elementId] || 0) + 1;
+            });
+        });
+
+        const rankings = managerEntries
+            .map((payload) => {
+                const seen = new Set();
+                const ownershipValues = [];
+                payload.players.forEach((player) => {
+                    const elementId = Number(player?.element_id || 0);
+                    if (!elementId || seen.has(elementId)) return;
+                    seen.add(elementId);
+                    ownershipValues.push((Number(holderCountByElement[elementId] || 0) / managerCount) * 100);
+                });
+                const averageOwnership = ownershipValues.length
+                    ? ownershipValues.reduce((sum, value) => sum + Number(value || 0), 0) / ownershipValues.length
+                    : 0;
+                return {
+                    name: String(payload?.team_name || payload?.manager_name || "-"),
+                    average_ownership: Number(averageOwnership.toFixed(1)),
+                };
+            })
+            .sort((a, b) =>
+                Number(a.average_ownership || 0) - Number(b.average_ownership || 0) ||
+                String(a.name || "").localeCompare(String(b.name || ""))
+            )
+            .map((item, index) => ({
+                ...item,
+                rank: index + 1,
+            }));
+
+        if (!rankings.length) {
+            container.innerHTML = '<div class="trend-empty">No special guy data</div>';
+            return;
+        }
+
+        const splitIndex = Math.ceil(rankings.length / 2);
+        const columns = [rankings.slice(0, splitIndex), rankings.slice(splitIndex)];
+        container.innerHTML = `
+            <div class="special-guy-grid">
+                ${columns.map((items) => `
+                    <div class="special-guy-column">
+                        ${items.map((item) => `
+                            <div class="special-guy-item">
+                                <div class="special-guy-rank">#${item.rank}</div>
+                                <div class="special-guy-name">${escapeHtml(item.name)}</div>
+                                <div class="special-guy-value">${Number(item.average_ownership || 0).toFixed(1)}%</div>
+                            </div>
+                        `).join("")}
+                    </div>
+                `).join("")}
+            </div>
+        `;
+    },
+
     fdr(data) {
         const headerRow = document.getElementById("fdr-header-row");
         const badge = document.getElementById("fdr-week-badge");
@@ -1056,6 +1125,7 @@ const App = {
             Render.h2hList(state?.h2h || []);
             Render.transferTrends(this.latestTransferTrends);
             Render.chipsUsed(state?.chips_used_summary || []);
+            Render.specialGuy(state?.picks_by_uid || {});
             Render.fdr(state?.fdr || {
                 weeks: [],
                 html: '<tr><td colspan="5" style="text-align:center;padding:20px;">Load failed</td></tr>',
