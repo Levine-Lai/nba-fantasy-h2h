@@ -259,20 +259,19 @@ function buildPreviousPicksByUid(previousState) {
     if (!standing || (Object.keys(standing).length === 0 && (!Array.isArray(players) || players.length === 0))) {
       continue;
     }
-      migrated[uid] = {
-        uid: uidToNumber(uid),
-        team_name: UID_MAP[uidToNumber(uid)],
-        total_live: Number(standing?.today_live || 0),
-        raw_total_live: Number(standing?.raw_today_live ?? standing?.today_live ?? 0),
+    migrated[uid] = {
+      uid: uidToNumber(uid),
+      team_name: UID_MAP[uidToNumber(uid)],
+      total_live: Number(standing?.today_live || 0),
+      raw_total_live: Number(standing?.raw_today_live ?? standing?.today_live ?? 0),
       penalty_score: Number(standing?.penalty_score || 0),
       transfer_count: Number(standing?.transfer_count || 0),
-        gd1_transfer_count: Number(standing?.gd1_transfer_count || 0),
-        gd1_missing_penalty: Number(standing?.gd1_missing_penalty || 0),
-        wildcard_active: !!standing?.wildcard_active,
-        chip_status: standing?.chip_status || null,
-        event_total: Number(standing?.total || 0),
-        players: Array.isArray(players) ? players : [],
-      };
+      gd1_transfer_count: Number(standing?.gd1_transfer_count || 0),
+      gd1_missing_penalty: Number(standing?.gd1_missing_penalty || 0),
+      wildcard_active: !!standing?.wildcard_active,
+      event_total: Number(standing?.total || 0),
+      players: Array.isArray(players) ? players : [],
+    };
   }
 
   return migrated;
@@ -753,15 +752,6 @@ function extractHistoryRecords(historyData) {
   return [];
 }
 
-function extractChipHistoryRecords(historyData) {
-  if (!historyData || typeof historyData !== "object") return [];
-  if (Array.isArray(historyData.chips)) return historyData.chips;
-  for (const key of ["card_history", "cards", "events", "results", "history"]) {
-    if (Array.isArray(historyData[key])) return historyData[key];
-  }
-  return [];
-}
-
 function parseEventMetaFromName(eventName) {
   const text = String(eventName || "");
   // 尝试匹配 "Gameweek 22 - Day 7" 格式
@@ -829,7 +819,7 @@ function resolveTransferGwDay(transfer, eventMetaById) {
 }
 
 function getWildcardDayFromHistory(historyData, currentGw, currentEvent, eventMetaById) {
-  for (const item of extractChipHistoryRecords(historyData)) {
+  for (const item of extractHistoryRecords(historyData)) {
     const name = String(item?.name || "").toLowerCase();
     if (name !== "wildcard" && name !== "wild_card") continue;
     const itemEvent = item?.event;
@@ -847,7 +837,7 @@ function getWildcardDayFromHistory(historyData, currentGw, currentEvent, eventMe
 
 function getChipDayMapFromHistory(historyData, currentGw, currentEvent, eventMetaById) {
   const chipDayMap = {};
-  for (const item of extractChipHistoryRecords(historyData)) {
+  for (const item of extractHistoryRecords(historyData)) {
     const rawName = String(item?.name || "").toLowerCase();
     if (!rawName) continue;
     const itemEvent = item?.event;
@@ -1124,42 +1114,6 @@ function buildLivePicksFromPicksData(picksData, elements, liveElements, teamsMet
   });
 }
 
-function buildLivePicksFromStoredPlayers(players, elements, liveElements, teamsMetaById = {}) {
-  return (players || []).map((player) => {
-    const elementId = Number(player?.element_id || 0);
-    const elem = elements[elementId] || {};
-    const teamMeta = teamsMetaById[Number(elem.team || player?.team_id || 0)] || {};
-    const stats = getPlayerStats(elementId, liveElements, elements);
-    const base = Number(stats?.fantasy || 0);
-    const isCaptain = !!player?.is_captain;
-    const multiplier = Number(player?.multiplier || 1) || 1;
-    const finalPoints = isCaptain ? base * multiplier : base;
-    return {
-      element_id: elementId,
-      name: elem.name || player?.name || `#${elementId}`,
-      position_type: elem.position || Number(player?.position_type || 0),
-      position_name: elem.position_name || player?.position_name || "UNK",
-      now_cost: Number(elem.now_cost || player?.now_cost || 0),
-      form: Number(elem.form || player?.form || 0),
-      points_per_game: Number(elem.points_per_game || player?.points_per_game || 0),
-      ep_next: Number(elem.ep_next || player?.ep_next || 0),
-      lineup_position: Number(player?.lineup_position || 0),
-      is_captain: isCaptain,
-      is_vice: !!player?.is_vice,
-      multiplier,
-      base_points: base,
-      final_points: finalPoints,
-      stats,
-      injury: parseInjuryStatus(elem),
-      team_id: elem.team || player?.team_id || 0,
-      team_name: teamMeta?.name || player?.team_name || "",
-      team_short: teamMeta?.short_name || player?.team_short || "",
-      team_logo_url: teamMeta?.logo_url || player?.team_logo_url || "/nba-team-logos/_.png",
-      is_effective: false,
-    };
-  });
-}
-
 function getBeijingDateKey(value = Date.now()) {
   const date = value instanceof Date ? value : new Date(value);
   return new Intl.DateTimeFormat("en-CA", {
@@ -1217,28 +1171,6 @@ function computeWeekTotalFromSummary(summary, todayScore) {
   return Math.max(0, Math.round(total));
 }
 
-function buildCaptainUsageFromHistoryOnly(historyData, currentGw, currentEvent, eventMetaById, previousCaptainUsed = null) {
-  const chipEvent = getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById);
-  if (!chipEvent?.event) {
-    return {
-      used: false,
-      label: "None",
-      day: null,
-      captain_name: null,
-      captain_points: null,
-    };
-  }
-  const previousDay = Number(previousCaptainUsed?.day || 0) || null;
-  const sameDay = previousDay !== null && previousDay === Number(chipEvent.day || 0);
-  return {
-    used: true,
-    label: chipEvent.day ? `DAY${chipEvent.day}` : "Used",
-    day: Number(chipEvent.day || 0) || null,
-    captain_name: sameDay ? previousCaptainUsed?.captain_name || null : null,
-    captain_points: sameDay ? previousCaptainUsed?.captain_points ?? null : null,
-  };
-}
-
 async function buildFreshHomepageState(baseState) {
   const matches = Array.isArray(baseState?.h2h) ? baseState.h2h : [];
   const currentEvent = Number(baseState?.current_event || 0);
@@ -1272,19 +1204,7 @@ async function buildFreshHomepageState(baseState) {
   await mapLimit(targetUids, 4, async (uid) => {
     const previous = baseState?.picks_by_uid?.[uid] || {};
     const picksRes = await fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 1);
-    let picks = null;
-    if (picksRes.ok && Array.isArray(picksRes.data?.picks)) {
-      picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
-    } else if (
-      Array.isArray(previous?.players) &&
-      previous.players.length > 0 &&
-      Number(previous?.current_event || 0) === currentEvent &&
-      previous?.fetch_status?.picks_ok === true
-    ) {
-      picks = buildLivePicksFromStoredPlayers(previous.players, elements, liveElements, teamsMetaById);
-    }
-
-    if (!Array.isArray(picks) || !picks.length) {
+    if (!picksRes.ok || !Array.isArray(picksRes.data?.picks)) {
       freshScoresByUid[uid] = {
         total_live: Number(previous?.total_live || 0),
         event_total: Number(previous?.event_total || 0),
@@ -1292,9 +1212,26 @@ async function buildFreshHomepageState(baseState) {
       return;
     }
 
+    const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
     const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
     const freshToday = Number(effectiveScore || 0);
     let summary = previous?.week_total_summary || null;
+    if (!summary) {
+      const historyRes = await fetchJsonSafe(`/entry/${uid}/history/`, 1);
+      if (historyRes.ok) {
+        const historyWeek = calculateWeekScoresFromHistory(
+          historyRes.data,
+          currentWeek,
+          currentEvent,
+          eventMetaById
+        );
+        summary = buildWeekTotalSummary(
+          historyWeek,
+          currentEvent,
+          Number(previous?.gd1_missing_penalty || 0)
+        );
+      }
+    }
     const freshWeek =
       computeWeekTotalFromSummary(summary, freshToday) ??
       Math.max(
@@ -1402,115 +1339,6 @@ async function buildFreshHomepageState(baseState) {
     picks_by_uid: nextPicksByUid,
     transfer_trends: nextTransferTrends,
   };
-}
-
-async function refreshManagerMetaState(env, previousState = null) {
-  const state = previousState || await getState(env);
-  if (!state) return refreshState(env, { full: true });
-
-  const bootstrap = await fetchJson("/bootstrap-static/", 1);
-  const events = bootstrap.events || [];
-  const elements = buildElementsMap(bootstrap);
-  const eventMetaById = buildEventMetaById(events);
-  const currentEvent = Number(state?.current_event || events.find((event) => event.is_current)?.id || events.find((event) => event.is_next)?.id || 0);
-  const currentEventName = state?.current_event_name || eventMetaById?.[currentEvent]?.name || "";
-  const currentWeek = Number(eventMetaById?.[currentEvent]?.gw || extractGwNumber(currentEventName) || 0);
-  const previousPicksByUid = buildPreviousPicksByUid(state);
-  const nextPicksByUid = { ...(state?.picks_by_uid || {}) };
-
-  await mapLimit(UID_LIST, 4, async (uid) => {
-    const previous = previousPicksByUid[uid] || nextPicksByUid[uid] || {};
-    const [transfersRes, historyRes] = await Promise.all([
-      fetchJsonSafe(`/entry/${uid}/transfers/`, 2),
-      fetchJsonSafe(`/entry/${uid}/history/`, 2),
-    ]);
-    const historyData = historyRes.ok && typeof historyRes.data === "object" && historyRes.data ? historyRes.data : null;
-    const transfersData = transfersRes.ok && Array.isArray(transfersRes.data) ? transfersRes.data : [];
-    const chipDayMap = historyData ? getChipDayMapFromHistory(historyData, currentWeek, currentEvent, eventMetaById) : {};
-    const wildcardDay = historyData
-      ? getWildcardDayFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
-      : Number(previous?.wildcard_day || 0) || null;
-    const richDay = historyData
-      ? Number(Object.entries(chipDayMap).find(([, value]) => value === "rich")?.[0] || 0) || null
-      : Number(previous?.rich_day || 0) || null;
-    const captainUsed = historyData
-      ? buildCaptainUsageFromHistoryOnly(historyData, currentWeek, currentEvent, eventMetaById, previous?.captain_used || null)
-      : previous?.captain_used || { used: false, label: "None", day: null, captain_name: null, captain_points: null };
-    const chipStatus = historyData
-      ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
-      : previous?.chip_status || {
-        captain_used: !!previous?.captain_used?.used,
-        wildcard_used: !!previous?.wildcard_active,
-        all_stars_used: !!previous?.rich_day,
-      };
-    const transferSummary = historyData && transfersRes.ok
-      ? buildWeeklyTransferSummary(transfersData, currentWeek, eventMetaById, elements, chipDayMap)
-      : {
-          records: Array.isArray(previous?.transfer_records) ? previous.transfer_records : [],
-          total_transfer_count: Number(previous?.transfer_count || 0),
-          penalty_transfer_count: Number(previous?.penalty_transfer_count || previous?.transfer_count || 0),
-          gd1_transfer_count: Number(previous?.gd1_transfer_count || 0),
-          gd1_missing_penalty: Number(previous?.gd1_missing_penalty || 0),
-          penalty_score: Number(previous?.penalty_score || 0),
-        };
-
-    nextPicksByUid[uid] = {
-      ...previous,
-      uid: uidToNumber(uid),
-      team_name: UID_MAP[uidToNumber(uid)] || previous?.team_name || uid,
-      current_event: currentEvent,
-      current_event_name: currentEventName,
-      wildcard_active: wildcardDay !== null,
-      wildcard_day: wildcardDay,
-      rich_day: richDay,
-      transfer_records: transferSummary.records,
-      transfer_count: Number(transferSummary.total_transfer_count || 0),
-      penalty_transfer_count: Number(transferSummary.penalty_transfer_count || 0),
-      gd1_transfer_count: Number(transferSummary.gd1_transfer_count || 0),
-      gd1_missing_penalty: Number(transferSummary.gd1_missing_penalty || 0),
-      penalty_score: Number(transferSummary.penalty_score || previous?.penalty_score || 0),
-      captain_used: captainUsed,
-      chip_status: chipStatus,
-      fetch_status: {
-        ...(previous?.fetch_status || {}),
-        history_ok: !!historyRes.ok,
-        transfers_ok: !!transfersRes.ok,
-      },
-    };
-  });
-
-  const nextH2h = Array.isArray(state?.h2h)
-    ? state.h2h.map((match) => {
-        const uid1 = normalizeUid(match?.uid1);
-        const uid2 = normalizeUid(match?.uid2);
-        const left = nextPicksByUid[uid1] || {};
-        const right = nextPicksByUid[uid2] || {};
-        return {
-          ...match,
-          transfer_count1: Number(left?.transfer_count || match?.transfer_count1 || 0),
-          transfer_count2: Number(right?.transfer_count || match?.transfer_count2 || 0),
-          wildcard1: !!left?.wildcard_active,
-          wildcard2: !!right?.wildcard_active,
-          chip_status1: left?.chip_status || match?.chip_status1 || null,
-          chip_status2: right?.chip_status || match?.chip_status2 || null,
-        };
-      })
-    : [];
-
-  const nextState = {
-    ...state,
-    generated_at: new Date().toISOString(),
-    h2h: nextH2h,
-    picks_by_uid: nextPicksByUid,
-    refresh_meta: {
-      ...(state?.refresh_meta || {}),
-      meta_mode: "daily",
-      meta_updated_at: new Date().toISOString(),
-    },
-  };
-
-  await env.NBA_CACHE.put(CACHE_KEY, JSON.stringify(nextState));
-  return nextState;
 }
 
 function buildLeagueDailyAverages(picksByUid, teamsPlayingToday) {
@@ -1627,7 +1455,7 @@ function buildLineupEconomySummary(players) {
 }
 
 function getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById) {
-  for (const item of extractChipHistoryRecords(historyData)) {
+  for (const item of extractHistoryRecords(historyData)) {
     const name = String(item?.name || "").toLowerCase();
     if (name !== "phcapt") continue;
     const itemEvent = Number(item?.event || 0);
@@ -1640,33 +1468,6 @@ function getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById
     };
   }
   return null;
-}
-
-function buildChipStatusSummary(historyData, currentGw, currentEvent, eventMetaById, captainUsed = null) {
-  let wildcardUsed = false;
-  let allStarsUsed = false;
-
-  for (const item of extractChipHistoryRecords(historyData)) {
-    const rawName = String(item?.name || "").toLowerCase();
-    if (!rawName) continue;
-    const itemEvent = Number(item?.event || 0);
-    const eventMeta = eventMetaById?.[itemEvent] || {};
-    const itemGw = Number(item?.gw || item?.gameweek || eventMeta.gw || extractGwNumber(itemEvent) || 0);
-
-    if (!wildcardUsed && (rawName === "wildcard" || rawName === "wild_card") && itemGw >= 17) {
-      wildcardUsed = true;
-    }
-    if (!allStarsUsed && rawName === "rich") {
-      allStarsUsed = true;
-    }
-    if (wildcardUsed && allStarsUsed) break;
-  }
-
-  return {
-    captain_used: !!captainUsed?.used,
-    wildcard_used: wildcardUsed,
-    all_stars_used: allStarsUsed,
-  };
 }
 
 async function buildCaptainUsageSummary(uidNumber, historyData, currentGw, currentEvent, eventMetaById, elements, eventLiveCache) {
@@ -1731,7 +1532,7 @@ function buildWeekEventIds(events, currentWeek, currentEvent) {
     .sort((a, b) => a - b);
 }
 
-function buildUpcomingEventIds(events, currentEvent, limit = 7) {
+function buildUpcomingEventIds(events, currentEvent, limit = 5) {
   const currentId = Number(currentEvent || 0);
   return (events || [])
     .map((event) => Number(event?.id || 0))
@@ -2416,7 +2217,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     fetchAllStandings(1),
     weeklyStandingsPhase ? fetchAllStandings(weeklyStandingsPhase) : Promise.resolve([]),
   ]);
-  const upcomingEventIds = buildUpcomingEventIds(events, currentEvent, 7);
+  const upcomingEventIds = buildUpcomingEventIds(events, currentEvent, 5);
   const fixturesByEvent = {
     [currentEvent]: fixturesRaw || [],
   };
@@ -2609,15 +2410,14 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     debugUid("trend_data", uid, null);
     debugUid("avatar_data", uid, null);
 
-    const hasHistoryData = !!historyRes.ok;
-    const canRecomputePenalty = !!transfersRes.ok && hasHistoryData;
-    const chipDayMap = hasHistoryData
+    const canRecomputePenalty = !!transfersRes.ok && !!historyRes.ok;
+    const chipDayMap = canRecomputePenalty
       ? getChipDayMapFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
       : {};
-    const wildcardDay = hasHistoryData
+    const wildcardDay = canRecomputePenalty
       ? getWildcardDayFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
       : Number(previous.wildcard_day || 0) || null;
-    const richDay = hasHistoryData
+    const richDay = canRecomputePenalty
       ? Object.entries(chipDayMap).find(([, value]) => value === "rich")?.[0] || null
       : Number(previous.rich_day || 0) || null;
     const transferSummary = canRecomputePenalty
@@ -2636,16 +2436,9 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     const wildcardActive = wildcardDay !== null;
     const penaltyScore = Number(transferSummary.penalty_score || 0);
     const historyWeek = calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
-    const captainUsed = hasHistoryData
+    const captainUsed = canRecomputePenalty
       ? await buildCaptainUsageSummary(uidNumber, historyData, currentWeek, currentEvent, eventMetaById, elements, eventLiveCache)
       : previous.captain_used || { used: false, label: "None", day: null, captain_name: null, captain_points: null };
-    const chipStatus = hasHistoryData
-      ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
-      : previous.chip_status || {
-        captain_used: !!previous?.captain_used?.used,
-        wildcard_used: !!previous?.wildcard_active,
-        all_stars_used: !!previous?.rich_day,
-      };
 
     standingsByUid[uid].penalty_score = penaltyScore;
     standingsByUid[uid].transfer_count = transferCount;
@@ -2657,7 +2450,6 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     standingsByUid[uid].rich_day = richDay ? Number(richDay) : null;
     standingsByUid[uid].transfer_records = transferSummary.records;
     standingsByUid[uid].captain_used = captainUsed;
-    standingsByUid[uid].chip_status = chipStatus;
     standingsByUid[uid].week_total_summary = buildWeekTotalSummary(historyWeek, currentEvent, gd1MissingPenalty);
     if (historyWeek.has_week_rows) {
       const previewTodayScore = historyWeek.today_points !== null
@@ -2792,7 +2584,6 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     standingsByUid[uid].picks = picks;
     standingsByUid[uid].lineup_economy = lineupEconomy;
     standingsByUid[uid].captain_used = captainUsed;
-    standingsByUid[uid].chip_status = chipStatus;
     standingsByUid[uid].fetch_status = {
       profile_ok: classicRank > 0,
       picks_ok: true,
@@ -2883,11 +2674,6 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
         captain_name: null,
         captain_points: null,
       },
-      chip_status: s.chip_status || {
-        captain_used: !!s?.captain_used?.used,
-        wildcard_used: !!s.wildcard_active,
-        all_stars_used: !!s.rich_day,
-      },
       lineup_economy: s.lineup_economy || {
         effective_total_cost: 0,
         breakeven_line: 0,
@@ -2946,8 +2732,6 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       captain_bonus2: Number(rightProjection.captain_bonus || 0),
       win_prob1: winProb.left,
       win_prob2: winProb.right,
-      chip_status1: picksByUid[uid1]?.chip_status || null,
-      chip_status2: picksByUid[uid2]?.chip_status || null,
     };
   });
 
@@ -3531,26 +3315,18 @@ export default {
           if (token !== auth) return jsonResponse({ success: false, error: "unauthorized" }, 401);
         }
         const mode = String(url.searchParams.get("mode") || "chunk").toLowerCase();
-        const state = mode === "meta"
-          ? await refreshManagerMetaState(env)
-          : await refreshState(env, { full: mode === "full" });
+        const state = await refreshState(env, { full: mode === "full" });
         return jsonResponse({
           success: true,
-          mode: mode === "full" ? "full" : mode === "meta" ? "meta" : "chunk",
+          mode: mode === "full" ? "full" : "chunk",
           current_event_name: state.current_event_name,
           refresh_meta: state.refresh_meta,
         });
       }
 
       let state = await getState(env);
-      const staleStateNeedsDailyRefresh =
-        !!state &&
-        isBeijingRefreshWindow(Date.now()) &&
-        getBeijingDateKey(state?.refresh_meta?.updated_at || state?.generated_at || 0) !== getBeijingDateKey();
       if (!state) {
         state = await refreshState(env, { full: true });
-      } else if (staleStateNeedsDailyRefresh) {
-        state = await refreshManagerMetaState(env, state);
       }
 
       if (path === "/api/state") {
