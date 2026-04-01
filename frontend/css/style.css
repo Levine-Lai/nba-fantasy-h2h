@@ -2202,14 +2202,14 @@ body {
 #trend-transfer-card {
     display: flex;
     flex-direction: column;
-    min-height: clamp(540px, 58vw, 680px);
+}
+
+#trend-transfer-card.diagram-mode {
+    min-height: clamp(420px, 48vw, 560px);
 }
 
 .trend-table.diagram-mode .trend-table-head {
-    visibility: hidden;
-    pointer-events: none;
-    background: transparent;
-    border-bottom-color: transparent;
+    display: none;
 }
 
 .trend-table-head,
@@ -2242,8 +2242,8 @@ body {
 }
 
 .trend-table-body.diagram-mode {
-    padding: 8px 12px 12px;
-    gap: 10px;
+    padding: 8px 12px 8px;
+    gap: 8px;
 }
 
 #trend-transfer-table {
@@ -2298,7 +2298,7 @@ body {
 .trend-sankey-wrap {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     height: 100%;
     min-height: 0;
 }
@@ -2357,8 +2357,7 @@ body {
 }
 
 .trend-sankey-node {
-    stroke: #ffffff;
-    stroke-width: 1.4;
+    stroke: none;
 }
 
 .trend-sankey-label {
@@ -2370,8 +2369,8 @@ body {
 }
 
 @media (max-width: 768px) {
-    #trend-transfer-card {
-        min-height: 500px;
+    #trend-transfer-card.diagram-mode {
+        min-height: 440px;
     }
 
     .trend-sankey-label {

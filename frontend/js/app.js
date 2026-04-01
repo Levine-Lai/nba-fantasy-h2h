@@ -599,6 +599,7 @@ function buildTransferDiagramData(picksByUid) {
     const sortNodes = (entries) => entries
         .map(([name, value]) => ({ name, value: Number(value || 0) }))
         .sort((a, b) =>
+            ((a.name === TRANSFER_DIAGRAM_OTHERS) ? 1 : 0) - ((b.name === TRANSFER_DIAGRAM_OTHERS) ? 1 : 0) ||
             Number(b.value || 0) - Number(a.value || 0) ||
             compareDiagramNames(a.name, b.name)
         );
@@ -636,7 +637,7 @@ function renderTransferDiagram(picksByUid) {
         data.rightNodes.reduce((sum, node) => sum + Number(node.value || 0), 0),
         1
     );
-    const targetHeight = 640;
+    const targetHeight = 500;
     const scale = Math.max(
         10,
         Math.min(26, (targetHeight - topPad - bottomPad - (Math.max(data.leftNodes.length, data.rightNodes.length) - 1) * nodeGap) / maxUnits)
@@ -845,7 +846,7 @@ const Render = {
 
         transferCard.classList.toggle("diagram-mode", direction === "diagram");
         transferTable.classList.toggle("diagram-mode", direction === "diagram");
-        transferHead.style.display = "";
+        transferHead.style.display = direction === "diagram" ? "none" : "";
 
         transferTable.innerHTML = direction === "diagram"
             ? renderTransferDiagram(picksByUid)
