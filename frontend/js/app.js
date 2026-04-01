@@ -804,9 +804,6 @@ const Render = {
             const wildcardLine = lineupData.wildcard_day
                 ? `<div class="score-sub" style="color:#4ade80;">WC Day ${lineupData.wildcard_day}</div>`
                 : (lineupData.wildcard_active ? '<div class="score-sub" style="color:#4ade80;">Wildcard Active</div>' : "");
-            const richLine = lineupData.rich_day
-                ? `<div class="score-sub" style="color:#38bdf8;">All-Star Day ${lineupData.rich_day}</div>`
-                : "";
             const economy = lineupData.lineup_economy || {};
             const economyPanel = `
                 <div class="lineup-economy">
@@ -824,12 +821,10 @@ const Render = {
                             <div class="dual-team-score">${lineupData.total_live}</div>
                             <div class="score-sub">Week ${lineupData.event_total || 0}</div>
                             ${wildcardLine}
-                            ${richLine}
                         </div>
                     ` : `
                         <div class="formation-info">Today: ${lineupData.total_live} | Week: ${lineupData.event_total || 0}</div>
                         ${wildcardLine}
-                        ${richLine}
                     `}
                     <div class="lineup-container">
                         <div class="lineup-section starters">
