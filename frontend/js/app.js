@@ -442,6 +442,10 @@ function getTransferDiagramColor(value, alpha = 1) {
         hash = text.charCodeAt(index) + ((hash << 5) - hash);
     }
     const hue = Math.abs(hash) % 360;
+    // Use HSL for solid colors, HSLA when alpha is needed
+    if (alpha === 1) {
+        return `hsl(${hue}, 72%, 48%)`;
+    }
     return `hsla(${hue}, 72%, 48%, ${alpha})`;
 }
 
@@ -583,9 +587,9 @@ function buildTransferDiagramData(picksByUid) {
 
     const normalizedLinkMap = new Map();
     rawLinks.forEach((link) => {
+        // Group to Others if source (转出) has less than 2 moves
         const shouldGroupToOthers =
-            Number(sourceTotals[link.source] || 0) < TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD &&
-            Number(targetTotals[link.target] || 0) < TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD;
+            Number(sourceTotals[link.source] || 0) < TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD;
         const normalizedSource = shouldGroupToOthers ? TRANSFER_DIAGRAM_OTHERS_LABEL : link.source;
         const normalizedTarget = shouldGroupToOthers ? TRANSFER_DIAGRAM_OTHERS_LABEL : link.target;
         const key = `${normalizedSource}__${normalizedTarget}`;
@@ -807,7 +811,7 @@ function renderTransferDiagram(picksByUid) {
         <div class="trend-sankey-wrap">
             <div class="trend-sankey-meta">
                 <div class="trend-sankey-title">League Moves</div>
-                <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · hover flows for exact counts · only paths with both sides &lt;2 moves are grouped to Others</div>
+                <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · hover flows for exact counts · players with &lt;2 outs are grouped to Others</div>
             </div>
             ${svg}
         </div>

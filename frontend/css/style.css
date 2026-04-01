@@ -2354,7 +2354,7 @@ body {
 
 .trend-sankey-label {
     fill: #1e293b;
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 700;
     letter-spacing: 0.01em;
     pointer-events: none;
@@ -2367,7 +2367,7 @@ body {
     }
     
     .trend-sankey-label {
-        font-size: 11px;
+        font-size: 13px;
     }
     
     .trend-sankey-meta {
