@@ -587,12 +587,13 @@ function buildTransferDiagramData(picksByUid) {
 
     const normalizedLinkMap = new Map();
     rawLinks.forEach((link) => {
-        // Group to Others if source (转出) has less than 2 moves
+        // Group to Others if source (转出) OR target (转入) has less than 2 moves
         const shouldGroupSource =
             Number(sourceTotals[link.source] || 0) < TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD;
+        const shouldGroupTarget =
+            Number(targetTotals[link.target] || 0) < TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD;
         const normalizedSource = shouldGroupSource ? TRANSFER_DIAGRAM_OTHERS_LABEL : link.source;
-        // Keep target as is - only source gets grouped to Others
-        const normalizedTarget = link.target;
+        const normalizedTarget = shouldGroupTarget ? TRANSFER_DIAGRAM_OTHERS_LABEL : link.target;
         const key = `${normalizedSource}__${normalizedTarget}`;
         const current = normalizedLinkMap.get(key) || {
             source: normalizedSource,
@@ -647,14 +648,14 @@ function renderTransferDiagram(picksByUid) {
         return '<div class="trend-empty">No weekly transfer diagram</div>';
     }
 
-    const width = 1100;
-    const topPad = 24;
-    const bottomPad = 24;
-    const nodeGap = 16;
-    const nodeWidth = 24;
-    const leftX = 260;
-    const rightX = width - 260 - nodeWidth;
-    const minNodeHeight = 20;
+    const width = 940;
+    const topPad = 20;
+    const bottomPad = 20;
+    const nodeGap = 12;
+    const nodeWidth = 22;
+    const leftX = 200;
+    const rightX = width - 200 - nodeWidth;
+    const minNodeHeight = 18;
 
     const measureColumnHeight = (nodes, scale) =>
         nodes.reduce((sum, node) => sum + Math.max(Number(node.value || 0) * scale, minNodeHeight), 0) +
@@ -666,8 +667,8 @@ function renderTransferDiagram(picksByUid) {
         data.rightNodes.reduce((sum, node) => sum + Number(node.value || 0), 0),
         1
     );
-    const targetHeight = 420;
-    scale = Math.max(8, Math.min(18, (targetHeight - topPad - bottomPad - (Math.max(data.leftNodes.length, data.rightNodes.length) - 1) * nodeGap) / maxUnits));
+    const targetHeight = 540;
+    scale = Math.max(10, Math.min(22, (targetHeight - topPad - bottomPad - (Math.max(data.leftNodes.length, data.rightNodes.length) - 1) * nodeGap) / maxUnits));
     
     const leftHeight = measureColumnHeight(data.leftNodes, scale);
     const rightHeight = measureColumnHeight(data.rightNodes, scale);
@@ -692,7 +693,7 @@ function renderTransferDiagram(picksByUid) {
 
     const links = data.links.map((link, index) => ({
         ...link,
-        thickness: Math.max(Number(link.value || 0) * scale, 4),
+        thickness: Math.max(Number(link.value || 0) * scale, 5),
         gradientId: `trend-flow-${index}`,
     }));
 
@@ -812,7 +813,7 @@ function renderTransferDiagram(picksByUid) {
         <div class="trend-sankey-wrap">
             <div class="trend-sankey-meta">
                 <div class="trend-sankey-title">League Moves</div>
-                <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · hover flows for exact counts · players with &lt;2 transfers out are grouped to "Others"</div>
+                <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · hover flows for exact counts · players with &lt;2 transfers (in or out) are grouped to "Others"</div>
             </div>
             ${svg}
         </div>
