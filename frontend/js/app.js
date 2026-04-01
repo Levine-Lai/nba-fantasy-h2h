@@ -839,9 +839,7 @@ const Render = {
         const weeklyOut = data?.league?.top_out || data?.overall?.top_out || [];
         const ownershipTop = data?.ownership_top || [];
         const managerCount = Number(data?.ownership_manager_count || 26);
-        const direction = App.transferDirection === "out"
-            ? "out"
-            : (App.transferDirection === "diagram" ? "diagram" : "in");
+        const direction = App.transferDirection === "out" ? "out" : "in";
         const activeItems = direction === "out" ? weeklyOut : weeklyIn;
 
         transferCard.classList.toggle("diagram-mode", direction === "diagram");
