@@ -536,6 +536,20 @@ function renderDiagramLabel(node, side, nodeWidth) {
     return `<text class="trend-sankey-label" x="${x}" y="${startY}" text-anchor="${anchor}" dominant-baseline="middle">${lines.map((line, index) => `<tspan x="${x}" dy="${index === 0 ? 0 : lineHeight}">${escapeHtml(line)}</tspan>`).join("")}</text>`;
 }
 
+function compareDiagramNodeNames(a, b) {
+    const aOthers = a === TRANSFER_DIAGRAM_OTHERS_LABEL;
+    const bOthers = b === TRANSFER_DIAGRAM_OTHERS_LABEL;
+    if (aOthers !== bOthers) return aOthers ? 1 : -1;
+    return String(a || "").localeCompare(String(b || ""));
+}
+
+function compareDiagramNodes(a, b) {
+    const aOthers = a?.name === TRANSFER_DIAGRAM_OTHERS_LABEL;
+    const bOthers = b?.name === TRANSFER_DIAGRAM_OTHERS_LABEL;
+    if (aOthers !== bOthers) return aOthers ? 1 : -1;
+    return Number(b?.value || 0) - Number(a?.value || 0) || compareDiagramNodeNames(a?.name, b?.name);
+}
+
 function buildTransferDiagramData(picksByUid) {
     const linkMap = new Map();
     let totalMoves = 0;
@@ -559,23 +573,35 @@ function buildTransferDiagramData(picksByUid) {
         String(a.target || "").localeCompare(String(b.target || ""))
     );
 
-    const links = [];
-    let minorMoveTotal = 0;
+    const sourceTotals = {};
+    const targetTotals = {};
     rawLinks.forEach((link) => {
-        if (Number(link.value || 0) < TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD) {
-            minorMoveTotal += Number(link.value || 0);
-            return;
-        }
-        links.push(link);
+        sourceTotals[link.source] = Number(sourceTotals[link.source] || 0) + Number(link.value || 0);
+        targetTotals[link.target] = Number(targetTotals[link.target] || 0) + Number(link.value || 0);
     });
 
-    if (minorMoveTotal > 0) {
-        links.push({
-            source: TRANSFER_DIAGRAM_OTHERS_LABEL,
-            target: TRANSFER_DIAGRAM_OTHERS_LABEL,
-            value: minorMoveTotal,
-        });
-    }
+    const normalizedLinkMap = new Map();
+    rawLinks.forEach((link) => {
+        const shouldGroupToOthers =
+            Number(sourceTotals[link.source] || 0) < TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD &&
+            Number(targetTotals[link.target] || 0) < TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD;
+        const normalizedSource = shouldGroupToOthers ? TRANSFER_DIAGRAM_OTHERS_LABEL : link.source;
+        const normalizedTarget = shouldGroupToOthers ? TRANSFER_DIAGRAM_OTHERS_LABEL : link.target;
+        const key = `${normalizedSource}__${normalizedTarget}`;
+        const current = normalizedLinkMap.get(key) || {
+            source: normalizedSource,
+            target: normalizedTarget,
+            value: 0,
+        };
+        current.value += Number(link.value || 0);
+        normalizedLinkMap.set(key, current);
+    });
+
+    const links = Array.from(normalizedLinkMap.values()).sort((a, b) =>
+        Number(b.value || 0) - Number(a.value || 0) ||
+        compareDiagramNodeNames(a.source, b.source) ||
+        compareDiagramNodeNames(a.target, b.target)
+    );
 
     if (!links.length) {
         return {
@@ -595,11 +621,11 @@ function buildTransferDiagramData(picksByUid) {
 
     const leftNodes = Object.entries(leftTotals)
         .map(([name, value]) => ({ name, value: Number(value || 0) }))
-        .sort((a, b) => Number(b.value || 0) - Number(a.value || 0) || String(a.name || "").localeCompare(String(b.name || "")));
+        .sort(compareDiagramNodes);
 
     const rightNodes = Object.entries(rightTotals)
         .map(([name, value]) => ({ name, value: Number(value || 0) }))
-        .sort((a, b) => Number(b.value || 0) - Number(a.value || 0) || String(a.name || "").localeCompare(String(b.name || "")));
+        .sort(compareDiagramNodes);
 
     return {
         totalMoves,
@@ -615,15 +641,15 @@ function renderTransferDiagram(picksByUid) {
         return '<div class="trend-empty">No weekly transfer diagram</div>';
     }
 
-    const width = 860;
-    const topPad = 24;
-    const bottomPad = 24;
+    const width = 900;
+    const topPad = 22;
+    const bottomPad = 22;
     const nodeGap = 16;
-    const nodeWidth = 20;
-    const leftX = 220;
-    const rightX = width - 220 - nodeWidth;
-    const curve = 168;
-    const minNodeHeight = 20;
+    const nodeWidth = 16;
+    const leftX = 218;
+    const rightX = width - 218 - nodeWidth;
+    const curve = 176;
+    const minNodeHeight = 18;
 
     const measureColumnHeight = (nodes, scale) =>
         nodes.reduce((sum, node) => sum + Math.max(Number(node.value || 0) * scale, minNodeHeight), 0) +
@@ -637,11 +663,11 @@ function renderTransferDiagram(picksByUid) {
         data.rightNodes.reduce((sum, node) => sum + Number(node.value || 0), 0),
         1
     );
-    const targetHeight = 420;
+    const targetHeight = 408;
     scale = Math.max(7, Math.min(16, (targetHeight - topPad - bottomPad - (Math.max(data.leftNodes.length, data.rightNodes.length) - 1) * nodeGap) / maxUnits));
     leftHeight = measureColumnHeight(data.leftNodes, scale);
     rightHeight = measureColumnHeight(data.rightNodes, scale);
-    const height = Math.max(320, Math.max(leftHeight, rightHeight) + topPad + bottomPad);
+    const height = Math.max(316, Math.max(leftHeight, rightHeight) + topPad + bottomPad);
 
     const layoutColumn = (nodes, x) => {
         let cursor = topPad;
@@ -660,10 +686,10 @@ function renderTransferDiagram(picksByUid) {
     const rightOrder = Object.fromEntries(rightNodes.map((node, index) => [node.name, index]));
     const leftOrder = Object.fromEntries(leftNodes.map((node, index) => [node.name, index]));
 
-    const links = data.links.map((link) => ({
+    const links = data.links.map((link, index) => ({
         ...link,
         thickness: Math.max(Number(link.value || 0) * scale, 4),
-        color: getTransferDiagramColor(link.source, 0.42),
+        gradientId: `trend-flow-${index}`,
     }));
 
     Object.values(leftByName).forEach((node) => {
@@ -692,6 +718,14 @@ function renderTransferDiagram(picksByUid) {
 
     const svg = `
         <svg class="trend-sankey-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly transfer diagram">
+            <defs>
+                ${links.map((link) => `
+                    <linearGradient id="${link.gradientId}" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="${getTransferDiagramColor(link.source, 0.42)}"></stop>
+                        <stop offset="100%" stop-color="${getTransferDiagramColor(link.target, 0.42)}"></stop>
+                    </linearGradient>
+                `).join("")}
+            </defs>
             ${links.map((link) => {
                 const leftNode = leftByName[link.source];
                 const rightNode = rightByName[link.target];
@@ -703,7 +737,7 @@ function renderTransferDiagram(picksByUid) {
                 return `
                     <path class="trend-sankey-link"
                         d="M ${startX} ${startY} C ${startX + curve} ${startY}, ${endX - curve} ${endY}, ${endX} ${endY}"
-                        stroke="${link.color}"
+                        stroke="url(#${link.gradientId})"
                         stroke-width="${Number(link.thickness || 0).toFixed(2)}">
                         <title>${escapeHtml(link.source)} -> ${escapeHtml(link.target)}: ${Number(link.value || 0)} moves</title>
                     </path>
@@ -727,8 +761,8 @@ function renderTransferDiagram(picksByUid) {
     return `
         <div class="trend-sankey-wrap">
             <div class="trend-sankey-meta">
-                <div class="trend-sankey-title">League GW Diagram</div>
-                <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · ${Number(data.links.length || 0)} shown paths · &lt;2 moves grouped to Others</div>
+                <div class="trend-sankey-title">League Moves</div>
+                <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · hover flows for exact counts · only paths with both sides &lt;2 moves are grouped to Others</div>
             </div>
             ${svg}
         </div>
