@@ -2341,9 +2341,10 @@ body {
 
 .trend-sankey-link {
     fill: none;
-    stroke-linecap: butt;
+    stroke-linecap: round;
+    stroke-linejoin: round;
     mix-blend-mode: normal;
-    opacity: 0.9;
+    opacity: 0.94;
     cursor: help;
     transition: opacity 0.2s ease;
 }
@@ -2354,6 +2355,7 @@ body {
 
 .trend-sankey-bundle {
     pointer-events: none;
+    opacity: 0.42;
 }
 
 .trend-sankey-node {

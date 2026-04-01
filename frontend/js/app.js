@@ -618,14 +618,14 @@ function renderTransferDiagram(picksByUid) {
         return '<div class="trend-empty">No weekly transfer diagram</div>';
     }
 
-    const width = 1100;
+    const width = 1200;
     const topPad = 12;
     const bottomPad = 12;
     const nodeGap = 10;
     const nodeWidth = 18;
-    const bundleWidth = 22;
-    const leftX = 170;
-    const rightX = width - 170 - nodeWidth;
+    const bundleWidth = 28;
+    const leftX = 126;
+    const rightX = width - 126 - nodeWidth;
     const minNodeHeight = 16;
 
     const measureColumnHeight = (nodes, scale) =>
@@ -708,8 +708,8 @@ function renderTransferDiagram(picksByUid) {
                         const leftNode = leftByName[link.source];
                         const rightNode = rightByName[link.target];
                         if (!leftNode || !rightNode) return "";
-                        const startX = Number(leftNode.x || 0) + nodeWidth;
-                        const endX = Number(rightNode.x || 0);
+                        const startX = Number(leftNode.x || 0) + nodeWidth - 6;
+                        const endX = Number(rightNode.x || 0) + 6;
                         const startY = Number(link.sourceY || 0);
                         const endY = Number(link.targetY || 0);
                         return `
@@ -744,12 +744,12 @@ function renderTransferDiagram(picksByUid) {
                     const leftNode = leftByName[link.source];
                     const rightNode = rightByName[link.target];
                     if (!leftNode || !rightNode) return "";
-                    const startX = Number(leftNode.x || 0) + nodeWidth;
-                    const endX = Number(rightNode.x || 0);
+                    const startX = Number(leftNode.x || 0) + nodeWidth - 6;
+                    const endX = Number(rightNode.x || 0) + 6;
                     const startY = Number(link.sourceY || 0);
                     const endY = Number(link.targetY || 0);
                     const distance = endX - startX;
-                    const controlOffset = Math.max(96, Math.min(distance * 0.38, 188));
+                    const controlOffset = Math.max(110, Math.min(distance * 0.4, 220));
                     const path = `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${endX - controlOffset} ${endY}, ${endX} ${endY}`;
                     return `
                         <path class="trend-sankey-link"
