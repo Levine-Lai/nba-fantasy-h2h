@@ -54,6 +54,37 @@ const API = {
     },
 };
 
+const GW23_LAST_STANDINGS = [
+    { rank: 1, uid: "2", team_name: "大吉鲁", gw: 23, won: 17, draw: 1, lost: 5, scored: 28919, conceded: 26523, points: 52 },
+    { rank: 2, uid: "15", team_name: "笨笨", gw: 23, won: 17, draw: 0, lost: 6, scored: 25710, conceded: 26714, points: 51 },
+    { rank: 3, uid: "4319", team_name: "Kimi", gw: 23, won: 16, draw: 0, lost: 7, scored: 29028, conceded: 27091, points: 48 },
+    { rank: 4, uid: "5095", team_name: "AI", gw: 23, won: 16, draw: 0, lost: 7, scored: 26188, conceded: 27733, points: 48 },
+    { rank: 5, uid: "3455", team_name: "Paul", gw: 23, won: 15, draw: 0, lost: 8, scored: 29323, conceded: 27748, points: 45 },
+    { rank: 6, uid: "10", team_name: "弗老大", gw: 23, won: 15, draw: 0, lost: 8, scored: 28692, conceded: 27800, points: 45 },
+    { rank: 7, uid: "17", team_name: "堡", gw: 23, won: 14, draw: 1, lost: 8, scored: 29055, conceded: 26287, points: 43 },
+    { rank: 8, uid: "6", team_name: "紫葱酱", gw: 23, won: 14, draw: 0, lost: 9, scored: 28438, conceded: 27412, points: 42 },
+    { rank: 9, uid: "14", team_name: "酸男", gw: 23, won: 14, draw: 0, lost: 9, scored: 28686, conceded: 28301, points: 42 },
+    { rank: 10, uid: "5410", team_name: "kusuri", gw: 23, won: 13, draw: 0, lost: 10, scored: 29212, conceded: 27763, points: 39 },
+    { rank: 11, uid: "9", team_name: "雕哥", gw: 23, won: 13, draw: 0, lost: 10, scored: 28049, conceded: 27245, points: 39 },
+    { rank: 12, uid: "4224", team_name: "班班", gw: 23, won: 12, draw: 0, lost: 11, scored: 28216, conceded: 27955, points: 36 },
+    { rank: 13, uid: "189", team_name: "凯文", gw: 23, won: 12, draw: 0, lost: 11, scored: 27804, conceded: 27883, points: 36 },
+    { rank: 14, uid: "5101", team_name: "鬼嗨", gw: 23, won: 12, draw: 0, lost: 11, scored: 27036, conceded: 27324, points: 36 },
+    { rank: 15, uid: "32", team_name: "伍家辉", gw: 23, won: 11, draw: 0, lost: 12, scored: 29301, conceded: 27110, points: 33 },
+    { rank: 16, uid: "16447", team_name: "文史哲", gw: 23, won: 11, draw: 0, lost: 12, scored: 27842, conceded: 28036, points: 33 },
+    { rank: 17, uid: "6441", team_name: "马哥", gw: 23, won: 10, draw: 0, lost: 13, scored: 26428, conceded: 26957, points: 30 },
+    { rank: 18, uid: "23", team_name: "橘队", gw: 23, won: 9, draw: 0, lost: 14, scored: 27425, conceded: 27816, points: 27 },
+    { rank: 19, uid: "4", team_name: "尼弟", gw: 23, won: 9, draw: 0, lost: 14, scored: 27642, conceded: 28320, points: 27 },
+    { rank: 20, uid: "11", team_name: "船哥", gw: 23, won: 9, draw: 0, lost: 14, scored: 27494, conceded: 28599, points: 27 },
+    { rank: 21, uid: "6412", team_name: "阿甘", gw: 23, won: 8, draw: 0, lost: 15, scored: 25416, conceded: 27094, points: 24 },
+    { rank: 22, uid: "22761", team_name: "纪导", gw: 23, won: 7, draw: 0, lost: 16, scored: 27950, conceded: 28277, points: 21 },
+    { rank: 23, uid: "42", team_name: "桑迪", gw: 23, won: 7, draw: 0, lost: 16, scored: 25139, conceded: 27583, points: 21 },
+    { rank: 24, uid: "5467", team_name: "老姜", gw: 23, won: 7, draw: 0, lost: 16, scored: 25937, conceded: 28454, points: 21 },
+    { rank: 25, uid: "6562", team_name: "柯南", gw: 23, won: 5, draw: 0, lost: 18, scored: 27662, conceded: 27795, points: 15 },
+    { rank: 26, uid: "8580", team_name: "小火龙", gw: 23, won: 5, draw: 0, lost: 18, scored: 25146, conceded: 27918, points: 15 },
+];
+
+const MAX_TITLE_POINTS_REMAINING = 6;
+
 function escapeHtml(value) {
     return String(value ?? "")
         .replace(/&/g, "&amp;")
@@ -267,6 +298,333 @@ function getNextRefreshDelay(fixtures) {
     return 120000;
 }
 
+function extractGameweekNumber(eventName) {
+    const text = String(eventName || "");
+    const match = text.match(/gameweek\s*(\d+)/i);
+    return match ? Number(match[1]) : null;
+}
+
+function getStandingsDisplayName(uid, state, fallback = "-") {
+    const key = String(uid || "");
+    return state?.picks_by_uid?.[key]?.team_name || fallback;
+}
+
+function buildStaticStandingsRows(state) {
+    const leaderPoints = GW23_LAST_STANDINGS.reduce((max, row) => Math.max(max, Number(row?.points || 0)), 0);
+    return GW23_LAST_STANDINGS.map((row) => ({
+        ...row,
+        team_name: getStandingsDisplayName(row.uid, state, row.team_name),
+        contender: Number(row.points || 0) + MAX_TITLE_POINTS_REMAINING >= leaderPoints,
+    }));
+}
+
+function buildLiveStandingsRows(state) {
+    const currentGw = extractGameweekNumber(state?.current_event_name) || 24;
+    const byUid = {};
+
+    GW23_LAST_STANDINGS.forEach((row) => {
+        byUid[String(row.uid)] = {
+            ...row,
+            gw: currentGw,
+            team_name: getStandingsDisplayName(row.uid, state, row.team_name),
+            base_rank: Number(row.rank || 0),
+            contender: false,
+        };
+    });
+
+    (state?.h2h || []).forEach((match) => {
+        const uid1 = String(match?.uid1 || "");
+        const uid2 = String(match?.uid2 || "");
+        const left = byUid[uid1];
+        const right = byUid[uid2];
+        if (!left || !right) return;
+
+        const total1 = Number(match?.total1 || 0);
+        const total2 = Number(match?.total2 || 0);
+        left.gw = currentGw;
+        right.gw = currentGw;
+        left.scored += total1;
+        left.conceded += total2;
+        right.scored += total2;
+        right.conceded += total1;
+
+        if (total1 > total2) {
+            left.won += 1;
+            left.points += 3;
+            right.lost += 1;
+        } else if (total2 > total1) {
+            right.won += 1;
+            right.points += 3;
+            left.lost += 1;
+        } else {
+            left.draw += 1;
+            right.draw += 1;
+            left.points += 1;
+            right.points += 1;
+        }
+    });
+
+    return Object.values(byUid)
+        .map((row) => ({
+            ...row,
+            diff: Number(row.scored || 0) - Number(row.conceded || 0),
+        }))
+        .sort((a, b) =>
+            Number(b.points || 0) - Number(a.points || 0) ||
+            Number(b.won || 0) - Number(a.won || 0) ||
+            Number(b.diff || 0) - Number(a.diff || 0) ||
+            Number(b.scored || 0) - Number(a.scored || 0) ||
+            Number(a.base_rank || a.rank || 0) - Number(b.base_rank || b.rank || 0) ||
+            String(a.team_name || "").localeCompare(String(b.team_name || ""))
+        )
+        .map((row, index) => ({
+            ...row,
+            rank: index + 1,
+        }));
+}
+
+function renderStandingsTable(rows, options = {}) {
+    const items = Array.isArray(rows) ? rows : [];
+    if (!items.length) return '<div class="trend-empty">No standings data</div>';
+
+    const highlightContenders = !!options.highlightContenders;
+    return `
+        <div class="rankings-table-scroll">
+            <table class="rankings-table">
+                <thead>
+                    <tr>
+                        <th>排名</th>
+                        <th class="team-col">玩家</th>
+                        <th>当前GW</th>
+                        <th>W</th>
+                        <th>D</th>
+                        <th>L</th>
+                        <th class="points-col">积分</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map((row) => `
+                        <tr class="${highlightContenders && row?.contender ? "contender-row" : ""}">
+                            <td>${Number(row?.rank || 0)}</td>
+                            <td class="team-cell">${escapeHtml(row?.team_name || "-")}</td>
+                            <td>${Number(row?.gw || 0)}</td>
+                            <td>${Number(row?.won || 0)}</td>
+                            <td>${Number(row?.draw || 0)}</td>
+                            <td>${Number(row?.lost || 0)}</td>
+                            <td class="points-cell">${Number(row?.points || 0)}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderFdrTableInto(headerRowId, badgeId, bodyId, data) {
+    const headerRow = document.getElementById(headerRowId);
+    const badge = document.getElementById(badgeId);
+    const body = document.getElementById(bodyId);
+    if (!headerRow || !badge || !body) return;
+
+    const weeks = Array.isArray(data?.weeks) ? data.weeks : [];
+    headerRow.innerHTML = `<th class="t-name">TEAM</th>${weeks.map((week) => `<th>${week}</th>`).join("")}<th class="avg-col">AVG</th>`;
+    badge.textContent = weeks.length ? `GW ${weeks.join("-")}` : "Auto GW";
+    body.innerHTML = data?.html || '<tr><td colspan="5" style="text-align:center;padding:20px;">No FDR data</td></tr>';
+}
+
+function getTransferDiagramColor(value, alpha = 1) {
+    const text = String(value || "");
+    let hash = 0;
+    for (let index = 0; index < text.length; index += 1) {
+        hash = text.charCodeAt(index) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    return `hsla(${hue}, 72%, 48%, ${alpha})`;
+}
+
+function buildTransferDiagramData(picksByUid) {
+    const linkMap = new Map();
+    let totalMoves = 0;
+
+    Object.values(picksByUid || {}).forEach((payload) => {
+        (payload?.transfer_records || []).forEach((record) => {
+            const source = String(record?.out_name || "").trim();
+            const target = String(record?.in_name || "").trim();
+            if (!source || !target) return;
+            totalMoves += 1;
+            const key = `${source}__${target}`;
+            const current = linkMap.get(key) || { source, target, value: 0 };
+            current.value += 1;
+            linkMap.set(key, current);
+        });
+    });
+
+    const links = Array.from(linkMap.values()).sort((a, b) =>
+        Number(b.value || 0) - Number(a.value || 0) ||
+        String(a.source || "").localeCompare(String(b.source || "")) ||
+        String(a.target || "").localeCompare(String(b.target || ""))
+    );
+
+    if (!links.length) {
+        return {
+            totalMoves,
+            links: [],
+            leftNodes: [],
+            rightNodes: [],
+        };
+    }
+
+    const leftTotals = {};
+    const rightTotals = {};
+    links.forEach((link) => {
+        leftTotals[link.source] = Number(leftTotals[link.source] || 0) + Number(link.value || 0);
+        rightTotals[link.target] = Number(rightTotals[link.target] || 0) + Number(link.value || 0);
+    });
+
+    const leftNodes = Object.entries(leftTotals)
+        .map(([name, value]) => ({ name, value: Number(value || 0) }))
+        .sort((a, b) => Number(b.value || 0) - Number(a.value || 0) || String(a.name || "").localeCompare(String(b.name || "")));
+
+    const rightNodes = Object.entries(rightTotals)
+        .map(([name, value]) => ({ name, value: Number(value || 0) }))
+        .sort((a, b) => Number(b.value || 0) - Number(a.value || 0) || String(a.name || "").localeCompare(String(b.name || "")));
+
+    return {
+        totalMoves,
+        links,
+        leftNodes,
+        rightNodes,
+    };
+}
+
+function renderTransferDiagram(picksByUid) {
+    const data = buildTransferDiagramData(picksByUid);
+    if (!data.links.length) {
+        return '<div class="trend-empty">No weekly transfer diagram</div>';
+    }
+
+    const width = 720;
+    const topPad = 24;
+    const bottomPad = 24;
+    const nodeGap = 14;
+    const nodeWidth = 18;
+    const leftX = 156;
+    const rightX = 546;
+    const curve = 126;
+    const minNodeHeight = 18;
+
+    const measureColumnHeight = (nodes, scale) =>
+        nodes.reduce((sum, node) => sum + Math.max(Number(node.value || 0) * scale, minNodeHeight), 0) +
+        Math.max(0, nodes.length - 1) * nodeGap;
+
+    let scale = 14;
+    let leftHeight = measureColumnHeight(data.leftNodes, scale);
+    let rightHeight = measureColumnHeight(data.rightNodes, scale);
+    const maxUnits = Math.max(
+        data.leftNodes.reduce((sum, node) => sum + Number(node.value || 0), 0),
+        data.rightNodes.reduce((sum, node) => sum + Number(node.value || 0), 0),
+        1
+    );
+    const targetHeight = 420;
+    scale = Math.max(7, Math.min(16, (targetHeight - topPad - bottomPad - (Math.max(data.leftNodes.length, data.rightNodes.length) - 1) * nodeGap) / maxUnits));
+    leftHeight = measureColumnHeight(data.leftNodes, scale);
+    rightHeight = measureColumnHeight(data.rightNodes, scale);
+    const height = Math.max(320, Math.max(leftHeight, rightHeight) + topPad + bottomPad);
+
+    const layoutColumn = (nodes, x) => {
+        let cursor = topPad;
+        return nodes.map((node) => {
+            const nodeHeight = Math.max(Number(node.value || 0) * scale, minNodeHeight);
+            const positioned = { ...node, x, y: cursor, height: nodeHeight };
+            cursor += nodeHeight + nodeGap;
+            return positioned;
+        });
+    };
+
+    const leftNodes = layoutColumn(data.leftNodes, leftX);
+    const rightNodes = layoutColumn(data.rightNodes, rightX);
+    const leftByName = Object.fromEntries(leftNodes.map((node) => [node.name, { ...node }]));
+    const rightByName = Object.fromEntries(rightNodes.map((node) => [node.name, { ...node }]));
+    const rightOrder = Object.fromEntries(rightNodes.map((node, index) => [node.name, index]));
+    const leftOrder = Object.fromEntries(leftNodes.map((node, index) => [node.name, index]));
+
+    const links = data.links.map((link) => ({
+        ...link,
+        thickness: Math.max(Number(link.value || 0) * scale, 4),
+        color: getTransferDiagramColor(link.source, 0.42),
+    }));
+
+    Object.values(leftByName).forEach((node) => {
+        const nodeLinks = links
+            .filter((link) => link.source === node.name)
+            .sort((a, b) => Number(rightOrder[a.target] || 0) - Number(rightOrder[b.target] || 0));
+        const totalThickness = nodeLinks.reduce((sum, link) => sum + Number(link.thickness || 0), 0);
+        let cursor = Number(node.y || 0) + Math.max(0, (Number(node.height || 0) - totalThickness) / 2);
+        nodeLinks.forEach((link) => {
+            link.sourceY = cursor + Number(link.thickness || 0) / 2;
+            cursor += Number(link.thickness || 0);
+        });
+    });
+
+    Object.values(rightByName).forEach((node) => {
+        const nodeLinks = links
+            .filter((link) => link.target === node.name)
+            .sort((a, b) => Number(leftOrder[a.source] || 0) - Number(leftOrder[b.source] || 0));
+        const totalThickness = nodeLinks.reduce((sum, link) => sum + Number(link.thickness || 0), 0);
+        let cursor = Number(node.y || 0) + Math.max(0, (Number(node.height || 0) - totalThickness) / 2);
+        nodeLinks.forEach((link) => {
+            link.targetY = cursor + Number(link.thickness || 0) / 2;
+            cursor += Number(link.thickness || 0);
+        });
+    });
+
+    const svg = `
+        <svg class="trend-sankey-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly transfer diagram">
+            ${links.map((link) => {
+                const leftNode = leftByName[link.source];
+                const rightNode = rightByName[link.target];
+                if (!leftNode || !rightNode) return "";
+                const startX = Number(leftNode.x || 0) + nodeWidth;
+                const endX = Number(rightNode.x || 0);
+                const startY = Number(link.sourceY || 0);
+                const endY = Number(link.targetY || 0);
+                return `
+                    <path class="trend-sankey-link"
+                        d="M ${startX} ${startY} C ${startX + curve} ${startY}, ${endX - curve} ${endY}, ${endX} ${endY}"
+                        stroke="${link.color}"
+                        stroke-width="${Number(link.thickness || 0).toFixed(2)}">
+                        <title>${escapeHtml(link.source)} -> ${escapeHtml(link.target)}: ${Number(link.value || 0)} moves</title>
+                    </path>
+                `;
+            }).join("")}
+            ${leftNodes.map((node) => `
+                <g>
+                    <rect class="trend-sankey-node" x="${Number(node.x || 0)}" y="${Number(node.y || 0)}" width="${nodeWidth}" height="${Number(node.height || 0)}" rx="8" fill="${getTransferDiagramColor(node.name, 0.9)}"></rect>
+                    <text class="trend-sankey-label" x="${Number(node.x || 0) - 10}" y="${Number(node.y || 0) + 14}" text-anchor="end">${escapeHtml(node.name)}</text>
+                    <text class="trend-sankey-count" x="${Number(node.x || 0) - 10}" y="${Number(node.y || 0) + 29}" text-anchor="end">${Number(node.value || 0)} moves</text>
+                </g>
+            `).join("")}
+            ${rightNodes.map((node) => `
+                <g>
+                    <rect class="trend-sankey-node" x="${Number(node.x || 0)}" y="${Number(node.y || 0)}" width="${nodeWidth}" height="${Number(node.height || 0)}" rx="8" fill="${getTransferDiagramColor(node.name, 0.9)}"></rect>
+                    <text class="trend-sankey-label" x="${Number(node.x || 0) + nodeWidth + 10}" y="${Number(node.y || 0) + 14}" text-anchor="start">${escapeHtml(node.name)}</text>
+                    <text class="trend-sankey-count" x="${Number(node.x || 0) + nodeWidth + 10}" y="${Number(node.y || 0) + 29}" text-anchor="start">${Number(node.value || 0)} moves</text>
+                </g>
+            `).join("")}
+        </svg>
+    `;
+
+    return `
+        <div class="trend-sankey-wrap">
+            <div class="trend-sankey-meta">
+                <div class="trend-sankey-title">League GW Diagram</div>
+                <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · ${Number(data.links.length || 0)} unique paths</div>
+            </div>
+            ${svg}
+        </div>
+    `;
+}
+
 const Render = {
     updateTime() {
         const element = document.getElementById("update-time");
@@ -300,10 +658,12 @@ const Render = {
         button.textContent = text;
     },
 
-    transferTrends(data) {
+    transferTrends(data, picksByUid = {}) {
         const transferTable = document.getElementById("trend-transfer-table");
         const ownership = document.getElementById("ownership-top");
-        if (!transferTable || !ownership) return;
+        const transferHead = document.getElementById("trend-transfer-head");
+        const transferCard = document.getElementById("trend-transfer-card");
+        if (!transferTable || !ownership || !transferHead || !transferCard) return;
 
         const formatOneDecimal = (value) => {
             const num = Number(value);
@@ -314,20 +674,30 @@ const Render = {
         const weeklyOut = data?.league?.top_out || data?.overall?.top_out || [];
         const ownershipTop = data?.ownership_top || [];
         const managerCount = Number(data?.ownership_manager_count || 26);
-        const direction = App.transferDirection === "out" ? "out" : "in";
+        const direction = App.transferDirection === "out"
+            ? "out"
+            : (App.transferDirection === "diagram" ? "diagram" : "in");
         const activeItems = direction === "out" ? weeklyOut : weeklyIn;
 
-        transferTable.innerHTML = activeItems.length
-            ? activeItems.map((item) => `
-                <div class="trend-table-row">
-                    <span class="trend-player-name">${escapeHtml(item.name)}</span>
-                    <span class="trend-cell-number">${formatOneDecimal(item.cost)}</span>
-                    <span class="trend-cell-number">${formatOneDecimal(item.form)}</span>
-                    <span class="trend-cell-number">${formatOneDecimal(item.value)}</span>
-                    <span class="trend-number">${Number(item.transfers || item.count || 0)}</span>
-                </div>
-            `).join("")
-            : '<div class="trend-empty">No weekly transfer trend data</div>';
+        transferCard.classList.toggle("diagram-mode", direction === "diagram");
+        transferTable.classList.toggle("diagram-mode", direction === "diagram");
+        transferHead.style.display = direction === "diagram" ? "none" : "";
+
+        transferTable.innerHTML = direction === "diagram"
+            ? renderTransferDiagram(picksByUid)
+            : (
+                activeItems.length
+                    ? activeItems.map((item) => `
+                        <div class="trend-table-row">
+                            <span class="trend-player-name">${escapeHtml(item.name)}</span>
+                            <span class="trend-cell-number">${formatOneDecimal(item.cost)}</span>
+                            <span class="trend-cell-number">${formatOneDecimal(item.form)}</span>
+                            <span class="trend-cell-number">${formatOneDecimal(item.value)}</span>
+                            <span class="trend-number">${Number(item.transfers || item.count || 0)}</span>
+                        </div>
+                    `).join("")
+                    : '<div class="trend-empty">No weekly transfer trend data</div>'
+            );
         ownership.innerHTML = ownershipTop.length
             ? ownershipTop.map((item) => `
                 <div class="trend-table-row ownership-row">
@@ -440,15 +810,25 @@ const Render = {
     },
 
     fdr(data) {
-        const headerRow = document.getElementById("fdr-header-row");
-        const badge = document.getElementById("fdr-week-badge");
-        const body = document.getElementById("fdr-body");
-        if (!headerRow || !badge || !body) return;
+        renderFdrTableInto("fdr-header-row", "fdr-week-badge", "fdr-body", data);
+    },
 
-        const weeks = Array.isArray(data?.weeks) ? data.weeks : [];
-        headerRow.innerHTML = `<th class="t-name">TEAM</th>${weeks.map((week) => `<th>${week}</th>`).join("")}<th class="avg-col">AVG</th>`;
-        badge.textContent = weeks.length ? `GW ${weeks.join("-")}` : "Auto GW";
-        body.innerHTML = data?.html || '<tr><td colspan="5" style="text-align:center;padding:20px;">No FDR data</td></tr>';
+    rankings(state) {
+        const lastWrap = document.getElementById("rankings-last-table-wrap");
+        const liveWrap = document.getElementById("rankings-live-table-wrap");
+        const lastBadge = document.getElementById("rankings-last-badge");
+        const liveBadge = document.getElementById("rankings-live-badge");
+        if (!lastWrap || !liveWrap || !lastBadge || !liveBadge) return;
+
+        const staticRows = buildStaticStandingsRows(state);
+        const liveRows = buildLiveStandingsRows(state);
+        const currentGw = extractGameweekNumber(state?.current_event_name) || 24;
+
+        lastBadge.textContent = "GW23 Final";
+        liveBadge.textContent = `GW${currentGw} Live`;
+        lastWrap.innerHTML = renderStandingsTable(staticRows, { highlightContenders: true });
+        liveWrap.innerHTML = renderStandingsTable(liveRows);
+        renderFdrTableInto("rankings-fdr-header-row", "rankings-fdr-week-badge", "rankings-fdr-body", state?.fdr || {});
     },
 
     injuries(data) {
@@ -1079,8 +1459,9 @@ const App = {
     playerOptions: [],
     referencePositionFilter: "ALL",
     referenceSearchQuery: "",
-    transferDirection: "in",
+    transferDirection: "diagram",
     latestTransferTrends: null,
+    latestPicksByUid: {},
 
     async getLineupCached(uid) {
         const key = String(uid);
@@ -1115,14 +1496,16 @@ const App = {
             this.lineupCache.clear();
             const state = await API.getState();
             this.latestTransferTrends = state?.transfer_trends || {};
+            this.latestPicksByUid = state?.picks_by_uid || {};
             Render.eventInfo(state?.current_event_name || "Loading...");
             Render.gameCount(state?.fixtures?.count || 0);
             Render.gamesList(state?.fixtures?.games || []);
             Render.matchCount(Array.isArray(state?.h2h) ? state.h2h.length : 0);
             Render.h2hList(state?.h2h || []);
-            Render.transferTrends(this.latestTransferTrends);
+            Render.transferTrends(this.latestTransferTrends, this.latestPicksByUid);
             Render.chipsUsed(state?.chips_used_summary || []);
             Render.specialGuy(state?.picks_by_uid || {});
+            Render.rankings(state || {});
             Render.fdr(state?.fdr || {
                 weeks: [],
                 html: '<tr><td colspan="5" style="text-align:center;padding:20px;">Load failed</td></tr>',
@@ -1426,7 +1809,7 @@ const App = {
                 document.querySelectorAll(".trend-switch-btn").forEach((button) => {
                     button.classList.toggle("active", button.dataset.transferDirection === this.transferDirection);
                 });
-                Render.transferTrends(this.latestTransferTrends || {});
+                Render.transferTrends(this.latestTransferTrends || {}, this.latestPicksByUid || {});
                 return;
             }
 
