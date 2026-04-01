@@ -2282,7 +2282,7 @@ body {
 .trend-sankey-wrap {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
 }
 
 .trend-sankey-meta {
@@ -2293,10 +2293,11 @@ body {
     gap: 8px 14px;
     font-size: 11px;
     color: #64748b;
+    padding: 0 4px;
 }
 
 .trend-sankey-title {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 900;
     letter-spacing: 0.02em;
     color: #0f172a;
@@ -2304,12 +2305,13 @@ body {
 
 .trend-sankey-note {
     font-size: 10px;
+    color: #64748b;
 }
 
 .trend-sankey-svg {
     display: block;
     width: 100%;
-    min-height: 368px;
+    min-height: 380px;
     border-radius: 16px;
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
@@ -2319,31 +2321,60 @@ body {
 
 .trend-sankey-link {
     fill: none;
-    stroke-linecap: round;
-    mix-blend-mode: normal;
-    opacity: 0.56;
+    stroke-linecap: butt;
+    mix-blend-mode: multiply;
+    opacity: 0.45;
     cursor: help;
-    transition: opacity 0.18s ease;
+    transition: opacity 0.2s ease, stroke-width 0.2s ease;
 }
 
 .trend-sankey-link:hover {
+    opacity: 0.85;
+}
+
+/* Highlight effect when hovering over the diagram */
+.trend-sankey-svg:hover .trend-sankey-link {
+    opacity: 0.25;
+}
+
+.trend-sankey-svg:hover .trend-sankey-link:hover {
     opacity: 0.9;
 }
 
-.trend-sankey-bundle {
-    pointer-events: none;
+.trend-sankey-node {
+    stroke: #ffffff;
+    stroke-width: 2;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+    transition: filter 0.2s ease;
 }
 
-.trend-sankey-node {
-    stroke: rgba(255, 255, 255, 0.92);
-    stroke-width: 1;
+.trend-sankey-node-group:hover .trend-sankey-node {
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.15));
 }
 
 .trend-sankey-label {
-    fill: #0f172a;
-    font-size: 17px;
-    font-weight: 900;
+    fill: #1e293b;
+    font-size: 13px;
+    font-weight: 700;
     letter-spacing: 0.01em;
+    pointer-events: none;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .trend-sankey-svg {
+        min-height: 320px;
+    }
+    
+    .trend-sankey-label {
+        font-size: 11px;
+    }
+    
+    .trend-sankey-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
 }
 
 .chips-summary-card {

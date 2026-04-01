@@ -526,12 +526,13 @@ function splitDiagramLabel(name, maxUnits = 14, maxLines = 2) {
 }
 
 function renderDiagramLabel(node, side, nodeWidth) {
+    const labelGap = 12;
     const x = side === "left"
-        ? Number(node.x || 0) - 20
-        : Number(node.x || 0) + nodeWidth + 20;
+        ? Number(node.x || 0) - labelGap
+        : Number(node.x || 0) + nodeWidth + labelGap;
     const anchor = side === "left" ? "end" : "start";
-    const lines = splitDiagramLabel(node.name);
-    const lineHeight = 18;
+    const lines = splitDiagramLabel(node.name, 16, 2);
+    const lineHeight = 16;
     const startY = Number(node.y || 0) + Number(node.height || 0) / 2 - ((lines.length - 1) * lineHeight) / 2;
     return `<text class="trend-sankey-label" x="${x}" y="${startY}" text-anchor="${anchor}" dominant-baseline="middle">${lines.map((line, index) => `<tspan x="${x}" dy="${index === 0 ? 0 : lineHeight}">${escapeHtml(line)}</tspan>`).join("")}</text>`;
 }
@@ -644,31 +645,28 @@ function renderTransferDiagram(picksByUid) {
     const width = 940;
     const topPad = 22;
     const bottomPad = 22;
-    const nodeGap = 16;
-    const nodeWidth = 22;
-    const bundleWidth = 28;
-    const leftX = 236;
-    const rightX = width - 236 - nodeWidth;
-    const curve = 154;
-    const minNodeHeight = 18;
+    const nodeGap = 14;
+    const nodeWidth = 20;
+    const leftX = 220;
+    const rightX = width - 220 - nodeWidth;
+    const minNodeHeight = 16;
 
     const measureColumnHeight = (nodes, scale) =>
         nodes.reduce((sum, node) => sum + Math.max(Number(node.value || 0) * scale, minNodeHeight), 0) +
         Math.max(0, nodes.length - 1) * nodeGap;
 
     let scale = 14;
-    let leftHeight = measureColumnHeight(data.leftNodes, scale);
-    let rightHeight = measureColumnHeight(data.rightNodes, scale);
     const maxUnits = Math.max(
         data.leftNodes.reduce((sum, node) => sum + Number(node.value || 0), 0),
         data.rightNodes.reduce((sum, node) => sum + Number(node.value || 0), 0),
         1
     );
-    const targetHeight = 408;
-    scale = Math.max(7, Math.min(16, (targetHeight - topPad - bottomPad - (Math.max(data.leftNodes.length, data.rightNodes.length) - 1) * nodeGap) / maxUnits));
-    leftHeight = measureColumnHeight(data.leftNodes, scale);
-    rightHeight = measureColumnHeight(data.rightNodes, scale);
-    const height = Math.max(316, Math.max(leftHeight, rightHeight) + topPad + bottomPad);
+    const targetHeight = 420;
+    scale = Math.max(8, Math.min(18, (targetHeight - topPad - bottomPad - (Math.max(data.leftNodes.length, data.rightNodes.length) - 1) * nodeGap) / maxUnits));
+    
+    const leftHeight = measureColumnHeight(data.leftNodes, scale);
+    const rightHeight = measureColumnHeight(data.rightNodes, scale);
+    const height = Math.max(320, Math.max(leftHeight, rightHeight) + topPad + bottomPad);
 
     const layoutColumn = (nodes, x) => {
         let cursor = topPad;
@@ -689,15 +687,17 @@ function renderTransferDiagram(picksByUid) {
 
     const links = data.links.map((link, index) => ({
         ...link,
-        thickness: Math.max(Number(link.value || 0) * scale, 4),
+        thickness: Math.max(Number(link.value || 0) * scale, 3),
         gradientId: `trend-flow-${index}`,
     }));
 
+    // Calculate source Y positions - flows start from vertical center of each outgoing flow section
     Object.values(leftByName).forEach((node) => {
         const nodeLinks = links
             .filter((link) => link.source === node.name)
             .sort((a, b) => Number(rightOrder[a.target] || 0) - Number(rightOrder[b.target] || 0));
         const totalThickness = nodeLinks.reduce((sum, link) => sum + Number(link.thickness || 0), 0);
+        // Start from the top of the node, centered
         let cursor = Number(node.y || 0) + Math.max(0, (Number(node.height || 0) - totalThickness) / 2);
         nodeLinks.forEach((link) => {
             link.sourceY = cursor + Number(link.thickness || 0) / 2;
@@ -705,6 +705,7 @@ function renderTransferDiagram(picksByUid) {
         });
     });
 
+    // Calculate target Y positions
     Object.values(rightByName).forEach((node) => {
         const nodeLinks = links
             .filter((link) => link.target === node.name)
@@ -717,51 +718,88 @@ function renderTransferDiagram(picksByUid) {
         });
     });
 
+    // Build SVG with improved visual design
     const svg = `
         <svg class="trend-sankey-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly transfer diagram">
             <defs>
-                ${links.map((link) => `
+                ${links.map((link) => {
+                    const sourceColor = getTransferDiagramColor(link.source, 1);
+                    const targetColor = getTransferDiagramColor(link.target, 1);
+                    return `
                     <linearGradient id="${link.gradientId}" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="${getTransferDiagramColor(link.source, 0.42)}"></stop>
-                        <stop offset="100%" stop-color="${getTransferDiagramColor(link.target, 0.42)}"></stop>
+                        <stop offset="0%" stop-color="${sourceColor}"></stop>
+                        <stop offset="100%" stop-color="${targetColor}"></stop>
                     </linearGradient>
-                `).join("")}
+                    `;
+                }).join("")}
             </defs>
-            ${leftNodes.map((node) => `
-                <rect class="trend-sankey-bundle" x="${Number(node.x || 0) + nodeWidth - 1}" y="${Number(node.y || 0)}" width="${bundleWidth + 2}" height="${Number(node.height || 0)}" rx="10" fill="${getTransferDiagramColor(node.name, 0.18)}"></rect>
-            `).join("")}
-            ${rightNodes.map((node) => `
-                <rect class="trend-sankey-bundle" x="${Number(node.x || 0) - bundleWidth - 1}" y="${Number(node.y || 0)}" width="${bundleWidth + 2}" height="${Number(node.height || 0)}" rx="10" fill="${getTransferDiagramColor(node.name, 0.18)}"></rect>
-            `).join("")}
+            
+            <!-- Flow lines - rendered first so they appear behind nodes -->
             ${links.map((link) => {
                 const leftNode = leftByName[link.source];
                 const rightNode = rightByName[link.target];
                 if (!leftNode || !rightNode) return "";
-                const startX = Number(leftNode.x || 0) + nodeWidth + bundleWidth;
-                const endX = Number(rightNode.x || 0) - bundleWidth;
+                
+                // Start exactly from the right edge of left node
+                const startX = Number(leftNode.x || 0) + nodeWidth;
+                const endX = Number(rightNode.x || 0);
                 const startY = Number(link.sourceY || 0);
                 const endY = Number(link.targetY || 0);
+                
+                // Calculate control points for smooth sankey-style curve
+                // Use a gradual curve that starts horizontal and ends horizontal
+                const distance = endX - startX;
+                const controlOffset = Math.min(distance * 0.5, 120);
+                
+                // Create cubic bezier path
+                const path = `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${endX - controlOffset} ${endY}, ${endX} ${endY}`;
+                
                 return `
                     <path class="trend-sankey-link"
-                        d="M ${startX} ${startY} C ${startX + curve} ${startY}, ${endX - curve} ${endY}, ${endX} ${endY}"
+                        d="${path}"
                         stroke="url(#${link.gradientId})"
-                        stroke-width="${Number(link.thickness || 0).toFixed(2)}">
-                        <title>${escapeHtml(link.source)} -> ${escapeHtml(link.target)}: ${Number(link.value || 0)} moves</title>
+                        stroke-width="${Number(link.thickness || 0).toFixed(2)}"
+                        fill="none">
+                        <title>${escapeHtml(link.source)} → ${escapeHtml(link.target)}: ${Number(link.value || 0)} moves</title>
                     </path>
                 `;
             }).join("")}
-            ${leftNodes.map((node) => `
-                <g>
-                    <rect class="trend-sankey-node" x="${Number(node.x || 0)}" y="${Number(node.y || 0)}" width="${nodeWidth}" height="${Number(node.height || 0)}" rx="8" fill="${getTransferDiagramColor(node.name, 0.9)}"></rect>
+            
+            <!-- Left nodes -->
+            ${leftNodes.map((node) => {
+                const color = getTransferDiagramColor(node.name, 1);
+                return `
+                <g class="trend-sankey-node-group">
+                    <rect class="trend-sankey-node" 
+                        x="${Number(node.x || 0)}" 
+                        y="${Number(node.y || 0)}" 
+                        width="${nodeWidth}" 
+                        height="${Number(node.height || 0)}" 
+                        rx="4" 
+                        fill="${color}">
+                    </rect>
                     ${renderDiagramLabel(node, "left", nodeWidth)}
                 </g>
-            `).join("")}
-            ${rightNodes.map((node) => `
-                <g>
-                    <rect class="trend-sankey-node" x="${Number(node.x || 0)}" y="${Number(node.y || 0)}" width="${nodeWidth}" height="${Number(node.height || 0)}" rx="8" fill="${getTransferDiagramColor(node.name, 0.9)}"></rect>
+                `;
+            }).join("")}
+            
+            <!-- Right nodes -->
+            ${rightNodes.map((node) => {
+                const color = getTransferDiagramColor(node.name, 1);
+                return `
+                <g class="trend-sankey-node-group">
+                    <rect class="trend-sankey-node" 
+                        x="${Number(node.x || 0)}" 
+                        y="${Number(node.y || 0)}" 
+                        width="${nodeWidth}" 
+                        height="${Number(node.height || 0)}" 
+                        rx="4" 
+                        fill="${color}">
+                    </rect>
                     ${renderDiagramLabel(node, "right", nodeWidth)}
                 </g>
-            `).join("")}
+                `;
+            }).join("")}
         </svg>
     `;
 
