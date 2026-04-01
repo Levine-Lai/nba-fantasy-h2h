@@ -418,8 +418,10 @@ const Render = {
             return;
         }
 
-        const splitIndex = Math.ceil(rankings.length / 2);
-        const columns = [rankings.slice(0, splitIndex), rankings.slice(splitIndex)];
+        const columns = [[], []];
+        rankings.forEach((item, index) => {
+            columns[index % 2].push(item);
+        });
         container.innerHTML = `
             <div class="special-guy-grid">
                 ${columns.map((items) => `

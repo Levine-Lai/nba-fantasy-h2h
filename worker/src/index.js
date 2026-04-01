@@ -269,6 +269,8 @@ function buildPreviousPicksByUid(previousState) {
         gd1_transfer_count: Number(standing?.gd1_transfer_count || 0),
         gd1_missing_penalty: Number(standing?.gd1_missing_penalty || 0),
         wildcard_active: !!standing?.wildcard_active,
+        wildcard_post_gw17_event: Number(standing?.wildcard_post_gw17_event || 0) || null,
+        rich_day: Number(standing?.rich_day || 0) || null,
         chip_status: standing?.chip_status || null,
         event_total: Number(standing?.total || 0),
         players: Array.isArray(players) ? players : [],
@@ -1341,19 +1343,19 @@ function buildChipsUsedSummary(picksByUid) {
       key: "captain",
       label: "Captain",
       note: "this week",
-      isUsed: (payload) => !!(payload?.chip_status?.captain_used || payload?.captain_used?.used),
+      isUsed: (payload) => buildPersistedChipStatus(payload).captain_used,
     },
     {
       key: "all_stars",
       label: "All-Stars",
       note: "season",
-      isUsed: (payload) => !!(payload?.chip_status?.all_stars_used || payload?.rich_day),
+      isUsed: (payload) => buildPersistedChipStatus(payload).all_stars_used,
     },
     {
       key: "wildcard",
       label: "Wildcard",
       note: "GW17+",
-      isUsed: (payload) => !!(payload?.chip_status?.wildcard_used || payload?.wildcard_active || payload?.wildcard_day),
+      isUsed: (payload) => buildPersistedChipStatus(payload).wildcard_used,
     },
   ];
 
@@ -1405,6 +1407,9 @@ async function refreshManagerMetaState(env, existingState = null) {
     const wildcardDay = hasHistoryData
       ? getWildcardDayFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
       : Number(previous.wildcard_day || 0) || null;
+    const wildcardPostGw17Event = hasHistoryData
+      ? getWildcardPostGw17Event(historyData, eventMetaById)
+      : Number(previous.wildcard_post_gw17_event || 0) || null;
     const richEvent = hasHistoryData
       ? getSeasonChipEvent(historyData, ["rich"])
       : Number(previous.rich_day || 0) || null;
@@ -1431,11 +1436,7 @@ async function refreshManagerMetaState(env, existingState = null) {
         };
     const chipStatus = hasHistoryData
       ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
-      : previous.chip_status || {
-          captain_used: !!previous?.captain_used?.used,
-          wildcard_used: !!previous?.wildcard_active,
-          all_stars_used: !!previous?.rich_day,
-        };
+      : buildPersistedChipStatus(previous);
 
     nextPicksByUid[uid] = {
       ...previous,
@@ -1446,6 +1447,7 @@ async function refreshManagerMetaState(env, existingState = null) {
       gd1_missing_penalty: gd1MissingPenalty,
       wildcard_active: previous.wildcard_active,
       wildcard_day: wildcardDay,
+      wildcard_post_gw17_event: wildcardPostGw17Event ? Number(wildcardPostGw17Event) : null,
       rich_day: richEvent ? Number(richEvent) : null,
       captain_used: captainUsed,
       chip_status: chipStatus,
@@ -1650,6 +1652,27 @@ function getSeasonChipEvent(historyData, names = []) {
     if (itemEvent > 0) return itemEvent;
   }
   return null;
+}
+
+function getWildcardPostGw17Event(historyData, eventMetaById, minGw = 17) {
+  for (const item of extractChipHistoryRecords(historyData)) {
+    const rawName = String(item?.name || "").toLowerCase();
+    if (rawName !== "wildcard" && rawName !== "wild_card") continue;
+    const itemEvent = Number(item?.event || 0);
+    const eventMeta = eventMetaById?.[itemEvent] || {};
+    const itemGw = Number(item?.gw || item?.gameweek || eventMeta.gw || extractGwNumber(itemEvent) || 0);
+    if (itemEvent > 0 && itemGw >= Number(minGw || 17)) return itemEvent;
+  }
+  return null;
+}
+
+function buildPersistedChipStatus(payload = {}) {
+  const current = payload?.chip_status && typeof payload.chip_status === "object" ? payload.chip_status : {};
+  return {
+    captain_used: !!(current?.captain_used || payload?.captain_used?.used),
+    wildcard_used: !!(current?.wildcard_used || payload?.wildcard_post_gw17_event),
+    all_stars_used: !!(current?.all_stars_used || payload?.rich_day),
+  };
 }
 
 function buildCaptainUsageFromHistoryOnly(historyData, currentGw, currentEvent, eventMetaById, previousCaptainUsed = null) {
@@ -2585,6 +2608,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       gd1_missing_penalty: Number(previous.gd1_missing_penalty || 0),
       wildcard_active: !!previous.wildcard_active,
       wildcard_day: Number(previous.wildcard_day || 0) || null,
+      wildcard_post_gw17_event: Number(previous.wildcard_post_gw17_event || 0) || null,
       rich_day: Number(previous.rich_day || 0) || null,
       transfer_records: Array.isArray(previous.transfer_records) ? previous.transfer_records : [],
       week_total_summary: previous.week_total_summary || null,
@@ -2655,6 +2679,9 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     const wildcardDay = hasHistoryData
       ? getWildcardDayFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
       : Number(previous.wildcard_day || 0) || null;
+    const wildcardPostGw17Event = hasHistoryData
+      ? getWildcardPostGw17Event(historyData, eventMetaById)
+      : Number(previous.wildcard_post_gw17_event || 0) || null;
     const richDay = hasHistoryData
       ? getSeasonChipEvent(historyData, ["rich"])
       : Number(previous.rich_day || 0) || null;
@@ -2679,11 +2706,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       : previous.captain_used || { used: false, label: "None", day: null, captain_name: null, captain_points: null };
     const chipStatus = hasHistoryData
       ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
-      : previous.chip_status || {
-        captain_used: !!previous?.captain_used?.used,
-        wildcard_used: !!previous?.wildcard_active,
-        all_stars_used: !!previous?.rich_day,
-      };
+      : buildPersistedChipStatus(previous);
 
     standingsByUid[uid].penalty_score = penaltyScore;
     standingsByUid[uid].transfer_count = transferCount;
@@ -2692,6 +2715,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     standingsByUid[uid].gd1_missing_penalty = gd1MissingPenalty;
     standingsByUid[uid].wildcard_active = wildcardActive;
     standingsByUid[uid].wildcard_day = wildcardDay;
+    standingsByUid[uid].wildcard_post_gw17_event = wildcardPostGw17Event ? Number(wildcardPostGw17Event) : null;
     standingsByUid[uid].rich_day = richDay ? Number(richDay) : null;
     standingsByUid[uid].transfer_records = transferSummary.records;
     standingsByUid[uid].captain_used = captainUsed;
@@ -2905,6 +2929,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       gd1_missing_penalty: s.gd1_missing_penalty || 0,
       wildcard_active: !!s.wildcard_active,
       wildcard_day: s.wildcard_day || null,
+      wildcard_post_gw17_event: s.wildcard_post_gw17_event || null,
       rich_day: s.rich_day || null,
       fetch_status: s.fetch_status || { picks_ok: true, history_ok: true, transfers_ok: true },
       event_total: s.week_total || 0,
@@ -2921,11 +2946,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
         captain_name: null,
         captain_points: null,
       },
-      chip_status: s.chip_status || {
-        captain_used: !!s?.captain_used?.used,
-        wildcard_used: !!s.wildcard_active,
-        all_stars_used: !!s.rich_day,
-      },
+      chip_status: buildPersistedChipStatus(s),
       lineup_economy: s.lineup_economy || {
         effective_total_cost: 0,
         breakeven_line: 0,
