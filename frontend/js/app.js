@@ -663,15 +663,12 @@ function renderTransferDiagram(picksByUid) {
     const rightOrder = Object.fromEntries(rightNodes.map((node, index) => [node.name, index]));
     const leftOrder = Object.fromEntries(leftNodes.map((node, index) => [node.name, index]));
 
-    const links = data.links.map((link) => ({
+    const links = data.links.map((link, index) => ({
         ...link,
+        id: `trend-transfer-link-${index}`,
         thickness: Math.max(Number(link.value || 0) * scale, 6),
-        stroke: getTransferDiagramColor(
-            link.source === TRANSFER_DIAGRAM_OTHERS && link.target !== TRANSFER_DIAGRAM_OTHERS
-                ? link.target
-                : link.source,
-            0.72
-        ),
+        sourceColor: getTransferDiagramColor(link.source, 1),
+        targetColor: getTransferDiagramColor(link.target, 1),
     }));
 
     Object.values(leftByName).forEach((node) => {
@@ -705,6 +702,25 @@ function renderTransferDiagram(picksByUid) {
                 <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · low-signal transfer names are grouped into Others</div>
             </div>
             <svg class="trend-sankey-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly transfer diagram">
+                <defs>
+                    ${links.map((link) => {
+                        const leftNode = leftByName[link.source];
+                        const rightNode = rightByName[link.target];
+                        if (!leftNode || !rightNode) return "";
+                        const startX = Number(leftNode.x || 0) + nodeWidth;
+                        const endX = Number(rightNode.x || 0);
+                        const startY = Number(link.sourceY || 0);
+                        const endY = Number(link.targetY || 0);
+                        return `
+                            <linearGradient id="${link.id}" gradientUnits="userSpaceOnUse"
+                                x1="${startX}" y1="${startY}" x2="${endX}" y2="${endY}">
+                                <stop offset="0%" stop-color="${link.sourceColor}" stop-opacity="0.92"></stop>
+                                <stop offset="48%" stop-color="${link.sourceColor}" stop-opacity="0.9"></stop>
+                                <stop offset="100%" stop-color="${link.targetColor}" stop-opacity="0.92"></stop>
+                            </linearGradient>
+                        `;
+                    }).join("")}
+                </defs>
                 ${leftNodes.map((node) => `
                     <rect class="trend-sankey-bundle"
                         x="${Number(node.x || 0) + nodeWidth - 1}"
@@ -727,8 +743,8 @@ function renderTransferDiagram(picksByUid) {
                     const leftNode = leftByName[link.source];
                     const rightNode = rightByName[link.target];
                     if (!leftNode || !rightNode) return "";
-                    const startX = Number(leftNode.x || 0) + nodeWidth + bundleWidth;
-                    const endX = Number(rightNode.x || 0) - bundleWidth;
+                    const startX = Number(leftNode.x || 0) + nodeWidth;
+                    const endX = Number(rightNode.x || 0);
                     const startY = Number(link.sourceY || 0);
                     const endY = Number(link.targetY || 0);
                     const distance = endX - startX;
@@ -737,7 +753,7 @@ function renderTransferDiagram(picksByUid) {
                     return `
                         <path class="trend-sankey-link"
                             d="${path}"
-                            stroke="${link.stroke}"
+                            stroke="url(#${link.id})"
                             stroke-width="${Number(link.thickness || 0).toFixed(2)}"
                             fill="none">
                             <title>${escapeHtml(link.source)} -> ${escapeHtml(link.target)}: ${Number(link.value || 0)} moves</title>
@@ -829,7 +845,7 @@ const Render = {
 
         transferCard.classList.toggle("diagram-mode", direction === "diagram");
         transferTable.classList.toggle("diagram-mode", direction === "diagram");
-        transferHead.style.display = direction === "diagram" ? "none" : "";
+        transferHead.style.display = "";
 
         transferTable.innerHTML = direction === "diagram"
             ? renderTransferDiagram(picksByUid)
@@ -1603,7 +1619,7 @@ const App = {
     playerOptions: [],
     referencePositionFilter: "ALL",
     referenceSearchQuery: "",
-    transferDirection: "diagram",
+    transferDirection: "in",
     latestTransferTrends: null,
     latestPicksByUid: {},
 
