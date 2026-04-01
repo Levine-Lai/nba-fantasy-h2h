@@ -1,2 +1,8 @@
 .wrangler/
 node_modules/
+cache/
+logs/
+backend/__pycache__/
+backend/routers/__pycache__/
+__pycache__/
+*.pyc

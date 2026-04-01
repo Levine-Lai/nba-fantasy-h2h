@@ -24,8 +24,8 @@ worker/
   wrangler.toml
   package.json
 
-backend/                # 本地 FastAPI 版本（可选）
-cache/
+backend/                # 本地 FastAPI 历史版本（可选保留）
+cache/                  # 本地产物目录（已忽略，可不保留）
 ```
 
 说明：
