@@ -2801,7 +2801,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     const captainUsedBase = hasHistoryData
       ? await buildCaptainUsageSummary(uidNumber, historyData, currentWeek, currentEvent, eventMetaById, elements, eventLiveCache)
       : previous.captain_used || { used: false, label: "None", day: null, captain_name: null, captain_points: null };
-    const captainUsed = activeChip === "phcapt"
+    let captainUsed = activeChip === "phcapt"
       ? {
           ...captainUsedBase,
           used: true,
@@ -2936,6 +2936,25 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       is_effective: false,
     };
     });
+
+    if (activeChip === "phcapt") {
+      const captainPick = picks.find((pick) => pick?.is_captain);
+      if (captainPick) {
+        const captainDay = Number(captainUsed?.day || currentMeta?.day || 0) || null;
+        const captainPoints = Number(captainPick.final_points || 0);
+        captainUsed = {
+          ...captainUsed,
+          used: true,
+          day: captainDay,
+          captain_name: captainPick.name || captainUsed?.captain_name || null,
+          captain_points: captainPoints,
+          label: captainDay
+            ? `DAY${captainDay}: ${captainPick.name || captainUsed?.captain_name || "None"} ${captainPoints}`
+            : `Used: ${captainPick.name || captainUsed?.captain_name || "None"} ${captainPoints}`,
+        };
+        standingsByUid[uid].captain_used = captainUsed;
+      }
+    }
 
     const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
     const lineupEconomy = buildLineupEconomySummary(picks);
@@ -3791,7 +3810,14 @@ export default {
         let payload = state.picks_by_uid[uid] || {};
         const forceFresh = url.searchParams.get("fresh") === "1";
         const eventChanged = Number(payload?.current_event || 0) !== Number(state?.current_event || 0);
-        if (forceFresh || eventChanged || !payload.players || payload.players.length === 0) {
+        const captainDetailsStale =
+          Number(payload?.current_event || 0) === Number(state?.current_event || 0) &&
+          !!payload?.chip_status?.captain_used &&
+          (
+            !payload?.captain_used?.used ||
+            !payload?.captain_used?.captain_name
+          );
+        if (forceFresh || eventChanged || !payload.players || payload.players.length === 0 || captainDetailsStale) {
           const freshState = await buildState(state, [uid]);
           payload = freshState.picks_by_uid[uid] || {};
         }
