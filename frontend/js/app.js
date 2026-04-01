@@ -530,13 +530,13 @@ function splitDiagramLabel(name, maxUnits = 14, maxLines = 2) {
 }
 
 function renderDiagramLabel(node, side, nodeWidth) {
-    const labelGap = 16;
+    const labelGap = 10;
     const x = side === "left"
         ? Number(node.x || 0) - labelGap
         : Number(node.x || 0) + nodeWidth + labelGap;
     const anchor = side === "left" ? "end" : "start";
-    const lines = splitDiagramLabel(node.name, 18, 2);
-    const lineHeight = 18;
+    const lines = splitDiagramLabel(node.name, 16, 2);
+    const lineHeight = 14;
     const startY = Number(node.y || 0) + Number(node.height || 0) / 2 - ((lines.length - 1) * lineHeight) / 2;
     return `<text class="trend-sankey-label" x="${x}" y="${startY}" text-anchor="${anchor}" dominant-baseline="middle">${lines.map((line, index) => `<tspan x="${x}" dy="${index === 0 ? 0 : lineHeight}">${escapeHtml(line)}</tspan>`).join("")}</text>`;
 }
@@ -648,14 +648,20 @@ function renderTransferDiagram(picksByUid) {
         return '<div class="trend-empty">No weekly transfer diagram</div>';
     }
 
-    const width = 940;
-    const topPad = 20;
-    const bottomPad = 20;
-    const nodeGap = 12;
-    const nodeWidth = 22;
-    const leftX = 200;
-    const rightX = width - 200 - nodeWidth;
-    const minNodeHeight = 18;
+    // Container dimensions - maximize usage of available space
+    const containerWidth = 940;
+    const containerHeight = 580;
+    const margin = { top: 16, right: 16, bottom: 16, left: 16 };
+    const width = containerWidth;
+    const height = containerHeight;
+    const topPad = margin.top;
+    const bottomPad = margin.bottom;
+    const nodeGap = 10;
+    const nodeWidth = 18;
+    // Position columns to use full width
+    const leftX = margin.left + 120;
+    const rightX = width - margin.right - 120 - nodeWidth;
+    const minNodeHeight = 16;
 
     const measureColumnHeight = (nodes, scale) =>
         nodes.reduce((sum, node) => sum + Math.max(Number(node.value || 0) * scale, minNodeHeight), 0) +
@@ -667,8 +673,9 @@ function renderTransferDiagram(picksByUid) {
         data.rightNodes.reduce((sum, node) => sum + Number(node.value || 0), 0),
         1
     );
-    const targetHeight = 540;
-    scale = Math.max(10, Math.min(22, (targetHeight - topPad - bottomPad - (Math.max(data.leftNodes.length, data.rightNodes.length) - 1) * nodeGap) / maxUnits));
+    // Calculate scale to fill the available height
+    const availableHeight = height - topPad - bottomPad;
+    scale = Math.max(8, Math.min(24, (availableHeight - (Math.max(data.leftNodes.length, data.rightNodes.length) - 1) * nodeGap) / maxUnits));
     
     const leftHeight = measureColumnHeight(data.leftNodes, scale);
     const rightHeight = measureColumnHeight(data.rightNodes, scale);
@@ -693,7 +700,7 @@ function renderTransferDiagram(picksByUid) {
 
     const links = data.links.map((link, index) => ({
         ...link,
-        thickness: Math.max(Number(link.value || 0) * scale, 5),
+        thickness: Math.max(Number(link.value || 0) * scale, 6),
         gradientId: `trend-flow-${index}`,
     }));
 
@@ -724,48 +731,48 @@ function renderTransferDiagram(picksByUid) {
         });
     });
 
-    // Build SVG with improved visual design
+    // Build SVG - use source color for links, fill container
     const svg = `
-        <svg class="trend-sankey-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly transfer diagram">
+        <svg class="trend-sankey-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Weekly transfer diagram">
             <defs>
                 ${links.map((link) => {
                     const sourceColor = getTransferDiagramColor(link.source, 1);
-                    const targetColor = getTransferDiagramColor(link.target, 1);
                     return `
                     <linearGradient id="${link.gradientId}" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="${sourceColor}"></stop>
-                        <stop offset="100%" stop-color="${targetColor}"></stop>
+                        <stop offset="0%" stop-color="${sourceColor}" stop-opacity="0.75"></stop>
+                        <stop offset="100%" stop-color="${sourceColor}" stop-opacity="0.45"></stop>
                     </linearGradient>
                     `;
                 }).join("")}
             </defs>
             
-            <!-- Flow lines - rendered first so they appear behind nodes -->
+            <!-- Flow lines - use source color with emphasis state -->
             ${links.map((link) => {
                 const leftNode = leftByName[link.source];
                 const rightNode = rightByName[link.target];
                 if (!leftNode || !rightNode) return "";
                 
-                // Start exactly from the right edge of left node
                 const startX = Number(leftNode.x || 0) + nodeWidth;
                 const endX = Number(rightNode.x || 0);
                 const startY = Number(link.sourceY || 0);
                 const endY = Number(link.targetY || 0);
                 
-                // Calculate control points for smooth sankey-style curve
-                // Use a gradual curve that starts horizontal and ends horizontal
+                // Smooth bezier curve
                 const distance = endX - startX;
-                const controlOffset = Math.min(distance * 0.5, 120);
-                
-                // Create cubic bezier path
+                const controlOffset = Math.min(distance * 0.5, 100);
                 const path = `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${endX - controlOffset} ${endY}, ${endX} ${endY}`;
+                
+                const sourceColor = getTransferDiagramColor(link.source, 1);
                 
                 return `
                     <path class="trend-sankey-link"
+                        data-source="${escapeHtml(link.source)}"
+                        data-target="${escapeHtml(link.target)}"
                         d="${path}"
-                        stroke="url(#${link.gradientId})"
+                        stroke="${sourceColor}"
                         stroke-width="${Number(link.thickness || 0).toFixed(2)}"
-                        fill="none">
+                        fill="none"
+                        style="--link-color: ${sourceColor}">
                         <title>${escapeHtml(link.source)} → ${escapeHtml(link.target)}: ${Number(link.value || 0)} moves</title>
                     </path>
                 `;
@@ -775,13 +782,13 @@ function renderTransferDiagram(picksByUid) {
             ${leftNodes.map((node) => {
                 const color = getTransferDiagramColor(node.name, 1);
                 return `
-                <g class="trend-sankey-node-group">
+                <g class="trend-sankey-node-group" data-node="${escapeHtml(node.name)}">
                     <rect class="trend-sankey-node" 
                         x="${Number(node.x || 0)}" 
                         y="${Number(node.y || 0)}" 
                         width="${nodeWidth}" 
                         height="${Number(node.height || 0)}" 
-                        rx="4" 
+                        rx="3" 
                         fill="${color}">
                     </rect>
                     ${renderDiagramLabel(node, "left", nodeWidth)}
@@ -793,13 +800,13 @@ function renderTransferDiagram(picksByUid) {
             ${rightNodes.map((node) => {
                 const color = getTransferDiagramColor(node.name, 1);
                 return `
-                <g class="trend-sankey-node-group">
+                <g class="trend-sankey-node-group" data-node="${escapeHtml(node.name)}">
                     <rect class="trend-sankey-node" 
                         x="${Number(node.x || 0)}" 
                         y="${Number(node.y || 0)}" 
                         width="${nodeWidth}" 
                         height="${Number(node.height || 0)}" 
-                        rx="4" 
+                        rx="3" 
                         fill="${color}">
                     </rect>
                     ${renderDiagramLabel(node, "right", nodeWidth)}
@@ -809,13 +816,60 @@ function renderTransferDiagram(picksByUid) {
         </svg>
     `;
 
+    // Generate unique ID for this diagram instance
+    const diagramId = `sankey-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Add inline script for emphasis interactions
+    const interactionScript = `
+        <script>
+        (function() {
+            const svg = document.getElementById('${diagramId}');
+            if (!svg) return;
+            
+            const links = svg.querySelectorAll('.trend-sankey-link');
+            const nodes = svg.querySelectorAll('.trend-sankey-node-group');
+            
+            // Store original stroke widths
+            links.forEach(link => {
+                const width = link.getAttribute('stroke-width');
+                link.style.setProperty('--original-width', width + 'px');
+            });
+            
+            // Node hover - highlight connected links
+            nodes.forEach(node => {
+                node.addEventListener('mouseenter', function() {
+                    const nodeName = this.getAttribute('data-node');
+                    links.forEach(link => {
+                        const source = link.getAttribute('data-source');
+                        const target = link.getAttribute('data-target');
+                        if (source === nodeName || target === nodeName) {
+                            link.classList.add('is-emphasized');
+                            link.style.opacity = '0.9';
+                        } else {
+                            link.style.opacity = '0.15';
+                        }
+                    });
+                });
+                
+                node.addEventListener('mouseleave', function() {
+                    links.forEach(link => {
+                        link.classList.remove('is-emphasized');
+                        link.style.opacity = '';
+                    });
+                });
+            });
+        })();
+        </script>
+    `;
+    
     return `
         <div class="trend-sankey-wrap">
             <div class="trend-sankey-meta">
                 <div class="trend-sankey-title">League Moves</div>
                 <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · hover flows for exact counts · players with &lt;2 transfers (in or out) are grouped to "Others"</div>
             </div>
-            ${svg}
+            ${svg.replace('<svg class="trend-sankey-svg"', `<svg id="${diagramId}" class="trend-sankey-svg"`)}
+            ${interactionScript}
         </div>
     `;
 }
