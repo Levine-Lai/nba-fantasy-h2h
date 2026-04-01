@@ -54,6 +54,7 @@ const API = {
     },
 };
 
+// Update this snapshot when a new gameweek closes.
 const GW23_LAST_STANDINGS = [
     { rank: 1, uid: "2", team_name: "大吉鲁", gw: 23, won: 17, draw: 1, lost: 5, scored: 28919, conceded: 26523, points: 52 },
     { rank: 2, uid: "15", team_name: "笨笨", gw: 23, won: 17, draw: 0, lost: 6, scored: 25710, conceded: 26714, points: 51 },
@@ -84,6 +85,8 @@ const GW23_LAST_STANDINGS = [
 ];
 
 const MAX_TITLE_POINTS_REMAINING = 6;
+const TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD = 2;
+const TRANSFER_DIAGRAM_OTHERS_LABEL = "Others";
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -442,6 +445,97 @@ function getTransferDiagramColor(value, alpha = 1) {
     return `hsla(${hue}, 72%, 48%, ${alpha})`;
 }
 
+function measureDiagramLabelUnits(text) {
+    return Array.from(String(text || "")).reduce((sum, ch) => (
+        sum + (/[\u0000-\u00ff]/.test(ch) ? 0.62 : 1.02)
+    ), 0);
+}
+
+function truncateDiagramLabel(text, maxUnits) {
+    const chars = Array.from(String(text || ""));
+    let output = "";
+    let units = 0;
+    for (const ch of chars) {
+        const nextUnits = units + measureDiagramLabelUnits(ch);
+        if (nextUnits > Math.max(1, maxUnits - 1)) break;
+        output += ch;
+        units = nextUnits;
+    }
+    return output && output !== text ? `${output}\u2026` : (output || text);
+}
+
+function chunkDiagramToken(token, maxUnits) {
+    const chars = Array.from(String(token || ""));
+    if (!chars.length) return [];
+    const parts = [];
+    let current = "";
+    let units = 0;
+    chars.forEach((ch) => {
+        const nextUnits = units + measureDiagramLabelUnits(ch);
+        if (current && nextUnits > maxUnits) {
+            parts.push(current);
+            current = ch;
+            units = measureDiagramLabelUnits(ch);
+            return;
+        }
+        current += ch;
+        units = nextUnits;
+    });
+    if (current) parts.push(current);
+    return parts;
+}
+
+function splitDiagramLabel(name, maxUnits = 11.5, maxLines = 2) {
+    const raw = String(name || "").trim();
+    if (!raw) return ["-"];
+
+    const expanded = raw
+        .replace(/([.\-/])/g, "$1 ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const tokens = expanded
+        .split(" ")
+        .filter(Boolean)
+        .flatMap((token) => (
+            measureDiagramLabelUnits(token) > maxUnits * 1.15
+                ? chunkDiagramToken(token, maxUnits)
+                : [token]
+        ));
+
+    const lines = [];
+    let current = "";
+
+    tokens.forEach((token) => {
+        const candidate = current ? `${current} ${token}` : token;
+        if (!current || measureDiagramLabelUnits(candidate) <= maxUnits) {
+            current = candidate;
+            return;
+        }
+        lines.push(current);
+        current = token;
+    });
+
+    if (current) lines.push(current);
+    if (lines.length <= maxLines) return lines;
+
+    const kept = lines.slice(0, maxLines - 1);
+    const remainder = lines.slice(maxLines - 1).join(" ");
+    kept.push(truncateDiagramLabel(remainder, maxUnits));
+    return kept;
+}
+
+function renderDiagramLabel(node, side, nodeWidth) {
+    const x = side === "left"
+        ? Number(node.x || 0) - 16
+        : Number(node.x || 0) + nodeWidth + 16;
+    const anchor = side === "left" ? "end" : "start";
+    const lines = splitDiagramLabel(node.name);
+    const lineHeight = 16;
+    const startY = Number(node.y || 0) + Number(node.height || 0) / 2 - ((lines.length - 1) * lineHeight) / 2;
+    return `<text class="trend-sankey-label" x="${x}" y="${startY}" text-anchor="${anchor}" dominant-baseline="middle">${lines.map((line, index) => `<tspan x="${x}" dy="${index === 0 ? 0 : lineHeight}">${escapeHtml(line)}</tspan>`).join("")}</text>`;
+}
+
 function buildTransferDiagramData(picksByUid) {
     const linkMap = new Map();
     let totalMoves = 0;
@@ -459,11 +553,29 @@ function buildTransferDiagramData(picksByUid) {
         });
     });
 
-    const links = Array.from(linkMap.values()).sort((a, b) =>
+    const rawLinks = Array.from(linkMap.values()).sort((a, b) =>
         Number(b.value || 0) - Number(a.value || 0) ||
         String(a.source || "").localeCompare(String(b.source || "")) ||
         String(a.target || "").localeCompare(String(b.target || ""))
     );
+
+    const links = [];
+    let minorMoveTotal = 0;
+    rawLinks.forEach((link) => {
+        if (Number(link.value || 0) < TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD) {
+            minorMoveTotal += Number(link.value || 0);
+            return;
+        }
+        links.push(link);
+    });
+
+    if (minorMoveTotal > 0) {
+        links.push({
+            source: TRANSFER_DIAGRAM_OTHERS_LABEL,
+            target: TRANSFER_DIAGRAM_OTHERS_LABEL,
+            value: minorMoveTotal,
+        });
+    }
 
     if (!links.length) {
         return {
@@ -503,15 +615,15 @@ function renderTransferDiagram(picksByUid) {
         return '<div class="trend-empty">No weekly transfer diagram</div>';
     }
 
-    const width = 720;
+    const width = 860;
     const topPad = 24;
     const bottomPad = 24;
-    const nodeGap = 14;
-    const nodeWidth = 18;
-    const leftX = 156;
-    const rightX = 546;
-    const curve = 126;
-    const minNodeHeight = 18;
+    const nodeGap = 16;
+    const nodeWidth = 20;
+    const leftX = 220;
+    const rightX = width - 220 - nodeWidth;
+    const curve = 168;
+    const minNodeHeight = 20;
 
     const measureColumnHeight = (nodes, scale) =>
         nodes.reduce((sum, node) => sum + Math.max(Number(node.value || 0) * scale, minNodeHeight), 0) +
@@ -600,15 +712,13 @@ function renderTransferDiagram(picksByUid) {
             ${leftNodes.map((node) => `
                 <g>
                     <rect class="trend-sankey-node" x="${Number(node.x || 0)}" y="${Number(node.y || 0)}" width="${nodeWidth}" height="${Number(node.height || 0)}" rx="8" fill="${getTransferDiagramColor(node.name, 0.9)}"></rect>
-                    <text class="trend-sankey-label" x="${Number(node.x || 0) - 10}" y="${Number(node.y || 0) + 14}" text-anchor="end">${escapeHtml(node.name)}</text>
-                    <text class="trend-sankey-count" x="${Number(node.x || 0) - 10}" y="${Number(node.y || 0) + 29}" text-anchor="end">${Number(node.value || 0)} moves</text>
+                    ${renderDiagramLabel(node, "left", nodeWidth)}
                 </g>
             `).join("")}
             ${rightNodes.map((node) => `
                 <g>
                     <rect class="trend-sankey-node" x="${Number(node.x || 0)}" y="${Number(node.y || 0)}" width="${nodeWidth}" height="${Number(node.height || 0)}" rx="8" fill="${getTransferDiagramColor(node.name, 0.9)}"></rect>
-                    <text class="trend-sankey-label" x="${Number(node.x || 0) + nodeWidth + 10}" y="${Number(node.y || 0) + 14}" text-anchor="start">${escapeHtml(node.name)}</text>
-                    <text class="trend-sankey-count" x="${Number(node.x || 0) + nodeWidth + 10}" y="${Number(node.y || 0) + 29}" text-anchor="start">${Number(node.value || 0)} moves</text>
+                    ${renderDiagramLabel(node, "right", nodeWidth)}
                 </g>
             `).join("")}
         </svg>
@@ -618,7 +728,7 @@ function renderTransferDiagram(picksByUid) {
         <div class="trend-sankey-wrap">
             <div class="trend-sankey-meta">
                 <div class="trend-sankey-title">League GW Diagram</div>
-                <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · ${Number(data.links.length || 0)} unique paths</div>
+                <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · ${Number(data.links.length || 0)} shown paths · &lt;2 moves grouped to Others</div>
             </div>
             ${svg}
         </div>
@@ -807,10 +917,6 @@ const Render = {
                 `).join("")}
             </div>
         `;
-    },
-
-    fdr(data) {
-        renderFdrTableInto("fdr-header-row", "fdr-week-badge", "fdr-body", data);
     },
 
     rankings(state) {
@@ -1506,10 +1612,6 @@ const App = {
             Render.chipsUsed(state?.chips_used_summary || []);
             Render.specialGuy(state?.picks_by_uid || {});
             Render.rankings(state || {});
-            Render.fdr(state?.fdr || {
-                weeks: [],
-                html: '<tr><td colspan="5" style="text-align:center;padding:20px;">Load failed</td></tr>',
-            });
             Render.updateTime();
             this.scheduleAutoRefresh(state);
         } catch (error) {

@@ -65,6 +65,7 @@ Invoke-WebRequest -Method POST "https://nba-fantasy-api.nbafantasy.workers.dev/a
 - `Weekly Transfers` should show league current-week transfer totals, not global event transfer trends.
 - `Chips Used` sits above `Ownership Top 10`.
 - `Chips Used` is derived from official `/history/` chip state and refreshed in daily meta refresh.
+- `Rankings` currently use a manual `GW23_LAST_STANDINGS` snapshot in `frontend/js/app.js`; update that base table when a new GW closes.
 - Detail modal requests should avoid default `fresh=1` unless a real cache miss/event change happens.
 
 ## Recent Real-Data Sanity Checks
