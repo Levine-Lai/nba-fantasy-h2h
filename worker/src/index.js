@@ -1253,6 +1253,7 @@ async function buildFreshHomepageState(baseState) {
       return;
     }
 
+    const activeChip = String(picksRes.data?.active_chip || "").toLowerCase();
     const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
     const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
     const freshToday = Number(effectiveScore || 0);
@@ -1270,6 +1271,25 @@ async function buildFreshHomepageState(baseState) {
       total_live: freshToday,
       event_total: freshWeek,
     };
+
+    const nextCaptainWeek = activeChip === "phcapt"
+      ? currentWeek
+      : (Number(previous?.captain_week || 0) || null);
+    nextPicksByUid[uid] = {
+      ...previous,
+      current_event: currentEvent,
+      current_event_name: currentEventName,
+      captain_week: nextCaptainWeek,
+      active_chip: activeChip || null,
+      chip_status: buildPersistedChipStatus({
+        ...previous,
+        current_event_name: currentEventName,
+        captain_week: nextCaptainWeek,
+      }, {
+        currentWeek,
+        activeChip,
+      }),
+    };
   });
 
   for (const uid of targetUids) {
@@ -1282,10 +1302,17 @@ async function buildFreshHomepageState(baseState) {
       current_event_name: currentEventName,
       total_live: Number(fresh.total_live || 0),
       event_total: Number(fresh.event_total || 0),
+      chip_status: buildPersistedChipStatus({
+        ...nextPicksByUid[uid],
+        current_event_name: currentEventName,
+      }, {
+        currentWeek,
+        activeChip: nextPicksByUid[uid]?.active_chip || "",
+      }),
     };
   }
 
-  const nextMatches = matches.map((match) => {
+  const nextMatches = syncMatchesWithPicksByUid(matches, nextPicksByUid).map((match) => {
     const uid1 = normalizeUid(match?.uid1);
     const uid2 = normalizeUid(match?.uid2);
     const fresh1 = freshScoresByUid[uid1];
@@ -1316,8 +1343,6 @@ async function buildFreshHomepageState(baseState) {
       projected_total2: projectedTotal2,
       win_prob1: winProb.left,
       win_prob2: winProb.right,
-      chip_status1: nextPicksByUid[uid1]?.chip_status || match?.chip_status1 || null,
-      chip_status2: nextPicksByUid[uid2]?.chip_status || match?.chip_status2 || null,
       penalty1: Number(nextPicksByUid[uid1]?.penalty_score ?? match?.penalty1 ?? 0),
       penalty2: Number(nextPicksByUid[uid2]?.penalty_score ?? match?.penalty2 ?? 0),
       transfer_count1: Number(nextPicksByUid[uid1]?.transfer_count ?? match?.transfer_count1 ?? 0),
@@ -1425,6 +1450,12 @@ async function refreshManagerMetaState(env, existingState = null) {
         ? previous.total_live || historyWeek?.today_points || 0
         : historyWeek?.today_points || 0
     );
+    const captainChipEvent = hasHistoryData
+      ? getCaptainChipEvent(historyData, currentWeek, currentEvent, eventMetaById)
+      : null;
+    const captainWeek = hasHistoryData
+      ? (captainChipEvent?.event ? currentWeek : null)
+      : (Number(previous.captain_week || 0) || null);
     const captainUsed = hasHistoryData
       ? buildCaptainUsageFromHistoryOnly(historyData, currentWeek, currentEvent, eventMetaById, previous.captain_used || null)
       : previous.captain_used || {
@@ -1434,9 +1465,18 @@ async function refreshManagerMetaState(env, existingState = null) {
           captain_name: null,
           captain_points: null,
         };
-    const chipStatus = hasHistoryData
+    const rawChipStatus = hasHistoryData
       ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
-      : buildPersistedChipStatus(previous);
+      : buildPersistedChipStatus(previous, { currentWeek });
+    const chipStatus = buildPersistedChipStatus({
+      ...previous,
+      current_event_name: currentEventName,
+      captain_used: captainUsed,
+      captain_week: captainWeek,
+      chip_status: rawChipStatus,
+    }, {
+      currentWeek,
+    });
 
     nextPicksByUid[uid] = {
       ...previous,
@@ -1449,6 +1489,7 @@ async function refreshManagerMetaState(env, existingState = null) {
       wildcard_day: wildcardDay,
       wildcard_post_gw17_event: wildcardPostGw17Event ? Number(wildcardPostGw17Event) : null,
       rich_day: richEvent ? Number(richEvent) : null,
+      captain_week: captainWeek ? Number(captainWeek) : null,
       captain_used: captainUsed,
       chip_status: chipStatus,
       week_total_summary: weekTotalSummary,
@@ -1471,7 +1512,7 @@ async function refreshManagerMetaState(env, existingState = null) {
     nextTransferTrends.today_value_top = previousState.transfer_trends.today_value_top;
   }
 
-  const nextMatches = (Array.isArray(previousState?.h2h) ? previousState.h2h : []).map((match) => {
+  const nextMatches = syncMatchesWithPicksByUid(Array.isArray(previousState?.h2h) ? previousState.h2h : [], nextPicksByUid).map((match) => {
     const uid1 = normalizeUid(match?.uid1);
     const uid2 = normalizeUid(match?.uid2);
     const left = nextPicksByUid[uid1] || {};
@@ -1489,8 +1530,6 @@ async function refreshManagerMetaState(env, existingState = null) {
       transfer_count2: Number(right.transfer_count ?? match?.transfer_count2 ?? 0),
       wildcard1: !!(left.wildcard_active ?? match?.wildcard1),
       wildcard2: !!(right.wildcard_active ?? match?.wildcard2),
-      chip_status1: left.chip_status || match?.chip_status1 || null,
-      chip_status2: right.chip_status || match?.chip_status2 || null,
     };
   });
 
@@ -1666,12 +1705,62 @@ function getWildcardPostGw17Event(historyData, eventMetaById, minGw = 17) {
   return null;
 }
 
-function buildPersistedChipStatus(payload = {}) {
+function getPayloadCurrentWeek(payload = {}, fallbackEventName = "") {
+  const eventName = String(payload?.current_event_name || fallbackEventName || "");
+  const parsed = parseEventMetaFromName(eventName);
+  return Number(parsed?.gw || extractGwNumber(eventName) || 0) || null;
+}
+
+function buildPersistedChipStatus(payload = {}, options = {}) {
   const current = payload?.chip_status && typeof payload.chip_status === "object" ? payload.chip_status : {};
+  const currentWeek = Number(options?.currentWeek || getPayloadCurrentWeek(payload, options?.current_event_name || "")) || null;
+  const captainWeek = Number(payload?.captain_week || 0) || null;
+  const activeChip = String(options?.activeChip || payload?.active_chip || "").toLowerCase();
+  const legacyCaptainUsed = !!(current?.captain_used || payload?.captain_used?.used);
+  let captainUsed = false;
+  if (activeChip === "phcapt") {
+    captainUsed = true;
+  } else if (captainWeek && currentWeek) {
+    captainUsed = captainWeek === currentWeek;
+  } else {
+    captainUsed = legacyCaptainUsed;
+  }
   return {
-    captain_used: !!(current?.captain_used || payload?.captain_used?.used),
+    captain_used: captainUsed,
     wildcard_used: !!(current?.wildcard_used || payload?.wildcard_post_gw17_event),
     all_stars_used: !!(current?.all_stars_used || payload?.rich_day),
+  };
+}
+
+function syncMatchesWithPicksByUid(matches, picksByUid) {
+  return (Array.isArray(matches) ? matches : []).map((match) => {
+    const uid1 = normalizeUid(match?.uid1);
+    const uid2 = normalizeUid(match?.uid2);
+    return {
+      ...match,
+      chip_status1: picksByUid?.[uid1]?.chip_status || null,
+      chip_status2: picksByUid?.[uid2]?.chip_status || null,
+    };
+  });
+}
+
+function normalizeStateChipStatus(state) {
+  if (!state || typeof state !== "object") return state;
+  const currentShape = state?.picks_by_uid;
+  if (!currentShape || typeof currentShape !== "object") return state;
+
+  const nextPicksByUid = {};
+  for (const [uid, payload] of Object.entries(currentShape)) {
+    nextPicksByUid[uid] = {
+      ...payload,
+      chip_status: buildPersistedChipStatus(payload),
+    };
+  }
+
+  return {
+    ...state,
+    picks_by_uid: nextPicksByUid,
+    h2h: syncMatchesWithPicksByUid(state?.h2h, nextPicksByUid),
   };
 }
 
@@ -2610,6 +2699,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       wildcard_day: Number(previous.wildcard_day || 0) || null,
       wildcard_post_gw17_event: Number(previous.wildcard_post_gw17_event || 0) || null,
       rich_day: Number(previous.rich_day || 0) || null,
+      captain_week: Number(previous.captain_week || 0) || null,
       transfer_records: Array.isArray(previous.transfer_records) ? previous.transfer_records : [],
       week_total_summary: previous.week_total_summary || null,
       lineup_economy: previous.lineup_economy || null,
@@ -2701,12 +2791,39 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     const wildcardActive = wildcardDay !== null;
     const penaltyScore = Number(transferSummary.penalty_score || 0);
     const historyWeek = calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
-    const captainUsed = hasHistoryData
+    const captainChipEvent = hasHistoryData
+      ? getCaptainChipEvent(historyData, currentWeek, currentEvent, eventMetaById)
+      : null;
+    const captainWeek = hasHistoryData
+      ? (captainChipEvent?.event ? currentWeek : null)
+      : (Number(previous.captain_week || 0) || null);
+    const activeChip = String(picksData?.active_chip || "").toLowerCase();
+    const captainUsedBase = hasHistoryData
       ? await buildCaptainUsageSummary(uidNumber, historyData, currentWeek, currentEvent, eventMetaById, elements, eventLiveCache)
       : previous.captain_used || { used: false, label: "None", day: null, captain_name: null, captain_points: null };
-    const chipStatus = hasHistoryData
+    const captainUsed = activeChip === "phcapt"
+      ? {
+          ...captainUsedBase,
+          used: true,
+          day: Number(captainUsedBase?.day || currentMeta?.day || 0) || null,
+          label: captainUsedBase?.used
+            ? captainUsedBase.label
+            : (currentMeta?.day ? `DAY${currentMeta.day}` : "Used"),
+        }
+      : captainUsedBase;
+    const rawChipStatus = hasHistoryData
       ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
-      : buildPersistedChipStatus(previous);
+      : buildPersistedChipStatus(previous, { currentWeek, activeChip });
+    const chipStatus = buildPersistedChipStatus({
+      ...previous,
+      current_event_name: currentEventName,
+      captain_used: captainUsed,
+      captain_week: activeChip === "phcapt" ? currentWeek : captainWeek,
+      chip_status: rawChipStatus,
+    }, {
+      currentWeek,
+      activeChip,
+    });
 
     standingsByUid[uid].penalty_score = penaltyScore;
     standingsByUid[uid].transfer_count = transferCount;
@@ -2717,6 +2834,9 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     standingsByUid[uid].wildcard_day = wildcardDay;
     standingsByUid[uid].wildcard_post_gw17_event = wildcardPostGw17Event ? Number(wildcardPostGw17Event) : null;
     standingsByUid[uid].rich_day = richDay ? Number(richDay) : null;
+    standingsByUid[uid].captain_week = activeChip === "phcapt"
+      ? Number(currentWeek || 0) || null
+      : (captainWeek ? Number(captainWeek) : null);
     standingsByUid[uid].transfer_records = transferSummary.records;
     standingsByUid[uid].captain_used = captainUsed;
     standingsByUid[uid].chip_status = chipStatus;
@@ -2931,6 +3051,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       wildcard_day: s.wildcard_day || null,
       wildcard_post_gw17_event: s.wildcard_post_gw17_event || null,
       rich_day: s.rich_day || null,
+      captain_week: s.captain_week || null,
       fetch_status: s.fetch_status || { picks_ok: true, history_ok: true, transfers_ok: true },
       event_total: s.week_total || 0,
       overall_total: s.overall_total || s.week_total || 0,
@@ -3630,10 +3751,11 @@ export default {
       if (shouldRefreshMetaOnDemand) {
         state = await refreshManagerMetaState(env, state);
       }
+      state = normalizeStateChipStatus(state);
 
       if (path === "/api/state") {
         const useFreshH2H = url.searchParams.get("fresh_h2h") === "1";
-        const responseState = useFreshH2H ? await buildFreshHomepageState(state) : state;
+        const responseState = useFreshH2H ? normalizeStateChipStatus(await buildFreshHomepageState(state)) : state;
         return jsonResponse(responseState);
       }
       if (path === "/api/fixtures") return jsonResponse(state.fixtures);
