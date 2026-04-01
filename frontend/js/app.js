@@ -85,8 +85,8 @@ const GW23_LAST_STANDINGS = [
 ];
 
 const MAX_TITLE_POINTS_REMAINING = 6;
-const TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD = 2;
-const TRANSFER_DIAGRAM_OTHERS_LABEL = "Others";
+const TRANSFER_DIAGRAM_THRESHOLD = 2;
+const TRANSFER_DIAGRAM_OTHERS = "Others";
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -442,30 +442,15 @@ function getTransferDiagramColor(value, alpha = 1) {
         hash = text.charCodeAt(index) + ((hash << 5) - hash);
     }
     const hue = Math.abs(hash) % 360;
-    // Use HSL for solid colors, HSLA when alpha is needed
-    if (alpha === 1) {
-        return `hsl(${hue}, 72%, 48%)`;
-    }
-    return `hsla(${hue}, 72%, 48%, ${alpha})`;
+    return alpha === 1
+        ? `hsl(${hue}, 70%, 52%)`
+        : `hsla(${hue}, 70%, 52%, ${alpha})`;
 }
 
 function measureDiagramLabelUnits(text) {
     return Array.from(String(text || "")).reduce((sum, ch) => (
         sum + (/[\u0000-\u00ff]/.test(ch) ? 0.62 : 1.02)
     ), 0);
-}
-
-function truncateDiagramLabel(text, maxUnits) {
-    const chars = Array.from(String(text || ""));
-    let output = "";
-    let units = 0;
-    for (const ch of chars) {
-        const nextUnits = units + measureDiagramLabelUnits(ch);
-        if (nextUnits > Math.max(1, maxUnits - 1)) break;
-        output += ch;
-        units = nextUnits;
-    }
-    return output && output !== text ? `${output}\u2026` : (output || text);
 }
 
 function chunkDiagramToken(token, maxUnits) {
@@ -475,41 +460,38 @@ function chunkDiagramToken(token, maxUnits) {
     let current = "";
     let units = 0;
     chars.forEach((ch) => {
-        const nextUnits = units + measureDiagramLabelUnits(ch);
-        if (current && nextUnits > maxUnits) {
+        const charUnits = measureDiagramLabelUnits(ch);
+        if (current && units + charUnits > maxUnits) {
             parts.push(current);
             current = ch;
-            units = measureDiagramLabelUnits(ch);
+            units = charUnits;
             return;
         }
         current += ch;
-        units = nextUnits;
+        units += charUnits;
     });
     if (current) parts.push(current);
     return parts;
 }
 
-function splitDiagramLabel(name, maxUnits = 14, maxLines = 2) {
+function splitDiagramLabel(name, maxUnits = 13.5, maxLines = 2) {
     const raw = String(name || "").trim();
     if (!raw) return ["-"];
 
-    const expanded = raw
+    const tokens = raw
         .replace(/([.\-/])/g, "$1 ")
         .replace(/\s+/g, " ")
-        .trim();
-
-    const tokens = expanded
+        .trim()
         .split(" ")
         .filter(Boolean)
         .flatMap((token) => (
-            measureDiagramLabelUnits(token) > maxUnits * 1.15
+            measureDiagramLabelUnits(token) > maxUnits * 1.1
                 ? chunkDiagramToken(token, maxUnits)
                 : [token]
         ));
 
     const lines = [];
     let current = "";
-
     tokens.forEach((token) => {
         const candidate = current ? `${current} ${token}` : token;
         if (!current || measureDiagramLabelUnits(candidate) <= maxUnits) {
@@ -519,44 +501,38 @@ function splitDiagramLabel(name, maxUnits = 14, maxLines = 2) {
         lines.push(current);
         current = token;
     });
-
     if (current) lines.push(current);
     if (lines.length <= maxLines) return lines;
-
-    const kept = lines.slice(0, maxLines - 1);
-    const remainder = lines.slice(maxLines - 1).join(" ");
-    kept.push(truncateDiagramLabel(remainder, maxUnits));
-    return kept;
+    return [
+        lines[0],
+        `${lines.slice(1).join(" ").slice(0, 12)}${lines.slice(1).join(" ").length > 12 ? "\u2026" : ""}`,
+    ];
 }
 
 function renderDiagramLabel(node, side, nodeWidth) {
-    const labelGap = 16;
     const x = side === "left"
-        ? Number(node.x || 0) - labelGap
-        : Number(node.x || 0) + nodeWidth + labelGap;
+        ? Number(node.x || 0) - 16
+        : Number(node.x || 0) + nodeWidth + 16;
     const anchor = side === "left" ? "end" : "start";
-    const lines = splitDiagramLabel(node.name, 18, 2);
     const lineHeight = 18;
+    const lines = splitDiagramLabel(node.name);
     const startY = Number(node.y || 0) + Number(node.height || 0) / 2 - ((lines.length - 1) * lineHeight) / 2;
     return `<text class="trend-sankey-label" x="${x}" y="${startY}" text-anchor="${anchor}" dominant-baseline="middle">${lines.map((line, index) => `<tspan x="${x}" dy="${index === 0 ? 0 : lineHeight}">${escapeHtml(line)}</tspan>`).join("")}</text>`;
 }
 
-function compareDiagramNodeNames(a, b) {
-    const aOthers = a === TRANSFER_DIAGRAM_OTHERS_LABEL;
-    const bOthers = b === TRANSFER_DIAGRAM_OTHERS_LABEL;
+function compareDiagramNames(a, b) {
+    const aOthers = a === TRANSFER_DIAGRAM_OTHERS;
+    const bOthers = b === TRANSFER_DIAGRAM_OTHERS;
     if (aOthers !== bOthers) return aOthers ? 1 : -1;
     return String(a || "").localeCompare(String(b || ""));
 }
 
-function compareDiagramNodes(a, b) {
-    const aOthers = a?.name === TRANSFER_DIAGRAM_OTHERS_LABEL;
-    const bOthers = b?.name === TRANSFER_DIAGRAM_OTHERS_LABEL;
-    if (aOthers !== bOthers) return aOthers ? 1 : -1;
-    return Number(b?.value || 0) - Number(a?.value || 0) || compareDiagramNodeNames(a?.name, b?.name);
-}
-
 function buildTransferDiagramData(picksByUid) {
-    const linkMap = new Map();
+    const rawLinks = [];
+    const sourceTotals = {};
+    const targetTotals = {};
+    const sourcePartners = {};
+    const targetPartners = {};
     let totalMoves = 0;
 
     Object.values(picksByUid || {}).forEach((payload) => {
@@ -565,59 +541,53 @@ function buildTransferDiagramData(picksByUid) {
             const target = String(record?.in_name || "").trim();
             if (!source || !target) return;
             totalMoves += 1;
-            const key = `${source}__${target}`;
-            const current = linkMap.get(key) || { source, target, value: 0 };
-            current.value += 1;
-            linkMap.set(key, current);
+            rawLinks.push({ source, target, value: 1 });
+            sourceTotals[source] = Number(sourceTotals[source] || 0) + 1;
+            targetTotals[target] = Number(targetTotals[target] || 0) + 1;
+            if (!sourcePartners[source]) sourcePartners[source] = new Set();
+            if (!targetPartners[target]) targetPartners[target] = new Set();
+            sourcePartners[source].add(target);
+            targetPartners[target].add(source);
         });
     });
 
-    const rawLinks = Array.from(linkMap.values()).sort((a, b) =>
-        Number(b.value || 0) - Number(a.value || 0) ||
-        String(a.source || "").localeCompare(String(b.source || "")) ||
-        String(a.target || "").localeCompare(String(b.target || ""))
-    );
-
-    const sourceTotals = {};
-    const targetTotals = {};
-    rawLinks.forEach((link) => {
-        sourceTotals[link.source] = Number(sourceTotals[link.source] || 0) + Number(link.value || 0);
-        targetTotals[link.target] = Number(targetTotals[link.target] || 0) + Number(link.value || 0);
-    });
-
-    const normalizedLinkMap = new Map();
-    rawLinks.forEach((link) => {
-        // Group to Others if source (转出) OR target (转入) has less than 2 moves
-        const shouldGroupSource =
-            Number(sourceTotals[link.source] || 0) < TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD;
-        const shouldGroupTarget =
-            Number(targetTotals[link.target] || 0) < TRANSFER_DIAGRAM_MINOR_LINK_THRESHOLD;
-        const normalizedSource = shouldGroupSource ? TRANSFER_DIAGRAM_OTHERS_LABEL : link.source;
-        const normalizedTarget = shouldGroupTarget ? TRANSFER_DIAGRAM_OTHERS_LABEL : link.target;
-        const key = `${normalizedSource}__${normalizedTarget}`;
-        const current = normalizedLinkMap.get(key) || {
-            source: normalizedSource,
-            target: normalizedTarget,
-            value: 0,
-        };
-        current.value += Number(link.value || 0);
-        normalizedLinkMap.set(key, current);
-    });
-
-    const links = Array.from(normalizedLinkMap.values()).sort((a, b) =>
-        Number(b.value || 0) - Number(a.value || 0) ||
-        compareDiagramNodeNames(a.source, b.source) ||
-        compareDiagramNodeNames(a.target, b.target)
-    );
-
-    if (!links.length) {
-        return {
-            totalMoves,
-            links: [],
-            leftNodes: [],
-            rightNodes: [],
-        };
+    if (!rawLinks.length) {
+        return { totalMoves: 0, links: [], leftNodes: [], rightNodes: [] };
     }
+
+    const keepSources = new Set(
+        Object.keys(sourceTotals).filter((name) => {
+            const total = Number(sourceTotals[name] || 0);
+            if (total < TRANSFER_DIAGRAM_THRESHOLD) return false;
+            const partners = Array.from(sourcePartners[name] || []);
+            return total >= 3 || partners.some((partner) => Number(targetTotals[partner] || 0) >= TRANSFER_DIAGRAM_THRESHOLD);
+        })
+    );
+
+    const keepTargets = new Set(
+        Object.keys(targetTotals).filter((name) => {
+            const total = Number(targetTotals[name] || 0);
+            if (total < TRANSFER_DIAGRAM_THRESHOLD) return false;
+            const partners = Array.from(targetPartners[name] || []);
+            return total >= 3 || partners.some((partner) => Number(sourceTotals[partner] || 0) >= TRANSFER_DIAGRAM_THRESHOLD);
+        })
+    );
+
+    const aggregated = new Map();
+    rawLinks.forEach((link) => {
+        const normalizedSource = keepSources.has(link.source) ? link.source : TRANSFER_DIAGRAM_OTHERS;
+        const normalizedTarget = keepTargets.has(link.target) ? link.target : TRANSFER_DIAGRAM_OTHERS;
+        const key = `${normalizedSource}__${normalizedTarget}`;
+        const current = aggregated.get(key) || { source: normalizedSource, target: normalizedTarget, value: 0 };
+        current.value += 1;
+        aggregated.set(key, current);
+    });
+
+    const links = Array.from(aggregated.values()).sort((a, b) =>
+        Number(b.value || 0) - Number(a.value || 0) ||
+        compareDiagramNames(a.source, b.source) ||
+        compareDiagramNames(a.target, b.target)
+    );
 
     const leftTotals = {};
     const rightTotals = {};
@@ -626,19 +596,18 @@ function buildTransferDiagramData(picksByUid) {
         rightTotals[link.target] = Number(rightTotals[link.target] || 0) + Number(link.value || 0);
     });
 
-    const leftNodes = Object.entries(leftTotals)
+    const sortNodes = (entries) => entries
         .map(([name, value]) => ({ name, value: Number(value || 0) }))
-        .sort(compareDiagramNodes);
-
-    const rightNodes = Object.entries(rightTotals)
-        .map(([name, value]) => ({ name, value: Number(value || 0) }))
-        .sort(compareDiagramNodes);
+        .sort((a, b) =>
+            Number(b.value || 0) - Number(a.value || 0) ||
+            compareDiagramNames(a.name, b.name)
+        );
 
     return {
         totalMoves,
         links,
-        leftNodes,
-        rightNodes,
+        leftNodes: sortNodes(Object.entries(leftTotals)),
+        rightNodes: sortNodes(Object.entries(rightTotals)),
     };
 }
 
@@ -648,31 +617,34 @@ function renderTransferDiagram(picksByUid) {
         return '<div class="trend-empty">No weekly transfer diagram</div>';
     }
 
-    const width = 940;
-    const topPad = 20;
-    const bottomPad = 20;
-    const nodeGap = 12;
-    const nodeWidth = 22;
-    const leftX = 200;
-    const rightX = width - 200 - nodeWidth;
-    const minNodeHeight = 18;
+    const width = 1100;
+    const topPad = 12;
+    const bottomPad = 12;
+    const nodeGap = 10;
+    const nodeWidth = 18;
+    const bundleWidth = 22;
+    const leftX = 170;
+    const rightX = width - 170 - nodeWidth;
+    const minNodeHeight = 16;
 
     const measureColumnHeight = (nodes, scale) =>
         nodes.reduce((sum, node) => sum + Math.max(Number(node.value || 0) * scale, minNodeHeight), 0) +
         Math.max(0, nodes.length - 1) * nodeGap;
 
-    let scale = 14;
     const maxUnits = Math.max(
         data.leftNodes.reduce((sum, node) => sum + Number(node.value || 0), 0),
         data.rightNodes.reduce((sum, node) => sum + Number(node.value || 0), 0),
         1
     );
-    const targetHeight = 540;
-    scale = Math.max(10, Math.min(22, (targetHeight - topPad - bottomPad - (Math.max(data.leftNodes.length, data.rightNodes.length) - 1) * nodeGap) / maxUnits));
-    
-    const leftHeight = measureColumnHeight(data.leftNodes, scale);
-    const rightHeight = measureColumnHeight(data.rightNodes, scale);
-    const height = Math.max(320, Math.max(leftHeight, rightHeight) + topPad + bottomPad);
+    const targetHeight = 640;
+    const scale = Math.max(
+        10,
+        Math.min(26, (targetHeight - topPad - bottomPad - (Math.max(data.leftNodes.length, data.rightNodes.length) - 1) * nodeGap) / maxUnits)
+    );
+    const height = Math.max(
+        360,
+        Math.max(measureColumnHeight(data.leftNodes, scale), measureColumnHeight(data.rightNodes, scale)) + topPad + bottomPad
+    );
 
     const layoutColumn = (nodes, x) => {
         let cursor = topPad;
@@ -691,19 +663,22 @@ function renderTransferDiagram(picksByUid) {
     const rightOrder = Object.fromEntries(rightNodes.map((node, index) => [node.name, index]));
     const leftOrder = Object.fromEntries(leftNodes.map((node, index) => [node.name, index]));
 
-    const links = data.links.map((link, index) => ({
+    const links = data.links.map((link) => ({
         ...link,
-        thickness: Math.max(Number(link.value || 0) * scale, 5),
-        gradientId: `trend-flow-${index}`,
+        thickness: Math.max(Number(link.value || 0) * scale, 6),
+        stroke: getTransferDiagramColor(
+            link.source === TRANSFER_DIAGRAM_OTHERS && link.target !== TRANSFER_DIAGRAM_OTHERS
+                ? link.target
+                : link.source,
+            0.72
+        ),
     }));
 
-    // Calculate source Y positions - flows start from vertical center of each outgoing flow section
     Object.values(leftByName).forEach((node) => {
         const nodeLinks = links
             .filter((link) => link.source === node.name)
             .sort((a, b) => Number(rightOrder[a.target] || 0) - Number(rightOrder[b.target] || 0));
         const totalThickness = nodeLinks.reduce((sum, link) => sum + Number(link.thickness || 0), 0);
-        // Start from the top of the node, centered
         let cursor = Number(node.y || 0) + Math.max(0, (Number(node.height || 0) - totalThickness) / 2);
         nodeLinks.forEach((link) => {
             link.sourceY = cursor + Number(link.thickness || 0) / 2;
@@ -711,7 +686,6 @@ function renderTransferDiagram(picksByUid) {
         });
     });
 
-    // Calculate target Y positions
     Object.values(rightByName).forEach((node) => {
         const nodeLinks = links
             .filter((link) => link.target === node.name)
@@ -724,98 +698,77 @@ function renderTransferDiagram(picksByUid) {
         });
     });
 
-    // Build SVG with improved visual design
-    const svg = `
-        <svg class="trend-sankey-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly transfer diagram">
-            <defs>
-                ${links.map((link) => {
-                    const sourceColor = getTransferDiagramColor(link.source, 1);
-                    const targetColor = getTransferDiagramColor(link.target, 1);
-                    return `
-                    <linearGradient id="${link.gradientId}" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="${sourceColor}"></stop>
-                        <stop offset="100%" stop-color="${targetColor}"></stop>
-                    </linearGradient>
-                    `;
-                }).join("")}
-            </defs>
-            
-            <!-- Flow lines - rendered first so they appear behind nodes -->
-            ${links.map((link) => {
-                const leftNode = leftByName[link.source];
-                const rightNode = rightByName[link.target];
-                if (!leftNode || !rightNode) return "";
-                
-                // Start exactly from the right edge of left node
-                const startX = Number(leftNode.x || 0) + nodeWidth;
-                const endX = Number(rightNode.x || 0);
-                const startY = Number(link.sourceY || 0);
-                const endY = Number(link.targetY || 0);
-                
-                // Calculate control points for smooth sankey-style curve
-                // Use a gradual curve that starts horizontal and ends horizontal
-                const distance = endX - startX;
-                const controlOffset = Math.min(distance * 0.5, 120);
-                
-                // Create cubic bezier path
-                const path = `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${endX - controlOffset} ${endY}, ${endX} ${endY}`;
-                
-                return `
-                    <path class="trend-sankey-link"
-                        d="${path}"
-                        stroke="url(#${link.gradientId})"
-                        stroke-width="${Number(link.thickness || 0).toFixed(2)}"
-                        fill="none">
-                        <title>${escapeHtml(link.source)} → ${escapeHtml(link.target)}: ${Number(link.value || 0)} moves</title>
-                    </path>
-                `;
-            }).join("")}
-            
-            <!-- Left nodes -->
-            ${leftNodes.map((node) => {
-                const color = getTransferDiagramColor(node.name, 1);
-                return `
-                <g class="trend-sankey-node-group">
-                    <rect class="trend-sankey-node" 
-                        x="${Number(node.x || 0)}" 
-                        y="${Number(node.y || 0)}" 
-                        width="${nodeWidth}" 
-                        height="${Number(node.height || 0)}" 
-                        rx="4" 
-                        fill="${color}">
-                    </rect>
-                    ${renderDiagramLabel(node, "left", nodeWidth)}
-                </g>
-                `;
-            }).join("")}
-            
-            <!-- Right nodes -->
-            ${rightNodes.map((node) => {
-                const color = getTransferDiagramColor(node.name, 1);
-                return `
-                <g class="trend-sankey-node-group">
-                    <rect class="trend-sankey-node" 
-                        x="${Number(node.x || 0)}" 
-                        y="${Number(node.y || 0)}" 
-                        width="${nodeWidth}" 
-                        height="${Number(node.height || 0)}" 
-                        rx="4" 
-                        fill="${color}">
-                    </rect>
-                    ${renderDiagramLabel(node, "right", nodeWidth)}
-                </g>
-                `;
-            }).join("")}
-        </svg>
-    `;
-
     return `
         <div class="trend-sankey-wrap">
             <div class="trend-sankey-meta">
                 <div class="trend-sankey-title">League Moves</div>
-                <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · hover flows for exact counts · players with &lt;2 transfers (in or out) are grouped to "Others"</div>
+                <div class="trend-sankey-note">${Number(data.totalMoves || 0)} total moves · low-signal transfer names are grouped into Others</div>
             </div>
-            ${svg}
+            <svg class="trend-sankey-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly transfer diagram">
+                ${leftNodes.map((node) => `
+                    <rect class="trend-sankey-bundle"
+                        x="${Number(node.x || 0) + nodeWidth - 1}"
+                        y="${Number(node.y || 0)}"
+                        width="${bundleWidth + 2}"
+                        height="${Number(node.height || 0)}"
+                        rx="9"
+                        fill="${getTransferDiagramColor(node.name, 0.18)}"></rect>
+                `).join("")}
+                ${rightNodes.map((node) => `
+                    <rect class="trend-sankey-bundle"
+                        x="${Number(node.x || 0) - bundleWidth - 1}"
+                        y="${Number(node.y || 0)}"
+                        width="${bundleWidth + 2}"
+                        height="${Number(node.height || 0)}"
+                        rx="9"
+                        fill="${getTransferDiagramColor(node.name, 0.18)}"></rect>
+                `).join("")}
+                ${links.map((link) => {
+                    const leftNode = leftByName[link.source];
+                    const rightNode = rightByName[link.target];
+                    if (!leftNode || !rightNode) return "";
+                    const startX = Number(leftNode.x || 0) + nodeWidth + bundleWidth;
+                    const endX = Number(rightNode.x || 0) - bundleWidth;
+                    const startY = Number(link.sourceY || 0);
+                    const endY = Number(link.targetY || 0);
+                    const distance = endX - startX;
+                    const controlOffset = Math.max(96, Math.min(distance * 0.38, 188));
+                    const path = `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${endX - controlOffset} ${endY}, ${endX} ${endY}`;
+                    return `
+                        <path class="trend-sankey-link"
+                            d="${path}"
+                            stroke="${link.stroke}"
+                            stroke-width="${Number(link.thickness || 0).toFixed(2)}"
+                            fill="none">
+                            <title>${escapeHtml(link.source)} -> ${escapeHtml(link.target)}: ${Number(link.value || 0)} moves</title>
+                        </path>
+                    `;
+                }).join("")}
+                ${leftNodes.map((node) => `
+                    <g>
+                        <rect class="trend-sankey-node"
+                            x="${Number(node.x || 0)}"
+                            y="${Number(node.y || 0)}"
+                            width="${nodeWidth}"
+                            height="${Number(node.height || 0)}"
+                            rx="4"
+                            fill="${getTransferDiagramColor(node.name, 1)}"></rect>
+                        ${renderDiagramLabel(node, "left", nodeWidth)}
+                    </g>
+                `).join("")}
+                ${rightNodes.map((node) => `
+                    <g>
+                        <rect class="trend-sankey-node"
+                            x="${Number(node.x || 0)}"
+                            y="${Number(node.y || 0)}"
+                            width="${nodeWidth}"
+                            height="${Number(node.height || 0)}"
+                            rx="4"
+                            fill="${getTransferDiagramColor(node.name, 1)}"></rect>
+                        ${renderDiagramLabel(node, "right", nodeWidth)}
+                    </g>
+                `).join("")}
+            </svg>
         </div>
     `;
 }
