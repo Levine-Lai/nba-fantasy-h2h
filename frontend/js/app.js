@@ -485,7 +485,7 @@ function chunkDiagramToken(token, maxUnits) {
     return parts;
 }
 
-function splitDiagramLabel(name, maxUnits = 11.5, maxLines = 2) {
+function splitDiagramLabel(name, maxUnits = 14, maxLines = 2) {
     const raw = String(name || "").trim();
     if (!raw) return ["-"];
 
@@ -527,11 +527,11 @@ function splitDiagramLabel(name, maxUnits = 11.5, maxLines = 2) {
 
 function renderDiagramLabel(node, side, nodeWidth) {
     const x = side === "left"
-        ? Number(node.x || 0) - 16
-        : Number(node.x || 0) + nodeWidth + 16;
+        ? Number(node.x || 0) - 20
+        : Number(node.x || 0) + nodeWidth + 20;
     const anchor = side === "left" ? "end" : "start";
     const lines = splitDiagramLabel(node.name);
-    const lineHeight = 16;
+    const lineHeight = 18;
     const startY = Number(node.y || 0) + Number(node.height || 0) / 2 - ((lines.length - 1) * lineHeight) / 2;
     return `<text class="trend-sankey-label" x="${x}" y="${startY}" text-anchor="${anchor}" dominant-baseline="middle">${lines.map((line, index) => `<tspan x="${x}" dy="${index === 0 ? 0 : lineHeight}">${escapeHtml(line)}</tspan>`).join("")}</text>`;
 }
@@ -641,14 +641,15 @@ function renderTransferDiagram(picksByUid) {
         return '<div class="trend-empty">No weekly transfer diagram</div>';
     }
 
-    const width = 900;
+    const width = 940;
     const topPad = 22;
     const bottomPad = 22;
     const nodeGap = 16;
-    const nodeWidth = 16;
-    const leftX = 218;
-    const rightX = width - 218 - nodeWidth;
-    const curve = 176;
+    const nodeWidth = 22;
+    const bundleWidth = 28;
+    const leftX = 236;
+    const rightX = width - 236 - nodeWidth;
+    const curve = 154;
     const minNodeHeight = 18;
 
     const measureColumnHeight = (nodes, scale) =>
@@ -726,12 +727,18 @@ function renderTransferDiagram(picksByUid) {
                     </linearGradient>
                 `).join("")}
             </defs>
+            ${leftNodes.map((node) => `
+                <rect class="trend-sankey-bundle" x="${Number(node.x || 0) + nodeWidth - 1}" y="${Number(node.y || 0)}" width="${bundleWidth + 2}" height="${Number(node.height || 0)}" rx="10" fill="${getTransferDiagramColor(node.name, 0.18)}"></rect>
+            `).join("")}
+            ${rightNodes.map((node) => `
+                <rect class="trend-sankey-bundle" x="${Number(node.x || 0) - bundleWidth - 1}" y="${Number(node.y || 0)}" width="${bundleWidth + 2}" height="${Number(node.height || 0)}" rx="10" fill="${getTransferDiagramColor(node.name, 0.18)}"></rect>
+            `).join("")}
             ${links.map((link) => {
                 const leftNode = leftByName[link.source];
                 const rightNode = rightByName[link.target];
                 if (!leftNode || !rightNode) return "";
-                const startX = Number(leftNode.x || 0) + nodeWidth;
-                const endX = Number(rightNode.x || 0);
+                const startX = Number(leftNode.x || 0) + nodeWidth + bundleWidth;
+                const endX = Number(rightNode.x || 0) - bundleWidth;
                 const startY = Number(link.sourceY || 0);
                 const endY = Number(link.targetY || 0);
                 return `

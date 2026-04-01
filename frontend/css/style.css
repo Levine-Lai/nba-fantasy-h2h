@@ -2320,14 +2320,18 @@ body {
 .trend-sankey-link {
     fill: none;
     stroke-linecap: round;
-    mix-blend-mode: multiply;
-    opacity: 0.44;
+    mix-blend-mode: normal;
+    opacity: 0.56;
     cursor: help;
     transition: opacity 0.18s ease;
 }
 
 .trend-sankey-link:hover {
-    opacity: 0.82;
+    opacity: 0.9;
+}
+
+.trend-sankey-bundle {
+    pointer-events: none;
 }
 
 .trend-sankey-node {
@@ -2337,8 +2341,8 @@ body {
 
 .trend-sankey-label {
     fill: #0f172a;
-    font-size: 15px;
-    font-weight: 800;
+    font-size: 17px;
+    font-weight: 900;
     letter-spacing: 0.01em;
 }
 
