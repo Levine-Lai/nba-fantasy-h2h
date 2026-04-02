@@ -1158,10 +1158,20 @@ function getBeijingHour(value = Date.now()) {
   }).format(date));
 }
 
+function countGoodCaptainManagers(summary) {
+  return (Array.isArray(summary) ? summary : []).reduce((sum, item) => (
+    sum + (Array.isArray(item?.managers) ? item.managers.length : 0)
+  ), 0);
+}
+
 function shouldRefreshManagerMeta(state, value = Date.now()) {
   if (!state || typeof state !== "object") return true;
   if (!state?.refresh_meta?.meta_updated_at) return true;
   if (!Array.isArray(state?.chips_used_summary) || state.chips_used_summary.length === 0) return true;
+  const captainChipSummary = (state.chips_used_summary || []).find((item) => String(item?.key || "") === "captain");
+  const expectedCaptainManagers = Number(captainChipSummary?.used_count || 0);
+  const actualCaptainManagers = countGoodCaptainManagers(state?.good_captain_summary);
+  if (expectedCaptainManagers !== actualCaptainManagers) return true;
   if (!hasDetailedTrendList(state?.transfer_trends?.league?.top_in)) return true;
   if (!Array.isArray(state?.h2h) || state.h2h.length === 0) return true;
   if (!state?.picks_by_uid || typeof state.picks_by_uid !== "object") return true;
