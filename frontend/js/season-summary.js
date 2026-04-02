@@ -1,6 +1,6 @@
 (function () {
     const PAGE_COUNT = 6;
-    const INTRO_EXIT_MS = 1040;
+    const INTRO_EXIT_MS = 900;
     const state = {
         currentPage: 0,
         lastUid: "",
@@ -19,14 +19,16 @@
             .replace(/'/g, "&#39;");
     }
 
-    function chartPath(values, width, height) {
-        const list = Array.isArray(values) && values.length ? values : [48, 54, 51, 60, 57, 63, 67];
+    function chartPath(values, width, height, options = {}) {
+        const list = Array.isArray(values) && values.length ? values : [1800, 1500, 1300, 980, 860, 720, 698];
         const min = Math.min(...list);
         const max = Math.max(...list);
         const span = Math.max(1, max - min);
+        const invert = !!options.invert;
         return list.map((value, index) => {
-            const x = 22 + (index * (width - 44)) / Math.max(1, list.length - 1);
-            const y = height - 18 - ((value - min) / span) * (height - 36);
+            const x = 24 + (index * (width - 48)) / Math.max(1, list.length - 1);
+            const normalized = invert ? (max - value) / span : (value - min) / span;
+            const y = height - 22 - normalized * (height - 44);
             return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
         }).join(" ");
     }
@@ -155,6 +157,38 @@
         `;
     }
 
+    function renderOrCurvePanel(profile) {
+        const curvePath = chartPath(profile?.cover?.or_curve || [], 880, 560, { invert: true });
+        return `
+            <aside class="season-summary-cover-panel">
+                <div class="season-summary-cover-chart">
+                    <svg viewBox="0 0 880 560" preserveAspectRatio="none" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="season-summary-cover-line" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#93c5fd"></stop>
+                                <stop offset="50%" stop-color="#60a5fa"></stop>
+                                <stop offset="100%" stop-color="#2563eb"></stop>
+                            </linearGradient>
+                            <linearGradient id="season-summary-cover-fill" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="rgba(96, 165, 250, 0.28)"></stop>
+                                <stop offset="100%" stop-color="rgba(96, 165, 250, 0)"></stop>
+                            </linearGradient>
+                        </defs>
+                        <g class="season-summary-cover-grid">
+                            <line x1="20" y1="80" x2="860" y2="80"></line>
+                            <line x1="20" y1="180" x2="860" y2="180"></line>
+                            <line x1="20" y1="280" x2="860" y2="280"></line>
+                            <line x1="20" y1="380" x2="860" y2="380"></line>
+                            <line x1="20" y1="480" x2="860" y2="480"></line>
+                        </g>
+                        <path d="${curvePath} L 856 538 L 24 538 Z" fill="url(#season-summary-cover-fill)" opacity="0.7"></path>
+                        <path d="${curvePath}" fill="none" stroke="url(#season-summary-cover-line)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </div>
+            </aside>
+        `;
+    }
+
     function renderCoverPage(profile) {
         const cover = profile?.cover || {};
         const realName = cover.real_name || profile.managerName || "";
@@ -173,7 +207,6 @@
                             <div class="season-summary-cover-stat">
                                 <div class="season-summary-cover-stat-label">${escapeHtml(item[0])}</div>
                                 <div class="season-summary-cover-stat-value">${escapeHtml(item[1])}</div>
-                                <div class="season-summary-cover-stat-note">${escapeHtml(item[2] || "")}</div>
                             </div>
                         `).join("")}
                     </div>
@@ -181,15 +214,7 @@
                     <div class="season-summary-cover-message">${escapeHtml(cover.opening_message || "")}</div>
                 </div>
 
-                <aside class="season-summary-cover-panel">
-                    <div class="season-summary-cover-panel-mark">${escapeHtml(cover.panel_headline || profile.seasonLabel || "")}</div>
-                    <div class="season-summary-cover-panel-copy">${escapeHtml(cover.panel_copy || cover.subtitle || "")}</div>
-                    <div class="season-summary-cover-panel-meta">
-                        <span>${escapeHtml(profile.uid || "")}</span>
-                        <span>${escapeHtml(cover.region_name || "China")}</span>
-                        <span>${escapeHtml(profile.generatedLabel || "")}</span>
-                    </div>
-                </aside>
+                ${renderOrCurvePanel(profile)}
             </section>
         `;
     }

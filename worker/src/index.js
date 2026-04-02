@@ -3932,6 +3932,12 @@ function buildWeeklyCurve(rows, eventMetaById) {
     });
 }
 
+function buildOverallRankCurve(rows) {
+  return (rows || [])
+    .map((row) => Number(row?.overall_rank || 0))
+    .filter((value) => Number.isFinite(value) && value > 0);
+}
+
 function getManagerDisplayName(uidNumber, historyData, entryData = null) {
   const candidates = [
     entryData?.player_first_name && entryData?.player_last_name ? `${entryData.player_first_name} ${entryData.player_last_name}` : "",
@@ -4129,6 +4135,7 @@ async function buildSeasonSummaryPayload(uidInput) {
   const seasonCount = Math.max(1, pastSeasons.length + 1);
   const previousSeason = pastSeasons[pastSeasons.length - 1] || null;
   const previousSeasonPoints = previousSeason ? formatFantasyScore(previousSeason?.total_points || previousSeason?.points || previousSeason?.total || 0) : null;
+  const previousSeasonRank = previousSeason ? Number(previousSeason?.rank || 0) || null : null;
   const pointsDelta = previousSeasonPoints !== null ? totalSeasonPoints - previousSeasonPoints : null;
 
   const chipEventNameByEvent = buildSeasonChipEventNameMap(historyData);
@@ -4220,24 +4227,43 @@ async function buildSeasonSummaryPayload(uidInput) {
     entryData?.player_last_name,
   ].filter((value) => String(value || "").trim()).join(" ").trim() || managerName;
   const displayName = String(entryData?.name || teamName || managerName || `#${uidNumber}`).trim();
+  const chinaLeague = (entryData?.leagues?.classic || []).find((league) =>
+    String(league?.name || "").trim().toLowerCase() === "china"
+  ) || null;
   const chinaRank = getLatestPositiveValue([
+    chinaLeague?.entry_rank,
+    chinaLeague?.rank,
+    ...(Array.isArray(chinaLeague?.active_phases)
+      ? chinaLeague.active_phases.map((phase) => phase?.rank)
+      : []),
     entryData?.summary_region_rank,
     entryData?.summary_overall_rank_country,
     entryData?.summary_country_rank,
     historyData?.summary_region_rank,
     historyData?.summary_overall_rank_country,
   ]) || null;
+  const rankDelta = previousSeasonRank && overallRank ? previousSeasonRank - overallRank : null;
   const openingMessage = seasonCount <= 1
     ? (
       overallRank && overallRank < 1000
         ? "恭喜你完成了自己的第一个赛季！没想到第一个赛季就能突破 Top1000 的大关，你真是范特西的天赋玩家。"
         : "恭喜你完成了自己的第一个赛季！排名什么都不重要，能坚持下来才是这个游戏的真谛。"
     )
-    : (
-      previousSeasonPoints !== null
-        ? `这是你的第 ${seasonCount} 个赛季。和上赛季相比，你的总分变化是 ${formatSignedFantasyDelta(pointsDelta)}，这一季的每一步都更像你自己的节奏。`
-        : `这是你的第 ${seasonCount} 个赛季。能一路玩到现在，本身就说明你已经把这项游戏变成了自己的长期爱好。`
-    );
+    : (seasonCount === 2
+      ? (
+        rankDelta === null
+          ? "恭喜你陪这个游戏走过了第二个年头。"
+          : rankDelta > 0
+            ? `恭喜你陪这个游戏走过了第二个年头，居然还在上个赛季的基础上进步了 ${formatDisplayNumber(rankDelta)} 名，可喜可贺。`
+            : rankDelta < 0
+              ? `恭喜你陪这个游戏走过了第二个年头，可惜比上个赛季退步了 ${formatDisplayNumber(Math.abs(rankDelta))} 名，再接再厉。`
+              : "恭喜你陪这个游戏走过了第二个年头，而且和上个赛季保持住了同样的名次。"
+      )
+      : (
+        previousSeasonPoints !== null
+          ? `这是你的第 ${seasonCount} 个赛季。和上赛季相比，你的总分变化是 ${formatSignedFantasyDelta(pointsDelta)}，这一季的每一步都更像你自己的节奏。`
+          : `这是你的第 ${seasonCount} 个赛季。能一路玩到现在，本身就说明你已经把这项游戏变成了自己的长期爱好。`
+      ));
 
   return {
     success: true,
@@ -4260,19 +4286,16 @@ async function buildSeasonSummaryPayload(uidInput) {
       region_name: String(entryData?.player_region_name || "").trim() || null,
       subtitle: `${teamName} 的这一季，先从总分、排名、Captain 与转会节奏开始讲。现在这版更像一份能跑通真实数据链路的内测故事册，后面我们可以继续把句子打磨得更有味道。`,
       opening_message: openingMessage,
-      panel_headline: seasonLabel,
-      panel_copy: seasonCount <= 1
-        ? "第一季最珍贵的从来不只是名次，而是你真的把这一整季走完了。"
-        : `第 ${seasonCount} 个赛季，意味着你已经不只是来体验，而是真的留下了自己的玩法。`,
+      or_curve: buildOverallRankCurve(rows),
       tags: [
         `第 ${seasonCount} 赛季`,
         `${qualifiedTransfers.length} 次非芯片转会`,
         captainUseCount ? `${captainUseCount} 次 Captain` : "Captain 还没开张",
       ],
       stats: [
-        ["赛季总分", formatDisplayNumber(totalSeasonPoints), "真实赛季累计得分"],
-        ["全球排名", formatDisplayRank(overallRank), overallRank ? "官方 overall rank" : "官方暂无返回"],
-        ["中国排名", formatDisplayRank(chinaRank), chinaRank ? "官方区域排名" : "官方 API 暂未直出"],
+        ["赛季总分", formatDisplayNumber(totalSeasonPoints), ""],
+        ["全球排名", formatDisplayRank(overallRank), ""],
+        ["中国排名", formatDisplayRank(chinaRank), ""],
       ],
       footer: [
         ["赛季总分", formatDisplayNumber(totalSeasonPoints)],
