@@ -16,7 +16,7 @@
     inset: 0;
     z-index: 6;
     pointer-events: none;
-    transition: opacity 0.42s ease, transform 0.42s ease;
+    transition: opacity 0.28s ease, visibility 0s linear 0.28s;
 }
 
 .season-summary-shell.intro-ready .season-summary-hero-player.left {
@@ -29,7 +29,7 @@
 
 .season-summary-shell.has-profile .season-summary-intro {
     opacity: 0;
-    transform: scale(0.985);
+    visibility: hidden;
 }
 
 .season-summary-shell.intro-loading:not(.intro-leaving) .season-summary-hero-player {
@@ -43,16 +43,8 @@
     transform: translate(-50%, -50%) scale(1);
 }
 
-.season-summary-shell.intro-leaving .season-summary-search-stage {
-    animation: season-summary-intro-fade-out 0.58s ease both;
-}
-
-.season-summary-shell.intro-leaving .season-summary-hero-player.left {
-    animation: season-summary-intro-fade-out 0.58s ease both;
-}
-
-.season-summary-shell.intro-leaving .season-summary-hero-player.right {
-    animation: season-summary-intro-fade-out 0.58s ease 0.06s both;
+.season-summary-shell.intro-leaving .season-summary-intro {
+    animation: season-summary-intro-fade-out 0.42s ease both;
 }
 
 .season-summary-hero-player {
@@ -178,6 +170,12 @@
     height: calc(100vh - 150px);
     min-height: 560px;
     padding-top: 0;
+    z-index: 1;
+}
+
+.season-summary-shell.intro-leaving .season-summary-book,
+.season-summary-shell.has-profile .season-summary-book {
+    z-index: 7;
 }
 
 .season-summary-pages {
@@ -330,6 +328,24 @@
 .season-summary-cover-grid line {
     stroke: rgba(148, 163, 184, 0.2);
     stroke-width: 1;
+}
+
+.season-summary-cover-axis {
+    stroke: rgba(71, 85, 105, 0.42);
+    stroke-width: 1.6;
+}
+
+.season-summary-cover-tick,
+.season-summary-cover-axis-label {
+    fill: #64748b;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.season-summary-cover-axis-label {
+    fill: #334155;
+    font-size: 20px;
+    font-weight: 900;
 }
 
 .season-summary-main,
@@ -572,7 +588,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 8px;
-    transform: translateY(-16px);
+    transform: translateY(-28px);
 }
 
 .season-summary-page-btn {

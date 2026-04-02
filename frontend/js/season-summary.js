@@ -33,6 +33,23 @@
         }).join(" ");
     }
 
+    function buildRankTicks(values, count = 4) {
+        const list = (Array.isArray(values) ? values : [])
+            .map((item) => Number(item || 0))
+            .filter((value) => Number.isFinite(value) && value > 0);
+        if (!list.length) return [];
+        const min = Math.min(...list);
+        const max = Math.max(...list);
+        if (min === max) return [min];
+        const ticks = [];
+        for (let i = 0; i < count; i += 1) {
+            const ratio = i / Math.max(1, count - 1);
+            const value = Math.round(max - ((max - min) * ratio));
+            ticks.push(value);
+        }
+        return [...new Set(ticks)];
+    }
+
     function refs() {
         return {
             shell: document.getElementById("season-summary-shell"),
@@ -158,11 +175,30 @@
     }
 
     function renderOrCurvePanel(profile) {
-        const curvePath = chartPath(profile?.cover?.or_curve || [], 880, 560, { invert: true });
+        const rawPoints = Array.isArray(profile?.cover?.or_curve) && profile.cover.or_curve.length
+            ? profile.cover.or_curve
+            : [
+                { gw: 1, rank: 1800 },
+                { gw: 4, rank: 1500 },
+                { gw: 8, rank: 1300 },
+                { gw: 12, rank: 980 },
+                { gw: 16, rank: 860 },
+                { gw: 20, rank: 720 },
+                { gw: 24, rank: 698 },
+            ];
+        const rankValues = rawPoints.map((item) => Number(item?.rank || 0)).filter((value) => value > 0);
+        const gwValues = rawPoints.map((item) => Number(item?.gw || 0)).filter((value) => value > 0);
+        const curvePath = chartPath(rankValues, 880, 560, { invert: true });
+        const rankTicks = buildRankTicks(rankValues, 5);
+        const gwTicks = [...new Set([
+            gwValues[0],
+            gwValues[Math.floor(gwValues.length / 2)],
+            gwValues[gwValues.length - 1],
+        ].filter((value) => Number.isFinite(value) && value > 0))];
         return `
             <aside class="season-summary-cover-panel">
                 <div class="season-summary-cover-chart">
-                    <svg viewBox="0 0 880 560" preserveAspectRatio="none" aria-hidden="true">
+                    <svg viewBox="0 0 880 560" preserveAspectRatio="none" aria-label="OR season curve">
                         <defs>
                             <linearGradient id="season-summary-cover-line" x1="0%" y1="0%" x2="100%" y2="0%">
                                 <stop offset="0%" stop-color="#93c5fd"></stop>
@@ -181,6 +217,22 @@
                             <line x1="20" y1="380" x2="860" y2="380"></line>
                             <line x1="20" y1="480" x2="860" y2="480"></line>
                         </g>
+                        <line class="season-summary-cover-axis" x1="24" y1="22" x2="24" y2="538"></line>
+                        <line class="season-summary-cover-axis" x1="24" y1="538" x2="856" y2="538"></line>
+                        ${rankTicks.map((tick, index) => {
+                            const y = 80 + (index * 400) / Math.max(1, rankTicks.length - 1);
+                            return `
+                                <text class="season-summary-cover-tick rank" x="10" y="${y + 4}" text-anchor="end">${escapeHtml(tick.toLocaleString("en-US"))}</text>
+                            `;
+                        }).join("")}
+                        ${gwTicks.map((tick, index) => {
+                            const x = 24 + (index * 832) / Math.max(1, gwTicks.length - 1);
+                            return `
+                                <text class="season-summary-cover-tick gw" x="${x}" y="556" text-anchor="middle">GW${escapeHtml(tick)}</text>
+                            `;
+                        }).join("")}
+                        <text class="season-summary-cover-axis-label y" x="16" y="40" text-anchor="start">OR</text>
+                        <text class="season-summary-cover-axis-label x" x="840" y="556" text-anchor="end">GW</text>
                         <path d="${curvePath} L 856 538 L 24 538 Z" fill="url(#season-summary-cover-fill)" opacity="0.7"></path>
                         <path d="${curvePath}" fill="none" stroke="url(#season-summary-cover-line)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>

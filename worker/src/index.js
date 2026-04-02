@@ -3882,7 +3882,7 @@ function formatDisplayNumber(value) {
 function formatDisplayRank(value) {
   const rank = Number(value || 0);
   if (!Number.isFinite(rank) || rank <= 0) return "-";
-  return `#${rank.toLocaleString("en-US")}`;
+  return rank.toLocaleString("en-US");
 }
 
 function formatSignedFantasyDelta(value) {
@@ -3932,10 +3932,18 @@ function buildWeeklyCurve(rows, eventMetaById) {
     });
 }
 
-function buildOverallRankCurve(rows) {
-  return (rows || [])
-    .map((row) => Number(row?.overall_rank || 0))
-    .filter((value) => Number.isFinite(value) && value > 0);
+function buildOverallRankCurve(rows, eventMetaById) {
+  const rankByGw = new Map();
+  for (const row of rows || []) {
+    const eventId = Number(row?.event || 0);
+    const gw = Number(eventMetaById?.[eventId]?.gw || 0);
+    const rank = Number(row?.overall_rank || 0);
+    if (!gw || !Number.isFinite(rank) || rank <= 0) continue;
+    rankByGw.set(gw, rank);
+  }
+  return Array.from(rankByGw.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([gw, rank]) => ({ gw, rank }));
 }
 
 function getManagerDisplayName(uidNumber, historyData, entryData = null) {
@@ -4246,7 +4254,7 @@ async function buildSeasonSummaryPayload(uidInput) {
   const openingMessage = seasonCount <= 1
     ? (
       overallRank && overallRank < 1000
-        ? "恭喜你完成了自己的第一个赛季！没想到第一个赛季就能突破 Top1000 的大关，你真是范特西的天赋玩家。"
+        ? `恭喜你完成了自己的第一个赛季！没想到第一个赛季就能达到全球第 ${formatDisplayRank(overallRank)} 名的排名，你真是范特西的天赋玩家。`
         : "恭喜你完成了自己的第一个赛季！排名什么都不重要，能坚持下来才是这个游戏的真谛。"
     )
     : (seasonCount === 2
@@ -4286,7 +4294,7 @@ async function buildSeasonSummaryPayload(uidInput) {
       region_name: String(entryData?.player_region_name || "").trim() || null,
       subtitle: `${teamName} 的这一季，先从总分、排名、Captain 与转会节奏开始讲。现在这版更像一份能跑通真实数据链路的内测故事册，后面我们可以继续把句子打磨得更有味道。`,
       opening_message: openingMessage,
-      or_curve: buildOverallRankCurve(rows),
+      or_curve: buildOverallRankCurve(rows, eventMetaById),
       tags: [
         `第 ${seasonCount} 赛季`,
         `${qualifiedTransfers.length} 次非芯片转会`,
