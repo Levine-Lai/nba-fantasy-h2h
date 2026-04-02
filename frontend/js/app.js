@@ -915,28 +915,15 @@ const Render = {
         const grouped = new Map();
 
         entries.forEach(([uid, payload]) => {
-            const players = Array.isArray(payload?.players) ? payload.players : [];
             const captainUsed = payload?.captain_used || {};
-            const captainPlayer = players.find((player) => !!player?.is_captain && Number(player?.multiplier || 1) > 1)
-                || players.find((player) => !!player?.is_captain);
-            const used = !!(
-                payload?.chip_status?.captain_used ||
-                captainUsed?.used ||
-                String(payload?.active_chip || "").toLowerCase() === "phcapt" ||
-                captainPlayer
-            );
+            const used = !!captainUsed?.used;
             if (!used) return;
 
-            const captainName = String(captainPlayer?.name || captainUsed?.captain_name || "").trim();
+            const captainName = String(captainUsed?.captain_name || "").trim();
             if (!captainName) return;
             const day = Number(captainUsed?.day || extractEventDayNumber(payload?.current_event_name) || 0) || null;
-            const captainPoints = Number(
-                captainPlayer?.final_points ??
-                captainPlayer?.base_points ??
-                captainUsed?.captain_points ??
-                0
-            );
-            const key = `${day || 0}__${captainName}`;
+            const captainPoints = Number(captainUsed?.captain_points || 0);
+            const key = `${day || 0}__${captainName}__${captainPoints}`;
             const current = grouped.get(key) || {
                 captain_name: captainName,
                 captain_points: captainPoints,
@@ -1071,7 +1058,6 @@ const Render = {
                             loading="lazy"
                             decoding="async"
                             onerror="this.onerror=null;this.src='/LOGO.png';">
-                        <div class="special-guy-name">${escapeHtml(item.name)}</div>
                         <div class="special-guy-value">${Number(item.average_ownership || 0).toFixed(1)}%</div>
                     </div>
                 `).join("")}

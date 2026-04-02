@@ -2565,8 +2565,8 @@ body {
 
 .special-guy-item {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 8px;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
     align-items: center;
     padding: 9px 10px;
     border: 1px solid #edf2f7;
@@ -2584,17 +2584,8 @@ body {
     box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
 }
 
-.special-guy-name {
-    min-width: 0;
-    font-size: 12px;
-    font-weight: 700;
-    color: #0f172a;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .special-guy-value {
+    justify-self: end;
     font-size: 13px;
     font-weight: 900;
     color: #0f172a;
@@ -2642,10 +2633,6 @@ body {
         width: 28px;
         height: 28px;
         border-radius: 9px;
-    }
-
-    .special-guy-name {
-        font-size: 11px;
     }
 
     .special-guy-value {
