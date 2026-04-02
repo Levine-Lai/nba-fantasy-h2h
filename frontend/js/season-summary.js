@@ -1,5 +1,6 @@
 (function () {
     const PAGE_COUNT = 6;
+    const INTRO_EXIT_MS = 720;
     const state = {
         currentPage: 0,
         lastUid: "",
@@ -55,6 +56,10 @@
 
     function setIntroReady() {
         refs().shell?.classList.add("intro-ready");
+    }
+
+    function setIntroLeaving(enabled) {
+        refs().shell?.classList.toggle("intro-leaving", !!enabled);
     }
 
     function updateIndicator() {
@@ -163,7 +168,7 @@
                         ${renderRows([
                             ["UID", profile.uid],
                             ["赛季", profile.seasonLabel || "-"],
-                            ["第几赛季", `第 ${profile.seasonCount || 1} 季`],
+                            ["第几个赛季", `第 ${profile.seasonCount || 1} 季`],
                             ["更新时间", profile.generatedLabel || "-"],
                         ])}
                     </div>
@@ -260,37 +265,46 @@
     function getLoadErrorMessage(error) {
         const text = String(error?.message || error || "");
         if (/failed to fetch|networkerror|load failed/i.test(text)) {
-            return "本地 API 没连上，请先启动 worker 的 `wrangler dev`";
+            return "本地 API 没有连上，请先启动 worker 的 wrangler dev";
         }
         if (/404|not found/i.test(text)) {
-            return "这个 entry_id 没查到数据，请换一个 UID 试试";
+            return "这个 Fantasy ID 没查到数据，可以换一个试试";
         }
         return text || "加载失败";
+    }
+
+    async function playIntroExit(profile, normalizedUid) {
+        refs().pages.innerHTML = renderPages(profile);
+        state.currentPage = 1;
+        updateIndicator();
+        setIntroLeaving(true);
+        await new Promise((resolve) => window.setTimeout(resolve, INTRO_EXIT_MS));
+        setHasProfile(true);
+        setIntroLeaving(false);
+        setStatus("");
+        updateUrl(normalizedUid);
     }
 
     async function loadSummary(uid) {
         const normalizedUid = String(uid || "").trim();
         if (!normalizedUid) {
-            setStatus("请输入 entry_id", "error");
+            setStatus("请输入 Fantasy ID", "error");
             refs().uidInput?.focus();
             return;
         }
 
         state.lastUid = normalizedUid;
         setHasProfile(false);
-        setStatus("加载中...");
+        setIntroLeaving(false);
+        setStatus("正在加载中，请稍后", "loading");
         refs().pages.innerHTML = `<div class="season-summary-placeholder"></div>`;
 
         try {
             const profile = await requestSummary(normalizedUid);
-            refs().pages.innerHTML = renderPages(profile);
-            state.currentPage = 0;
-            updateIndicator();
-            setHasProfile(true);
-            setStatus("");
-            updateUrl(normalizedUid);
+            await playIntroExit(profile, normalizedUid);
         } catch (error) {
             console.error("Season summary load failed:", error);
+            setIntroLeaving(false);
             setHasProfile(false);
             setStatus(getLoadErrorMessage(error), "error");
         }
@@ -324,7 +338,6 @@
                     url.searchParams.delete("uid");
                     window.history.replaceState({}, "", url.toString());
                 }
-                return;
             }
         });
 
