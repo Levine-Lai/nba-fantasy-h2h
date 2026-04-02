@@ -1,0 +1,466 @@
+.season-summary-layout {
+    padding: 14px 24px 18px;
+}
+
+.season-summary-layout.active {
+    display: block;
+}
+
+.season-summary-shell {
+    position: relative;
+    min-height: calc(100vh - 118px);
+}
+
+.season-summary-search-stage {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: min(520px, calc(100% - 32px));
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    transition: top 0.38s ease, transform 0.38s ease, width 0.38s ease;
+}
+
+.season-summary-shell.has-profile .season-summary-search-stage {
+    top: 8px;
+    width: min(420px, calc(100% - 48px));
+    transform: translate(-50%, 0);
+}
+
+.season-summary-search {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(219, 228, 238, 0.92);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 20px 48px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(16px);
+}
+
+.season-summary-input {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    padding: 0 14px;
+    border: none;
+    background: transparent;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+    text-align: center;
+    outline: none;
+}
+
+.season-summary-input::placeholder {
+    color: #94a3b8;
+    font-weight: 700;
+}
+
+.season-summary-submit {
+    min-width: 244px;
+    height: 46px;
+    padding: 0 20px;
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #dff1ff 0%, #9ed0ff 55%, #63b0ff 100%);
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    box-shadow: 0 14px 30px rgba(96, 165, 250, 0.28);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.season-summary-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 34px rgba(96, 165, 250, 0.34);
+    filter: saturate(1.05);
+}
+
+.season-summary-status {
+    min-height: 22px;
+    margin-top: 10px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.season-summary-status.error {
+    color: #b91c1c;
+}
+
+.season-summary-book {
+    position: relative;
+    height: calc(100vh - 150px);
+    min-height: 560px;
+    padding-top: 76px;
+}
+
+.season-summary-pages {
+    position: relative;
+    height: 100%;
+}
+
+.season-summary-placeholder {
+    position: absolute;
+    inset: 76px 0 0;
+}
+
+.season-summary-page {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(260px, 0.92fr);
+    gap: 16px;
+    padding: 20px;
+    border-radius: 26px;
+    border: 1px solid #e5edf5;
+    background:
+        radial-gradient(circle at top left, rgba(191, 219, 254, 0.18), transparent 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.06);
+    opacity: 0;
+    transform: perspective(1200px) rotateY(-8deg) translateX(44px) scale(0.985);
+    transform-origin: left center;
+    pointer-events: none;
+    transition: opacity 0.34s ease, transform 0.52s cubic-bezier(0.2, 0.8, 0.2, 1);
+    overflow: hidden;
+}
+
+.season-summary-page.active {
+    opacity: 1;
+    transform: perspective(1200px) rotateY(0deg) translateX(0) scale(1);
+    pointer-events: auto;
+    z-index: 2;
+}
+
+.season-summary-main,
+.season-summary-side {
+    min-width: 0;
+    height: 100%;
+}
+
+.season-summary-main {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.season-summary-side {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.season-summary-overline {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.season-summary-name {
+    font-size: clamp(32px, 4vw, 56px);
+    line-height: 0.92;
+    font-weight: 900;
+    letter-spacing: -0.06em;
+    color: #0f172a;
+}
+
+.season-summary-team {
+    font-size: 16px;
+    font-weight: 800;
+    color: #475569;
+}
+
+.season-summary-page-title {
+    font-size: clamp(24px, 2.5vw, 34px);
+    line-height: 0.95;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    color: #0f172a;
+}
+
+.season-summary-mini-title {
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.season-summary-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.season-summary-card,
+.season-summary-rail,
+.season-summary-row-list,
+.season-summary-quote {
+    border: 1px solid #e5edf5;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.84);
+}
+
+.season-summary-card,
+.season-summary-rail,
+.season-summary-row-list,
+.season-summary-quote {
+    padding: 16px;
+}
+
+.season-summary-stat-label {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.season-summary-stat-value {
+    margin-top: 8px;
+    font-size: clamp(28px, 3vw, 44px);
+    line-height: 0.95;
+    font-weight: 900;
+    letter-spacing: -0.05em;
+    color: #0f172a;
+}
+
+.season-summary-stat-note {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: #64748b;
+}
+
+.season-summary-chart {
+    height: 190px;
+    border-radius: 18px;
+    background:
+        linear-gradient(180deg, rgba(59, 130, 246, 0.08), rgba(255, 255, 255, 0.08)),
+        repeating-linear-gradient(180deg, rgba(15, 23, 42, 0.05) 0 1px, transparent 1px 40px),
+        repeating-linear-gradient(90deg, rgba(15, 23, 42, 0.04) 0 1px, transparent 1px 72px),
+        #fff;
+    overflow: hidden;
+}
+
+.season-summary-chart svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.season-summary-row-list {
+    display: grid;
+    gap: 10px;
+}
+
+.season-summary-row {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.season-summary-row-key {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.season-summary-row-value {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.5;
+    color: #0f172a;
+}
+
+.season-summary-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.season-summary-badges span {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid #dbe4ee;
+    background: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    color: #334155;
+}
+
+.season-summary-rail {
+    display: grid;
+    gap: 12px;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.97), rgba(30, 41, 59, 0.97));
+    color: #fff;
+}
+
+.season-summary-rail .season-summary-mini-title,
+.season-summary-rail .season-summary-row-key {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.season-summary-rail .season-summary-row-value,
+.season-summary-rail .season-summary-footnote,
+.season-summary-rail li {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.season-summary-rail ul {
+    display: grid;
+    gap: 8px;
+    padding-left: 18px;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.season-summary-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.season-summary-kpi {
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.season-summary-kpi strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 24px;
+    line-height: 1;
+    color: #fff;
+}
+
+.season-summary-footnote {
+    font-size: 12px;
+    line-height: 1.55;
+    color: #475569;
+}
+
+.season-summary-quote {
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.6;
+    color: #0f172a;
+    background: linear-gradient(135deg, rgba(255, 243, 205, 0.82), rgba(255, 255, 255, 0.94));
+}
+
+.season-summary-footer {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 5;
+}
+
+.season-summary-nav {
+    display: flex;
+    gap: 8px;
+}
+
+.season-summary-page-btn {
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(191, 219, 254, 0.9);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.98));
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.1);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.season-summary-page-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(96, 165, 250, 0.95);
+    box-shadow: 0 18px 36px rgba(37, 99, 235, 0.16);
+}
+
+@media (max-width: 1100px) {
+    .season-summary-shell {
+        min-height: calc(100vh - 108px);
+    }
+
+    .season-summary-book {
+        height: calc(100vh - 140px);
+        min-height: 640px;
+    }
+
+    .season-summary-page {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .season-summary-layout {
+        padding: 10px 12px 16px;
+    }
+
+    .season-summary-shell {
+        min-height: calc(100vh - 96px);
+    }
+
+    .season-summary-book {
+        height: calc(100vh - 126px);
+        min-height: 700px;
+        padding-top: 72px;
+    }
+
+    .season-summary-page {
+        padding: 14px;
+        border-radius: 20px;
+    }
+
+    .season-summary-grid-3 {
+        grid-template-columns: 1fr;
+    }
+
+    .season-summary-row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+
+    .season-summary-input {
+        font-size: 18px;
+    }
+
+    .season-summary-submit {
+        min-width: 170px;
+        padding: 0 14px;
+        font-size: 12px;
+    }
+
+    .season-summary-stat-value {
+        font-size: 30px;
+    }
+
+    .season-summary-footer {
+        right: 8px;
+        bottom: 6px;
+    }
+}

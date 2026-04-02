@@ -7,7 +7,18 @@
     <link rel="icon" type="image/jpeg" href="/LOGO.png">
     <link rel="stylesheet" href="/css/style.css">
     <script>
-        window.__API_BASE__ = "";
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            const queryBase = (params.get("api_base") || "").trim().replace(/\/+$/, "");
+            const storageKey = "__NBA_API_BASE__";
+            const localDefault = (window.location.protocol === "file:" || /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname))
+                ? "http://127.0.0.1:8787"
+                : "";
+            if (queryBase) {
+                window.localStorage.setItem(storageKey, queryBase);
+            }
+            window.__API_BASE__ = queryBase || window.localStorage.getItem(storageKey) || localDefault;
+        }());
     </script>
 </head>
 <body>

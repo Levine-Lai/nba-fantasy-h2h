@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA Fantasy Season Summary</title>
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <link rel="icon" type="image/jpeg" href="/LOGO.png">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/season-summary.css">
+    <script>
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            const queryBase = (params.get("api_base") || "").trim().replace(/\/+$/, "");
+            const storageKey = "__NBA_API_BASE__";
+            const localDefault = (window.location.protocol === "file:" || /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname))
+                ? "http://127.0.0.1:8787"
+                : "";
+            if (queryBase) {
+                window.localStorage.setItem(storageKey, queryBase);
+            }
+            window.__API_BASE__ = queryBase || window.localStorage.getItem(storageKey) || localDefault;
+        }());
+    </script>
+</head>
+<body>
+    <div class="header">
+        <div class="brand">
+            <img src="/LOGO.jpg" alt="NBA Fantasy H2H logo" class="brand-logo">
+            <div class="brand-copy">
+                <h1>NBA Fantasy H2H</h1>
+                <div class="brand-tagline">Season Summary Preview</div>
+                <span>Private Preview Route</span>
+            </div>
+        </div>
+        <div class="controls">
+            <a class="btn" href="/">返回主页</a>
+        </div>
+    </div>
+
+    <main class="container season-summary-layout active">
+        <div class="season-summary-shell" id="season-summary-shell">
+            <div class="season-summary-search-stage" id="season-summary-search-stage">
+                <form class="season-summary-search" id="season-summary-search-form">
+                    <input id="season-summary-uid" class="season-summary-input" type="text" inputmode="numeric" placeholder="请输入你的Fantasy ID">
+                    <button class="season-summary-submit" id="season-summary-generate-btn" type="submit">看看你这赛季都经历了什么</button>
+                </form>
+                <div class="season-summary-status" id="season-summary-status"></div>
+            </div>
+            <div class="season-summary-book">
+                <div class="season-summary-pages" id="season-summary-pages">
+                    <div class="season-summary-placeholder"></div>
+                </div>
+            </div>
+            <div class="season-summary-footer">
+                <div class="season-summary-nav">
+                    <button class="season-summary-page-btn" id="season-summary-prev-btn" type="button" aria-label="上一页">←</button>
+                    <button class="season-summary-page-btn" id="season-summary-next-btn" type="button" aria-label="下一页">→</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/season-summary.js"></script>
+</body>
+</html>

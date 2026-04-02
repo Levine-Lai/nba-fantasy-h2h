@@ -3838,6 +3838,506 @@ async function getPlayerReferencePayload(env, options = {}) {
   return fetchPlayerReferencePayload(playerQuery);
 }
 
+function buildSeasonLabel(value = Date.now()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const year = Number(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+  }).format(date));
+  const month = Number(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+  }).format(date));
+  const startYear = month >= 7 ? year : year - 1;
+  const endShort = String((startYear + 1) % 100).padStart(2, "0");
+  return `${startYear}-${endShort}`;
+}
+
+function formatBeijingDateTimeLabel(value = Date.now()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const datePart = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+  const timePart = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+  return `${datePart} ${timePart}`;
+}
+
+function formatFantasyScore(value) {
+  return Number(Math.round(Number(value || 0) / 10) || 0);
+}
+
+function formatDisplayNumber(value) {
+  const num = Number(value || 0);
+  if (!Number.isFinite(num)) return "-";
+  return num.toLocaleString("en-US");
+}
+
+function formatDisplayRank(value) {
+  const rank = Number(value || 0);
+  if (!Number.isFinite(rank) || rank <= 0) return "-";
+  return `#${rank.toLocaleString("en-US")}`;
+}
+
+function formatSignedFantasyDelta(value) {
+  const num = Number(value || 0);
+  if (!Number.isFinite(num)) return "N/A";
+  const prefix = num > 0 ? "+" : "";
+  return `${prefix}${formatDisplayNumber(num)}`;
+}
+
+function buildSeasonChipEventNameMap(historyData) {
+  const map = {};
+  for (const item of extractChipHistoryRecords(historyData)) {
+    const eventId = Number(item?.event || 0);
+    const name = String(item?.name || "").toLowerCase();
+    if (!eventId || !name) continue;
+    map[eventId] = name;
+  }
+  return map;
+}
+
+function getSortedHistoryRows(historyData) {
+  return [...(Array.isArray(historyData?.current) ? historyData.current : [])]
+    .filter((row) => row && typeof row === "object" && Number(row?.event || 0) > 0)
+    .sort((a, b) => Number(a?.event || 0) - Number(b?.event || 0));
+}
+
+function getLatestPositiveValue(values) {
+  const list = (values || []).map((item) => Number(item || 0)).filter((value) => Number.isFinite(value) && value > 0);
+  return list.length ? list[list.length - 1] : null;
+}
+
+function buildWeeklyCurve(rows, eventMetaById) {
+  const pointsByGw = new Map();
+  for (const row of rows || []) {
+    const eventId = Number(row?.event || 0);
+    const gw = Number(eventMetaById?.[eventId]?.gw || 0);
+    if (!gw) continue;
+    pointsByGw.set(gw, Number(pointsByGw.get(gw) || 0) + Number(row?.points || 0));
+  }
+
+  let running = 0;
+  return Array.from(pointsByGw.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([, rawPoints]) => {
+      running += Number(rawPoints || 0);
+      return formatFantasyScore(running);
+    });
+}
+
+function getManagerDisplayName(uidNumber, historyData, entryData = null) {
+  const candidates = [
+    entryData?.player_first_name && entryData?.player_last_name ? `${entryData.player_first_name} ${entryData.player_last_name}` : "",
+    entryData?.player_name,
+    entryData?.name,
+    entryData?.entry_name,
+    historyData?.player_name,
+    historyData?.name,
+    historyData?.entry_name,
+    UID_MAP[uidNumber],
+  ];
+  for (const value of candidates) {
+    const text = String(value || "").trim();
+    if (text) return text;
+  }
+  return `#${uidNumber}`;
+}
+
+function getTeamDisplayName(uidNumber, historyData, entryData = null) {
+  const candidates = [
+    entryData?.entry_name,
+    historyData?.entry_name,
+    UID_MAP[uidNumber],
+  ];
+  for (const value of candidates) {
+    const text = String(value || "").trim();
+    if (text) return text;
+  }
+  return `#${uidNumber}`;
+}
+
+function toGwDayLabel(gw, day) {
+  if (gw && day) return `GW${gw} Day${day}`;
+  if (gw) return `GW${gw}`;
+  if (day) return `Day${day}`;
+  return "Unknown";
+}
+
+function describeTransferStyle(totalTransfers, activeWeeks, penaltyPoints) {
+  if (totalTransfers >= 45) {
+    return `这是一个明显愿意主动换人的赛季。${activeWeeks} 个比赛周动过手，而且愿意为节奏付出 ${penaltyPoints} 分。`;
+  }
+  if (totalTransfers >= 28) {
+    return `整体不是乱冲的风格，但也绝不保守。${activeWeeks} 个比赛周有动作，说明你会在合适的时候果断出手。`;
+  }
+  return `这赛季的转会节奏偏克制，更像是只在真的想清楚以后才动手。`;
+}
+
+function describeCaptainStyle(captainCount, favoriteCaptainName) {
+  if (captainCount >= 8) {
+    return `这是一份相当敢开 Captain 的赛季记录，而 ${favoriteCaptainName} 看起来像你最熟悉的答案。`;
+  }
+  if (captainCount >= 4) {
+    return `你不是每周都开 Captain，但会把它留给自己最有把握的时点。`;
+  }
+  if (captainCount >= 1) {
+    return `Captain 用得不算多，不过每一次都很像一次认真下的注。`;
+  }
+  return `这一季还没有留下 Captain 记录，反而让这页多了点“按兵不动”的味道。`;
+}
+
+function buildTransferHoldSummary(qualifiedTransfers, eventOrder, currentOrder, elements) {
+  const open = new Map();
+  const spells = [];
+  const sorted = [...(qualifiedTransfers || [])].sort((a, b) =>
+    Number(a?.event || 0) - Number(b?.event || 0) ||
+    Number(a?.index || 0) - Number(b?.index || 0)
+  );
+
+  for (const transfer of sorted) {
+    const order = Number(eventOrder.get(Number(transfer?.event || 0)) || 0);
+    const outId = Number(transfer?.element_out || 0);
+    const inId = Number(transfer?.element_in || 0);
+
+    if (outId && open.has(outId)) {
+      const start = open.get(outId);
+      spells.push({
+        player_name: start.player_name,
+        start_label: start.start_label,
+        end_label: transfer.label,
+        length: Math.max(1, order - Number(start.order || 0) + 1),
+      });
+      open.delete(outId);
+    }
+
+    if (inId && !open.has(inId)) {
+      open.set(inId, {
+        order,
+        player_name: elements[inId]?.name || `#${inId}`,
+        start_label: transfer.label,
+      });
+    }
+  }
+
+  for (const [, start] of open.entries()) {
+    spells.push({
+      player_name: start.player_name,
+      start_label: start.start_label,
+      end_label: "现在",
+      length: Math.max(1, Number(currentOrder || 0) - Number(start.order || 0) + 1),
+    });
+  }
+
+  return spells.sort((a, b) =>
+    Number(b?.length || 0) - Number(a?.length || 0) ||
+    String(a?.player_name || "").localeCompare(String(b?.player_name || ""))
+  )[0] || null;
+}
+
+async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eventMetaById) {
+  const liveCache = {};
+  const records = [];
+
+  for (const chip of captainEvents || []) {
+    const eventId = Number(chip?.event || 0);
+    if (!eventId) continue;
+    const picksRes = await fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 1);
+    if (!picksRes.ok) continue;
+    const picks = Array.isArray(picksRes.data?.picks) ? picksRes.data.picks : [];
+    const captainPick = picks.find((pick) => pick?.is_captain || Number(pick?.multiplier || 1) > 1);
+    if (!captainPick) continue;
+
+    if (!liveCache[eventId]) {
+      const liveRes = await fetchJsonSafe(`/event/${eventId}/live/`, 1);
+      const liveElements = {};
+      const rawElements = liveRes.ok ? liveRes.data?.elements : null;
+      if (Array.isArray(rawElements)) {
+        for (const item of rawElements) liveElements[item.id] = item;
+      } else if (rawElements && typeof rawElements === "object") {
+        for (const [key, value] of Object.entries(rawElements)) liveElements[Number(key)] = value;
+      }
+      liveCache[eventId] = liveElements;
+    }
+
+    const elementId = Number(captainPick?.element || 0);
+    const stats = getPlayerStats(elementId, liveCache[eventId] || {}, elements);
+    const fantasyPoints = Number(stats?.fantasy || 0) * Number(captainPick?.multiplier || 1);
+    const meta = eventMetaById?.[eventId] || {};
+    records.push({
+      event: eventId,
+      gw: Number(meta?.gw || 0) || null,
+      day: Number(meta?.day || 0) || null,
+      label: toGwDayLabel(meta?.gw, meta?.day),
+      captain_name: elements[elementId]?.name || `#${elementId}`,
+      captain_points: Math.round(fantasyPoints),
+    });
+  }
+
+  return records.sort((a, b) =>
+    Number(a?.event || 0) - Number(b?.event || 0)
+  );
+}
+
+async function buildSeasonSummaryPayload(uidInput) {
+  const uidNumber = uidToNumber(uidInput);
+  if (!uidNumber) {
+    throw new Error("uid is required");
+  }
+
+  const [bootstrap, historyRes, transfersRes, entryRes] = await Promise.all([
+    fetchJson("/bootstrap-static/", 1),
+    fetchJsonSafe(`/entry/${uidNumber}/history/`, 1),
+    fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 1),
+    fetchJsonSafe(`/entry/${uidNumber}/`, 1),
+  ]);
+
+  if (!historyRes.ok || !historyRes.data) {
+    throw new Error(`entry ${uidNumber} history not found`);
+  }
+
+  const historyData = historyRes.data;
+  const entryData = entryRes.ok ? entryRes.data : null;
+  const elements = buildElementsMap(bootstrap);
+  const eventMetaById = buildEventMetaById(bootstrap.events || []);
+  const sortedEventIds = (bootstrap.events || []).map((item) => Number(item?.id || 0)).filter(Boolean).sort((a, b) => a - b);
+  const eventOrder = new Map(sortedEventIds.map((eventId, index) => [eventId, index + 1]));
+
+  const rows = getSortedHistoryRows(historyData);
+  const latestRow = rows[rows.length - 1] || {};
+  const totalSeasonPoints = Math.max(
+    formatFantasyScore(rows.reduce((sum, row) => sum + Number(row?.points || 0), 0)),
+    formatFantasyScore(latestRow?.total_points || 0)
+  );
+  const overallRank = getLatestPositiveValue(rows.map((row) => row?.overall_rank)) || Number(entryData?.summary_overall_rank || 0) || null;
+  const seasonCurve = buildWeeklyCurve(rows, eventMetaById);
+  const weeklyTotals = [];
+  let previous = 0;
+  for (const total of seasonCurve) {
+    weeklyTotals.push(Number(total || 0) - previous);
+    previous = Number(total || 0);
+  }
+  const bestWeekScore = weeklyTotals.length ? Math.max(...weeklyTotals) : 0;
+
+  const pastSeasons = Array.isArray(historyData?.past) ? historyData.past : [];
+  const seasonCount = Math.max(1, pastSeasons.length + 1);
+  const previousSeason = pastSeasons[pastSeasons.length - 1] || null;
+  const previousSeasonPoints = previousSeason ? formatFantasyScore(previousSeason?.total_points || previousSeason?.points || previousSeason?.total || 0) : null;
+  const pointsDelta = previousSeasonPoints !== null ? totalSeasonPoints - previousSeasonPoints : null;
+
+  const chipEventNameByEvent = buildSeasonChipEventNameMap(historyData);
+  const rawTransfers = Array.isArray(transfersRes.data) ? transfersRes.data : [];
+  const qualifiedTransfers = rawTransfers
+    .map((transfer, index) => {
+      const eventId = Number(transfer?.event || 0);
+      const chipName = String(chipEventNameByEvent[eventId] || "").toLowerCase();
+      const { gw, day } = resolveTransferGwDay(transfer, eventMetaById);
+      const inId = Number(transfer?.element_in || 0);
+      const outId = Number(transfer?.element_out || 0);
+      return {
+        ...transfer,
+        index,
+        event: eventId,
+        gw,
+        day,
+        label: toGwDayLabel(gw, day),
+        is_chip_bulk_move: chipName === "wildcard" || chipName === "wild_card" || chipName === "rich",
+        in_name: elements[inId]?.name || `#${inId}`,
+        out_name: elements[outId]?.name || `#${outId}`,
+      };
+    })
+    .filter((transfer) => !transfer.is_chip_bulk_move);
+
+  const transferWeeksActive = new Set(qualifiedTransfers.map((transfer) => Number(transfer?.gw || 0)).filter(Boolean)).size;
+  const transferPenaltyPoints = formatFantasyScore(rows.reduce((sum, row) => sum + Number(row?.event_transfers_cost || 0), 0));
+  const incomingCounts = new Map();
+  const outgoingCounts = new Map();
+  const returningCounts = new Map();
+  for (const transfer of qualifiedTransfers) {
+    const inName = String(transfer?.in_name || "").trim();
+    const outName = String(transfer?.out_name || "").trim();
+    if (inName) incomingCounts.set(inName, Number(incomingCounts.get(inName) || 0) + 1);
+    if (outName) outgoingCounts.set(outName, Number(outgoingCounts.get(outName) || 0) + 1);
+  }
+  for (const [name, count] of incomingCounts.entries()) {
+    if (count > 1) returningCounts.set(name, count);
+  }
+  const favoriteIncoming = [...incomingCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
+  const favoriteOutgoing = [...outgoingCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
+  const favoriteReturner = [...returningCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
+  const currentEventOrder = Number(eventOrder.get(Number(latestRow?.event || sortedEventIds[sortedEventIds.length - 1] || 0)) || sortedEventIds.length || 1);
+  const longestHold = buildTransferHoldSummary(qualifiedTransfers, eventOrder, currentEventOrder, elements);
+
+  const captainEvents = extractChipHistoryRecords(historyData)
+    .map((item) => {
+      const eventId = Number(item?.event || 0);
+      const rawName = String(item?.name || "").toLowerCase();
+      const meta = eventMetaById?.[eventId] || {};
+      return {
+        event: eventId,
+        name: rawName,
+        gw: Number(item?.gw || item?.gameweek || meta?.gw || 0) || null,
+        day: Number(item?.day || meta?.day || 0) || null,
+      };
+    })
+    .filter((item) => item.event && item.name === "phcapt")
+    .sort((a, b) => Number(a?.event || 0) - Number(b?.event || 0));
+
+  const captainRecords = await buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eventMetaById);
+  const captainUseCount = captainRecords.length;
+  const captainTotalPoints = captainRecords.reduce((sum, item) => sum + Number(item?.captain_points || 0), 0);
+  const captainNameCounts = new Map();
+  for (const record of captainRecords) {
+    const name = String(record?.captain_name || "").trim();
+    if (!name) continue;
+    captainNameCounts.set(name, Number(captainNameCounts.get(name) || 0) + 1);
+  }
+  const favoriteCaptain = [...captainNameCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
+  const bestCaptain = [...captainRecords].sort((a, b) => Number(b?.captain_points || 0) - Number(a?.captain_points || 0))[0] || null;
+  const worstCaptain = [...captainRecords].sort((a, b) => Number(a?.captain_points || 0) - Number(b?.captain_points || 0))[0] || null;
+
+  const bestDayRow = [...rows].sort((a, b) => Number(b?.points || 0) - Number(a?.points || 0))[0] || null;
+  const bestDayMeta = eventMetaById?.[Number(bestDayRow?.event || 0)] || {};
+  const bestDayPoints = bestDayRow ? formatFantasyScore(bestDayRow.points) : 0;
+  const bestRankRow = rows
+    .filter((row) => Number(row?.overall_rank || 0) > 0)
+    .sort((a, b) => Number(a?.overall_rank || 0) - Number(b?.overall_rank || 0))[0] || null;
+  const bestRankMeta = eventMetaById?.[Number(bestRankRow?.event || 0)] || {};
+
+  const managerName = getManagerDisplayName(uidNumber, historyData, entryData);
+  const teamName = getTeamDisplayName(uidNumber, historyData, entryData);
+  const seasonLabel = buildSeasonLabel();
+  const captainFavoriteName = favoriteCaptain?.[0] || "还没有固定答案";
+  const generatedAt = new Date().toISOString();
+
+  return {
+    success: true,
+    uid: String(uidNumber),
+    managerName,
+    teamName,
+    seasonLabel,
+    seasonCount,
+    sourceLabel: "official api live",
+    generated_at: generatedAt,
+    generatedLabel: formatBeijingDateTimeLabel(generatedAt),
+    sourceNote: "内测版：当前直接按官方 API 按需生成。第 5 页先用转会轨迹去描摹阵容偏好，长期持有与替补遗憾会在后续版本接入逐周阵容快照。",
+    intro: `${managerName} 的 ${seasonLabel} 赛季故事已经接进主站子页面了。现在输入 entry_id 就能即时生成，不需要为了换人或改文案反复部署整个站点。`,
+    cover: {
+      subtitle: `${teamName} 的这一季，先从总分、排名、Captain 与转会节奏开始讲。现在这版更像一份能跑通真实数据链路的内测故事册，后面我们可以继续把句子打磨得更有味道。`,
+      tags: [
+        `第 ${seasonCount} 赛季`,
+        `${qualifiedTransfers.length} 次非芯片转会`,
+        captainUseCount ? `${captainUseCount} 次 Captain` : "Captain 还没开张",
+      ],
+      footer: [
+        ["赛季总分", formatDisplayNumber(totalSeasonPoints)],
+        ["全球排名", formatDisplayRank(overallRank)],
+        ["数据来源", "Official API"],
+      ],
+    },
+    overview: {
+      lead: seasonCount > 1
+        ? `这是你的第 ${seasonCount} 个赛季。把它放回整季曲线里看，比单看某一周更容易看出你这一季到底是稳住了、起伏了，还是终于把自己的节奏打明白了。`
+        : "这是你的首个完整赛季版本。现在这页先把总分、全球排名和赛季走势搭起来，让整体画像先站住。",
+      cards: [
+        ["赛季总得分", formatDisplayNumber(totalSeasonPoints), previousSeasonPoints !== null ? `相较上赛季 ${formatSignedFantasyDelta(pointsDelta)} 分` : "当前版本已接入真实赛季总分"],
+        ["全球排名", formatDisplayRank(overallRank), overallRank ? "按历史接口里的最新 overall rank 展示" : "如果官方没有返回 rank，这里会留空"],
+        ["赛季序列", `第 ${seasonCount} 季`, previousSeasonPoints !== null ? `上赛季总分 ${formatDisplayNumber(previousSeasonPoints)}` : "之后还可以继续做跨赛季对比"],
+      ],
+      curve: seasonCurve,
+      sideTitle: "整体回顾",
+      sideBullets: [
+        `目前已经能稳定拿到赛季总分、全球排名和整季曲线。`,
+        `本季单周最高分是 ${formatDisplayNumber(bestWeekScore)}，这很适合后面再补“最像你的那一周”的文案。`,
+        previousSeasonPoints !== null
+          ? `和上季相比，你的总分变化是 ${formatSignedFantasyDelta(pointsDelta)}。`
+          : "如果后面想强化“进步/退步”的叙事，可以继续补更多 past 赛季字段。 ",
+      ],
+      sideKpis: [
+        ["Best GW", formatDisplayNumber(bestWeekScore)],
+        ["Curve", `${seasonCurve.length} 周`],
+      ],
+    },
+    transfers: {
+      lead: "这页先不把你写成冷冰冰的转会计数器，而是先看你这一季到底多爱动手、愿不愿意为节奏付费，以及有没有自己偏爱的回头草。",
+      rows: [
+        ["总转会", `${formatDisplayNumber(qualifiedTransfers.length)} 次（不含 WC / AS）`],
+        ["操作周数", `${formatDisplayNumber(transferWeeksActive)} 周有过动作`],
+        ["扣分情况", `${transferPenaltyPoints > 0 ? "-" : ""}${formatDisplayNumber(transferPenaltyPoints)} 分`],
+        ["最常换入", favoriteIncoming ? `${favoriteIncoming[0]} · ${favoriteIncoming[1]} 次` : "暂无明显偏好"],
+      ],
+      quote: describeTransferStyle(qualifiedTransfers.length, transferWeeksActive, transferPenaltyPoints),
+      sideTitle: "转会侧写",
+      sideBullets: [
+        favoriteOutgoing ? `这一季最常送走的人是 ${favoriteOutgoing[0]}。` : "目前没有明显反复卖出的对象。",
+        favoriteReturner ? `${favoriteReturner[0]} 被你反复带回来了 ${favoriteReturner[1]} 次，很像真正的“回头草”。` : "暂时还没出现特别明显的回购球员。",
+        "这一页已经完全基于真实 transfers/history 接口，不依赖首页缓存。",
+      ],
+    },
+    captain: {
+      lead: "Captain 页先按整个赛季的 Captain chip 记录来排，不看今天，不看本周，而是回头看你这一季到底把赌注押在了谁身上。",
+      cards: [
+        ["Captain 次数", formatDisplayNumber(captainUseCount), "这里统计的是整个赛季开过 Captain chip 的次数"],
+        ["队长总得分", formatDisplayNumber(captainTotalPoints), "已按当日 Captain 球员真实 fantasy 分回算"],
+        ["最爱 Captain", favoriteCaptain ? favoriteCaptain[0] : "暂无", favoriteCaptain ? `一共选了 ${favoriteCaptain[1]} 次` : "暂时还没有 Captain 记录"],
+      ],
+      rows: [
+        ["最高队长", bestCaptain ? `${bestCaptain.label} · ${bestCaptain.captain_name} · ${formatDisplayNumber(bestCaptain.captain_points)} 分` : "暂无 Captain 记录"],
+        ["最低队长", worstCaptain ? `${worstCaptain.label} · ${worstCaptain.captain_name} · ${formatDisplayNumber(worstCaptain.captain_points)} 分` : "暂无 Captain 记录"],
+      ],
+      sideTitle: "Captain 侧写",
+      sideBullets: [
+        describeCaptainStyle(captainUseCount, captainFavoriteName),
+        captainUseCount ? `这一页已经会逐个去查 Captain 当天的 picks/live，所以同一个 entry_id 每次都能按真实记录生成。` : "后面可以继续补上“哪一次最值、哪一次最伤”的专属句子。",
+      ],
+    },
+    roster: {
+      lead: "这一页的完整版将来会接“持有多久、替补遗憾、冷门高光”。当前内测版先用真实的转会轨迹，去勾勒你更偏爱的那类球员与关系线。",
+      rows: [
+        ["最长持有（转会后）", longestHold ? `${longestHold.player_name} · 约 ${formatDisplayNumber(longestHold.length)} 个比赛日 · ${longestHold.start_label} 到 ${longestHold.end_label}` : "还没有足够的转会轨迹来估算"],
+        ["最常换出", favoriteOutgoing ? `${favoriteOutgoing[0]} · ${favoriteOutgoing[1]} 次` : "暂无明显倾向"],
+        ["回头草", favoriteReturner ? `${favoriteReturner[0]} · ${favoriteReturner[1]} 次重新带回` : "这一季暂时没有明显回购对象"],
+      ],
+      badges: [
+        favoriteIncoming ? `偏爱 ${favoriteIncoming[0]}` : "偏好待生成",
+        longestHold ? "转会后长期陪跑" : "等待更多轨迹",
+        favoriteReturner ? "会回头看旧爱" : "回头草未出现",
+      ],
+      sideTitle: "阵容偏好（初版）",
+      sideBullets: [
+        "这一页目前还是“转会轨迹版”，还没接逐周阵容快照。",
+        "后续补上每周 picks 缓存后，就能继续做最长持有、替补遗憾和低持有率高光。",
+      ],
+    },
+    highlights: {
+      lead: "最后一页先收集这个赛季最容易被记住的几个瞬间，让整份总结不会只剩下表格和排名。",
+      cards: [
+        ["赛季最高单日", bestDayRow ? formatDisplayNumber(bestDayPoints) : "-", bestDayRow ? `${toGwDayLabel(bestDayMeta?.gw, bestDayMeta?.day)} 打出来的最高单日` : "还没有足够的历史数据"],
+        ["最高全球排名", bestRankRow ? formatDisplayRank(bestRankRow.overall_rank) : "-", bestRankRow ? `${toGwDayLabel(bestRankMeta?.gw, bestRankMeta?.day)} 达到的最好位置` : "官方若缺 rank 字段，这里会留空"],
+        ["赛季标签", qualifiedTransfers.length >= 40 ? "敢赌" : (captainUseCount >= 6 ? "会挑时机" : "偏稳"), "后面很适合继续加一句更像你的收尾文案"],
+      ],
+      quote: bestDayRow
+        ? `${toGwDayLabel(bestDayMeta?.gw, bestDayMeta?.day)} 的 ${formatDisplayNumber(bestDayPoints)} 分，会是这版赛季总结里最适合被单独打亮的一页。`
+        : "等真实数据补齐后，这一页会成为整份总结最适合做动效收尾的位置。",
+      sideTitle: "高光页",
+      sideBullets: [
+        bestRankRow ? `目前已经能抓到全季最佳单日和最好 global rank 那一天。` : "最高排名这块还取决于官方历史里有没有稳定 rank 字段。",
+        "这页后面最适合加轻动效和一句赛季收刀文案。",
+      ],
+      sideKpis: [
+        ["Best Day", bestDayRow ? toGwDayLabel(bestDayMeta?.gw, bestDayMeta?.day) : "-"],
+        ["Best OR", bestRankRow ? formatDisplayRank(bestRankRow.overall_rank) : "-"],
+      ],
+    },
+  };
+}
+
 export default {
   async fetch(request, env, ctx) {
     try {
@@ -3876,6 +4376,20 @@ export default {
           current_event_name: state.current_event_name,
           refresh_meta: state.refresh_meta,
         });
+      }
+
+      if (path === "/api/season-summary") {
+        const uid = url.searchParams.get("uid") || url.searchParams.get("entry_id");
+        if (!uid) {
+          return jsonResponse({ success: false, error: "uid is required" }, 400);
+        }
+        try {
+          return jsonResponse(await buildSeasonSummaryPayload(uid));
+        } catch (error) {
+          const message = String(error?.message || error || "season summary failed");
+          const status = /not found|required/i.test(message) ? 404 : 500;
+          return jsonResponse({ success: false, error: message }, status);
+        }
       }
 
       let state = await getState(env);
