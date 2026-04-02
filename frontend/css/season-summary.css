@@ -11,6 +11,52 @@
     min-height: calc(100vh - 118px);
 }
 
+.season-summary-intro {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    pointer-events: none;
+    transition: opacity 0.42s ease, transform 0.42s ease;
+}
+
+.season-summary-shell.intro-ready .season-summary-hero-player.left {
+    animation: season-summary-hero-left-in 0.82s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.season-summary-shell.intro-ready .season-summary-hero-player.right {
+    animation: season-summary-hero-right-in 0.82s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s both;
+}
+
+.season-summary-shell.has-profile .season-summary-intro {
+    opacity: 0;
+    transform: scale(0.985);
+}
+
+.season-summary-hero-player {
+    position: absolute;
+    bottom: 92px;
+    width: min(28vw, 330px);
+    max-width: 30%;
+    opacity: 0;
+    pointer-events: none;
+    filter: drop-shadow(0 18px 36px rgba(15, 23, 42, 0.14));
+}
+
+.season-summary-hero-player.left {
+    left: max(10px, 2.5vw);
+}
+
+.season-summary-hero-player.right {
+    right: max(10px, 2.5vw);
+}
+
+.season-summary-hero-player img {
+    display: block;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+}
+
 .season-summary-search-stage {
     position: absolute;
     left: 50%;
@@ -18,13 +64,8 @@
     width: min(520px, calc(100% - 32px));
     transform: translate(-50%, -50%);
     z-index: 4;
-    transition: top 0.38s ease, transform 0.38s ease, width 0.38s ease;
-}
-
-.season-summary-shell.has-profile .season-summary-search-stage {
-    top: 8px;
-    width: min(420px, calc(100% - 48px));
-    transform: translate(-50%, 0);
+    transition: opacity 0.32s ease, transform 0.32s ease;
+    pointer-events: auto;
 }
 
 .season-summary-search {
@@ -61,14 +102,14 @@
 }
 
 .season-summary-submit {
-    min-width: 244px;
+    min-width: 114px;
     height: 46px;
-    padding: 0 20px;
+    padding: 0 22px;
     border: none;
     border-radius: 999px;
     background: linear-gradient(135deg, #dff1ff 0%, #9ed0ff 55%, #63b0ff 100%);
     color: #0f172a;
-    font-size: 14px;
+    font-size: 18px;
     font-weight: 900;
     letter-spacing: 0.01em;
     cursor: pointer;
@@ -99,7 +140,7 @@
     position: relative;
     height: calc(100vh - 150px);
     min-height: 560px;
-    padding-top: 76px;
+    padding-top: 0;
 }
 
 .season-summary-pages {
@@ -109,7 +150,7 @@
 
 .season-summary-placeholder {
     position: absolute;
-    inset: 76px 0 0;
+    inset: 0;
 }
 
 .season-summary-page {
@@ -401,6 +442,28 @@
     box-shadow: 0 18px 36px rgba(37, 99, 235, 0.16);
 }
 
+@keyframes season-summary-hero-left-in {
+    from {
+        opacity: 0;
+        transform: translateX(-90px) scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+@keyframes season-summary-hero-right-in {
+    from {
+        opacity: 0;
+        transform: translateX(90px) scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
 @media (max-width: 1100px) {
     .season-summary-shell {
         min-height: calc(100vh - 108px);
@@ -409,6 +472,11 @@
     .season-summary-book {
         height: calc(100vh - 140px);
         min-height: 640px;
+    }
+
+    .season-summary-hero-player {
+        width: min(24vw, 250px);
+        bottom: 118px;
     }
 
     .season-summary-page {
@@ -428,7 +496,10 @@
     .season-summary-book {
         height: calc(100vh - 126px);
         min-height: 700px;
-        padding-top: 72px;
+    }
+
+    .season-summary-intro {
+        display: none;
     }
 
     .season-summary-page {
@@ -450,9 +521,9 @@
     }
 
     .season-summary-submit {
-        min-width: 170px;
+        min-width: 96px;
         padding: 0 14px;
-        font-size: 12px;
+        font-size: 16px;
     }
 
     .season-summary-stat-value {

@@ -53,6 +53,10 @@
         refs().shell?.classList.toggle("has-profile", !!enabled);
     }
 
+    function setIntroReady() {
+        refs().shell?.classList.add("intro-ready");
+    }
+
     function updateIndicator() {
         document.querySelectorAll(".season-summary-page").forEach((page, index) => {
             page.classList.toggle("active", index === state.currentPage);
@@ -347,6 +351,7 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
+        requestAnimationFrame(() => setIntroReady());
         bindEvents();
         initFromUrl();
     });
