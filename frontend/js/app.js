@@ -901,6 +901,90 @@ const Render = {
             : '<div class="trend-empty">No chips usage data</div>';
     },
 
+    goodCaptain(picksByUid) {
+        const container = document.getElementById("good-captain-summary");
+        if (!container) return;
+
+        const entries = Object.entries(picksByUid || {});
+        const grouped = new Map();
+
+        entries.forEach(([uid, payload]) => {
+            const captainUsed = payload?.captain_used || {};
+            if (!captainUsed?.used || !captainUsed?.captain_name) return;
+
+            const captainName = String(captainUsed.captain_name || "").trim();
+            const day = Number(captainUsed.day || 0) || null;
+            const captainPoints = Number(captainUsed.captain_points || 0);
+            const key = `${day || 0}__${captainName}`;
+            const current = grouped.get(key) || {
+                captain_name: captainName,
+                captain_points: captainPoints,
+                day,
+                managers: [],
+            };
+
+            current.captain_points = Math.max(Number(current.captain_points || 0), captainPoints);
+            current.managers.push({
+                uid: String(uid || ""),
+                team_name: String(payload?.team_name || payload?.manager_name || `#${uid}`),
+                logo_url: getManagerLogoUrl(payload?.team_name || payload?.manager_name || `#${uid}`),
+            });
+            grouped.set(key, current);
+        });
+
+        const rows = Array.from(grouped.values())
+            .map((item) => ({
+                ...item,
+                managers: item.managers.sort((a, b) => String(a.team_name || "").localeCompare(String(b.team_name || ""))),
+            }))
+            .sort((a, b) =>
+                Number(b.captain_points || 0) - Number(a.captain_points || 0) ||
+                Number(a.day || 99) - Number(b.day || 99) ||
+                String(a.captain_name || "").localeCompare(String(b.captain_name || ""))
+            )
+            .map((item, index) => ({
+                ...item,
+                rank: index + 1,
+            }));
+
+        const formatCaptainPoints = (value) => {
+            const num = Number(value || 0);
+            if (!Number.isFinite(num)) return "--";
+            return Number.isInteger(num) ? `${num}` : num.toFixed(1);
+        };
+
+        container.innerHTML = rows.length
+            ? rows.map((item) => `
+                <div class="good-captain-item">
+                    <div class="good-captain-main">
+                        <div class="good-captain-rank">#${item.rank}</div>
+                        <div class="good-captain-copy">
+                            <div class="good-captain-line">
+                                <span class="good-captain-name">${escapeHtml(item.captain_name || "-")}</span>
+                                <span class="good-captain-points">${formatCaptainPoints(item.captain_points)}分</span>
+                                <span class="good-captain-day">${item.day ? `Day${item.day}` : "Day?"}</span>
+                            </div>
+                            <div class="good-captain-avatars">
+                                ${item.managers.map((manager) => `
+                                    <img
+                                        class="good-captain-avatar"
+                                        src="${escapeHtml(manager.logo_url || "/LOGO.png")}"
+                                        alt="${escapeHtml(manager.team_name)} logo"
+                                        title="${escapeHtml(manager.team_name)}"
+                                        width="36"
+                                        height="36"
+                                        loading="lazy"
+                                        decoding="async"
+                                        onerror="this.onerror=null;this.src='/LOGO.png';">
+                                `).join("")}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join("")
+            : '<div class="trend-empty">No captain choices this week</div>';
+    },
+
     specialGuy(picksByUid) {
         const container = document.getElementById("special-guy-summary");
         if (!container) return;
@@ -951,21 +1035,13 @@ const Render = {
             return;
         }
 
-        const columns = [[], []];
-        rankings.forEach((item, index) => {
-            columns[index % 2].push(item);
-        });
         container.innerHTML = `
             <div class="special-guy-grid">
-                ${columns.map((items) => `
-                    <div class="special-guy-column">
-                        ${items.map((item) => `
-                            <div class="special-guy-item">
-                                <div class="special-guy-rank">#${item.rank}</div>
-                                <div class="special-guy-name">${escapeHtml(item.name)}</div>
-                                <div class="special-guy-value">${Number(item.average_ownership || 0).toFixed(1)}%</div>
-                            </div>
-                        `).join("")}
+                ${rankings.map((item) => `
+                    <div class="special-guy-item">
+                        <div class="special-guy-rank">#${item.rank}</div>
+                        <div class="special-guy-name">${escapeHtml(item.name)}</div>
+                        <div class="special-guy-value">${Number(item.average_ownership || 0).toFixed(1)}%</div>
                     </div>
                 `).join("")}
             </div>
@@ -1663,6 +1739,7 @@ const App = {
             Render.h2hList(state?.h2h || []);
             Render.transferTrends(this.latestTransferTrends, this.latestPicksByUid);
             Render.chipsUsed(state?.chips_used_summary || []);
+            Render.goodCaptain(state?.picks_by_uid || {});
             Render.specialGuy(state?.picks_by_uid || {});
             Render.rankings(state || {});
             Render.updateTime();

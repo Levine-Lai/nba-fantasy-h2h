@@ -2468,6 +2468,85 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
+.good-captain-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px;
+    border: 1px solid #dbe4ee;
+    border-radius: 18px;
+    background:
+        linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.98)),
+        #fff;
+    margin-bottom: 18px;
+}
+
+.good-captain-item {
+    padding: 12px 14px;
+    border: 1px solid #edf2f7;
+    border-radius: 14px;
+    background: #fff;
+}
+
+.good-captain-main {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.good-captain-rank {
+    min-width: 34px;
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1.2;
+    color: #64748b;
+    font-variant-numeric: tabular-nums;
+}
+
+.good-captain-copy {
+    min-width: 0;
+}
+
+.good-captain-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 10px;
+}
+
+.good-captain-name,
+.good-captain-points {
+    font-size: 18px;
+    font-weight: 900;
+    color: #0f172a;
+}
+
+.good-captain-day {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.good-captain-avatars {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.good-captain-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    object-fit: cover;
+    background: #fff;
+    border: 1px solid #dbe4ee;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
 .special-guy-card {
     border: 1px solid #dbe4ee;
     border-radius: 18px;
@@ -2480,29 +2559,23 @@ body {
 
 .special-guy-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-}
-
-.special-guy-column {
-    display: flex;
-    flex-direction: column;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 10px;
 }
 
 .special-guy-item {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
-    padding: 10px 12px;
+    padding: 9px 10px;
     border: 1px solid #edf2f7;
     border-radius: 14px;
     background: #fff;
 }
 
 .special-guy-rank {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 900;
     color: #64748b;
     font-variant-numeric: tabular-nums;
@@ -2510,7 +2583,7 @@ body {
 
 .special-guy-name {
     min-width: 0;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 700;
     color: #0f172a;
     overflow: hidden;
@@ -2519,10 +2592,60 @@ body {
 }
 
 .special-guy-value {
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 900;
     color: #0f172a;
     font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 768px) {
+    .good-captain-card {
+        padding: 12px;
+        gap: 8px;
+    }
+
+    .good-captain-item {
+        padding: 10px 12px;
+    }
+
+    .good-captain-main {
+        gap: 10px;
+    }
+
+    .good-captain-name,
+    .good-captain-points {
+        font-size: 16px;
+    }
+
+    .good-captain-day {
+        font-size: 11px;
+    }
+
+    .good-captain-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+    }
+
+    .special-guy-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .special-guy-item {
+        padding: 10px;
+    }
+
+    .special-guy-rank {
+        font-size: 10px;
+    }
+
+    .special-guy-name {
+        font-size: 11px;
+    }
+
+    .special-guy-value {
+        font-size: 12px;
+    }
 }
 
 .other-chart-wrap {
@@ -2768,7 +2891,7 @@ body {
     }
 
     .special-guy-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
     }
 
