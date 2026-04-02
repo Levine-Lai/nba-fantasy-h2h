@@ -1,6 +1,6 @@
 (function () {
     const PAGE_COUNT = 6;
-    const INTRO_EXIT_MS = 720;
+    const INTRO_EXIT_MS = 1040;
     const state = {
         currentPage: 0,
         lastUid: "",
@@ -56,6 +56,10 @@
 
     function setIntroReady() {
         refs().shell?.classList.add("intro-ready");
+    }
+
+    function setIntroLoading(enabled) {
+        refs().shell?.classList.toggle("intro-loading", !!enabled);
     }
 
     function setIntroLeaving(enabled) {
@@ -151,29 +155,49 @@
         `;
     }
 
-    function renderPages(profile) {
-        const curvePath = chartPath(profile?.overview?.curve || [], 860, 190);
+    function renderCoverPage(profile) {
+        const cover = profile?.cover || {};
+        const realName = cover.real_name || profile.managerName || "";
+        const englishName = [cover.first_name, cover.last_name].filter(Boolean).join(" ").trim() || realName;
+        const stats = Array.isArray(cover.stats) ? cover.stats : [];
+
         return `
-            <section class="season-summary-page active">
-                <div class="season-summary-main">
-                    <div class="season-summary-overline">${escapeHtml(profile.seasonLabel || "")}</div>
-                    <div class="season-summary-name">${escapeHtml(profile.managerName || "")}</div>
-                    <div class="season-summary-team">${escapeHtml(profile.teamName || "")}</div>
-                    ${renderStatsGrid(profile.cover?.footer || [])}
-                    <div class="season-summary-quote">${escapeHtml(profile.cover?.subtitle || "")}</div>
+            <section class="season-summary-page active season-summary-page-cover">
+                <div class="season-summary-cover-main">
+                    <div class="season-summary-overline season-summary-cover-overline">${escapeHtml(cover.season_mark || profile.seasonLabel || "")}</div>
+                    <div class="season-summary-cover-title">${escapeHtml(cover.display_name || profile.teamName || profile.managerName || "")}</div>
+                    <div class="season-summary-cover-subtitle">${escapeHtml(englishName)}</div>
+
+                    <div class="season-summary-cover-stats">
+                        ${stats.map((item) => `
+                            <div class="season-summary-cover-stat">
+                                <div class="season-summary-cover-stat-label">${escapeHtml(item[0])}</div>
+                                <div class="season-summary-cover-stat-value">${escapeHtml(item[1])}</div>
+                                <div class="season-summary-cover-stat-note">${escapeHtml(item[2] || "")}</div>
+                            </div>
+                        `).join("")}
+                    </div>
+
+                    <div class="season-summary-cover-message">${escapeHtml(cover.opening_message || "")}</div>
                 </div>
-                <aside class="season-summary-side">
-                    <div class="season-summary-rail">
-                        <div class="season-summary-mini-title">Overview</div>
-                        ${renderRows([
-                            ["UID", profile.uid],
-                            ["赛季", profile.seasonLabel || "-"],
-                            ["第几个赛季", `第 ${profile.seasonCount || 1} 季`],
-                            ["更新时间", profile.generatedLabel || "-"],
-                        ])}
+
+                <aside class="season-summary-cover-panel">
+                    <div class="season-summary-cover-panel-mark">${escapeHtml(cover.panel_headline || profile.seasonLabel || "")}</div>
+                    <div class="season-summary-cover-panel-copy">${escapeHtml(cover.panel_copy || cover.subtitle || "")}</div>
+                    <div class="season-summary-cover-panel-meta">
+                        <span>${escapeHtml(profile.uid || "")}</span>
+                        <span>${escapeHtml(cover.region_name || "China")}</span>
+                        <span>${escapeHtml(profile.generatedLabel || "")}</span>
                     </div>
                 </aside>
             </section>
+        `;
+    }
+
+    function renderPages(profile) {
+        const curvePath = chartPath(profile?.overview?.curve || [], 860, 190);
+        return `
+            ${renderCoverPage(profile)}
 
             <section class="season-summary-page">
                 <div class="season-summary-main">
@@ -275,12 +299,13 @@
 
     async function playIntroExit(profile, normalizedUid) {
         refs().pages.innerHTML = renderPages(profile);
-        state.currentPage = 1;
+        state.currentPage = 0;
         updateIndicator();
         setIntroLeaving(true);
         await new Promise((resolve) => window.setTimeout(resolve, INTRO_EXIT_MS));
         setHasProfile(true);
         setIntroLeaving(false);
+        setIntroLoading(false);
         setStatus("");
         updateUrl(normalizedUid);
     }
@@ -295,6 +320,7 @@
 
         state.lastUid = normalizedUid;
         setHasProfile(false);
+        setIntroLoading(true);
         setIntroLeaving(false);
         setStatus("正在加载中，请稍后", "loading");
         refs().pages.innerHTML = `<div class="season-summary-placeholder"></div>`;
@@ -305,6 +331,7 @@
         } catch (error) {
             console.error("Season summary load failed:", error);
             setIntroLeaving(false);
+            setIntroLoading(false);
             setHasProfile(false);
             setStatus(getLoadErrorMessage(error), "error");
         }
@@ -328,16 +355,15 @@
 
         document.addEventListener("click", (event) => {
             const navButton = event.target.closest(".nav-tab");
-            if (navButton) {
-                const page = String(navButton.dataset.page || "home");
-                if (page === "season-summary") {
-                    updateUrl(state.lastUid || "");
-                } else {
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete("page");
-                    url.searchParams.delete("uid");
-                    window.history.replaceState({}, "", url.toString());
-                }
+            if (!navButton) return;
+            const page = String(navButton.dataset.page || "home");
+            if (page === "season-summary") {
+                updateUrl(state.lastUid || "");
+            } else {
+                const url = new URL(window.location.href);
+                url.searchParams.delete("page");
+                url.searchParams.delete("uid");
+                window.history.replaceState({}, "", url.toString());
             }
         });
 

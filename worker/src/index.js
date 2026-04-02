@@ -4215,6 +4215,29 @@ async function buildSeasonSummaryPayload(uidInput) {
   const seasonLabel = buildSeasonLabel();
   const captainFavoriteName = favoriteCaptain?.[0] || "还没有固定答案";
   const generatedAt = new Date().toISOString();
+  const realName = [
+    entryData?.player_first_name,
+    entryData?.player_last_name,
+  ].filter((value) => String(value || "").trim()).join(" ").trim() || managerName;
+  const displayName = String(entryData?.name || teamName || managerName || `#${uidNumber}`).trim();
+  const chinaRank = getLatestPositiveValue([
+    entryData?.summary_region_rank,
+    entryData?.summary_overall_rank_country,
+    entryData?.summary_country_rank,
+    historyData?.summary_region_rank,
+    historyData?.summary_overall_rank_country,
+  ]) || null;
+  const openingMessage = seasonCount <= 1
+    ? (
+      overallRank && overallRank < 1000
+        ? "恭喜你完成了自己的第一个赛季！没想到第一个赛季就能突破 Top1000 的大关，你真是范特西的天赋玩家。"
+        : "恭喜你完成了自己的第一个赛季！排名什么都不重要，能坚持下来才是这个游戏的真谛。"
+    )
+    : (
+      previousSeasonPoints !== null
+        ? `这是你的第 ${seasonCount} 个赛季。和上赛季相比，你的总分变化是 ${formatSignedFantasyDelta(pointsDelta)}，这一季的每一步都更像你自己的节奏。`
+        : `这是你的第 ${seasonCount} 个赛季。能一路玩到现在，本身就说明你已经把这项游戏变成了自己的长期爱好。`
+    );
 
   return {
     success: true,
@@ -4229,11 +4252,27 @@ async function buildSeasonSummaryPayload(uidInput) {
     sourceNote: "内测版：当前直接按官方 API 按需生成。第 5 页先用转会轨迹去描摹阵容偏好，长期持有与替补遗憾会在后续版本接入逐周阵容快照。",
     intro: `${managerName} 的 ${seasonLabel} 赛季故事已经接进主站子页面了。现在输入 entry_id 就能即时生成，不需要为了换人或改文案反复部署整个站点。`,
     cover: {
+      season_mark: seasonLabel,
+      display_name: displayName,
+      real_name: realName,
+      first_name: String(entryData?.player_first_name || "").trim(),
+      last_name: String(entryData?.player_last_name || "").trim(),
+      region_name: String(entryData?.player_region_name || "").trim() || null,
       subtitle: `${teamName} 的这一季，先从总分、排名、Captain 与转会节奏开始讲。现在这版更像一份能跑通真实数据链路的内测故事册，后面我们可以继续把句子打磨得更有味道。`,
+      opening_message: openingMessage,
+      panel_headline: seasonLabel,
+      panel_copy: seasonCount <= 1
+        ? "第一季最珍贵的从来不只是名次，而是你真的把这一整季走完了。"
+        : `第 ${seasonCount} 个赛季，意味着你已经不只是来体验，而是真的留下了自己的玩法。`,
       tags: [
         `第 ${seasonCount} 赛季`,
         `${qualifiedTransfers.length} 次非芯片转会`,
         captainUseCount ? `${captainUseCount} 次 Captain` : "Captain 还没开张",
+      ],
+      stats: [
+        ["赛季总分", formatDisplayNumber(totalSeasonPoints), "真实赛季累计得分"],
+        ["全球排名", formatDisplayRank(overallRank), overallRank ? "官方 overall rank" : "官方暂无返回"],
+        ["中国排名", formatDisplayRank(chinaRank), chinaRank ? "官方区域排名" : "官方 API 暂未直出"],
       ],
       footer: [
         ["赛季总分", formatDisplayNumber(totalSeasonPoints)],
