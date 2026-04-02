@@ -1506,7 +1506,16 @@ async function refreshManagerMetaState(env, existingState = null) {
       ? (captainChipEvent?.event ? currentWeek : null)
       : (Number(previous.captain_week || 0) || null);
     const captainUsed = hasHistoryData
-      ? await buildCaptainUsageSummary(uidNumber, historyData, currentWeek, currentEvent, eventMetaById, elements, eventLiveCache)
+      ? await buildCaptainUsageSummary(
+          uidNumber,
+          historyData,
+          currentWeek,
+          currentEvent,
+          eventMetaById,
+          elements,
+          eventLiveCache,
+          previous.captain_used || null
+        )
       : previous.captain_used || {
           used: false,
           label: "None",
@@ -1866,7 +1875,16 @@ function buildChipStatusSummary(historyData, currentGw, currentEvent, eventMetaB
   };
 }
 
-async function buildCaptainUsageSummary(uidNumber, historyData, currentGw, currentEvent, eventMetaById, elements, eventLiveCache) {
+async function buildCaptainUsageSummary(
+  uidNumber,
+  historyData,
+  currentGw,
+  currentEvent,
+  eventMetaById,
+  elements,
+  eventLiveCache,
+  previousCaptainUsed = null
+) {
   const chipEvent = getCaptainChipEvent(historyData, currentGw, currentEvent, eventMetaById);
   if (!chipEvent?.event) {
     return {
@@ -1879,9 +1897,34 @@ async function buildCaptainUsageSummary(uidNumber, historyData, currentGw, curre
   }
 
   const picksRes = await fetchJsonSafe(`/entry/${uidNumber}/event/${chipEvent.event}/picks/`, 4);
+  if (!picksRes.ok) {
+    if (previousCaptainUsed?.used && previousCaptainUsed?.captain_name) {
+      return {
+        ...previousCaptainUsed,
+        used: true,
+        day: Number(previousCaptainUsed?.day || chipEvent.day || 0) || null,
+        label: previousCaptainUsed?.label || (chipEvent.day ? `DAY${chipEvent.day}` : "Used"),
+      };
+    }
+    return {
+      used: true,
+      label: chipEvent.day ? `DAY${chipEvent.day}: None` : "Used",
+      day: chipEvent.day,
+      captain_name: null,
+      captain_points: null,
+    };
+  }
   const picks = Array.isArray(picksRes.data?.picks) ? picksRes.data.picks : [];
   const captainPick = picks.find((pick) => pick?.is_captain);
   if (!captainPick) {
+    if (previousCaptainUsed?.used && previousCaptainUsed?.captain_name) {
+      return {
+        ...previousCaptainUsed,
+        used: true,
+        day: Number(previousCaptainUsed?.day || chipEvent.day || 0) || null,
+        label: previousCaptainUsed?.label || (chipEvent.day ? `DAY${chipEvent.day}` : "Used"),
+      };
+    }
     return {
       used: true,
       label: chipEvent.day ? `DAY${chipEvent.day}: None` : "Used",
@@ -1894,6 +1937,14 @@ async function buildCaptainUsageSummary(uidNumber, historyData, currentGw, curre
   if (!eventLiveCache[chipEvent.event]) {
     const liveRes = await fetchJsonSafe(`/event/${chipEvent.event}/live/`, 4);
     const rawElements = liveRes.ok ? liveRes.data?.elements : null;
+    if (!liveRes.ok && previousCaptainUsed?.used && previousCaptainUsed?.captain_name) {
+      return {
+        ...previousCaptainUsed,
+        used: true,
+        day: Number(previousCaptainUsed?.day || chipEvent.day || 0) || null,
+        label: previousCaptainUsed?.label || (chipEvent.day ? `DAY${chipEvent.day}` : "Used"),
+      };
+    }
     const liveElements = {};
     if (Array.isArray(rawElements)) {
       for (const item of rawElements) liveElements[item.id] = item;
@@ -2850,7 +2901,16 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       : (Number(previous.captain_week || 0) || null);
     const activeChip = String(picksData?.active_chip || "").toLowerCase();
     const captainUsedBase = hasHistoryData
-      ? await buildCaptainUsageSummary(uidNumber, historyData, currentWeek, currentEvent, eventMetaById, elements, eventLiveCache)
+      ? await buildCaptainUsageSummary(
+          uidNumber,
+          historyData,
+          currentWeek,
+          currentEvent,
+          eventMetaById,
+          elements,
+          eventLiveCache,
+          previous.captain_used || null
+        )
       : previous.captain_used || { used: false, label: "None", day: null, captain_name: null, captain_points: null };
     let captainUsed = activeChip === "phcapt"
       ? {

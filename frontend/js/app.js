@@ -414,7 +414,7 @@ function renderStandingsTable(rows, options = {}) {
                 <tbody>
                     ${items.map((row) => `
                         <tr class="${highlightContenders && row?.contender ? "contender-row" : ""}">
-                            <td>${Number(row?.rank || 0)}</td>
+                            <td>${Number(row?.rank || 0) === 1 ? "皇冠" : Number(row?.rank || 0)}</td>
                             <td class="team-cell">${escapeHtml(row?.team_name || "-")}</td>
                             <td>${Number(row?.gw || 0)}</td>
                             <td>${Number(row?.won || 0)}</td>
