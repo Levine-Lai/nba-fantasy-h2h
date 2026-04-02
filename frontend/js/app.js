@@ -307,6 +307,12 @@ function extractGameweekNumber(eventName) {
     return match ? Number(match[1]) : null;
 }
 
+function extractEventDayNumber(eventName) {
+    const text = String(eventName || "");
+    const match = text.match(/day\s*(\d+)/i);
+    return match ? Number(match[1]) : null;
+}
+
 function getStandingsDisplayName(uid, state, fallback = "-") {
     const key = String(uid || "");
     return state?.picks_by_uid?.[key]?.team_name || fallback;
@@ -909,12 +915,27 @@ const Render = {
         const grouped = new Map();
 
         entries.forEach(([uid, payload]) => {
+            const players = Array.isArray(payload?.players) ? payload.players : [];
             const captainUsed = payload?.captain_used || {};
-            if (!captainUsed?.used || !captainUsed?.captain_name) return;
+            const captainPlayer = players.find((player) => !!player?.is_captain && Number(player?.multiplier || 1) > 1)
+                || players.find((player) => !!player?.is_captain);
+            const used = !!(
+                payload?.chip_status?.captain_used ||
+                captainUsed?.used ||
+                String(payload?.active_chip || "").toLowerCase() === "phcapt" ||
+                captainPlayer
+            );
+            if (!used) return;
 
-            const captainName = String(captainUsed.captain_name || "").trim();
-            const day = Number(captainUsed.day || 0) || null;
-            const captainPoints = Number(captainUsed.captain_points || 0);
+            const captainName = String(captainPlayer?.name || captainUsed?.captain_name || "").trim();
+            if (!captainName) return;
+            const day = Number(captainUsed?.day || extractEventDayNumber(payload?.current_event_name) || 0) || null;
+            const captainPoints = Number(
+                captainPlayer?.final_points ??
+                captainPlayer?.base_points ??
+                captainUsed?.captain_points ??
+                0
+            );
             const key = `${day || 0}__${captainName}`;
             const current = grouped.get(key) || {
                 captain_name: captainName,
@@ -1018,6 +1039,7 @@ const Render = {
                     : 0;
                 return {
                     name: String(payload?.team_name || payload?.manager_name || "-"),
+                    logo_url: getManagerLogoUrl(payload?.team_name || payload?.manager_name || "-"),
                     average_ownership: Number(averageOwnership.toFixed(1)),
                 };
             })
@@ -1039,7 +1061,16 @@ const Render = {
             <div class="special-guy-grid">
                 ${rankings.map((item) => `
                     <div class="special-guy-item">
-                        <div class="special-guy-rank">#${item.rank}</div>
+                        <img
+                            class="special-guy-avatar"
+                            src="${escapeHtml(item.logo_url || "/LOGO.png")}"
+                            alt="${escapeHtml(item.name)} logo"
+                            title="#${item.rank} ${escapeHtml(item.name)}"
+                            width="30"
+                            height="30"
+                            loading="lazy"
+                            decoding="async"
+                            onerror="this.onerror=null;this.src='/LOGO.png';">
                         <div class="special-guy-name">${escapeHtml(item.name)}</div>
                         <div class="special-guy-value">${Number(item.average_ownership || 0).toFixed(1)}%</div>
                     </div>
