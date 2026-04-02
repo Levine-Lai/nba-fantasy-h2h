@@ -1358,6 +1358,7 @@ async function buildFreshHomepageState(baseState) {
     current_event_name: currentEventName || baseState?.current_event_name,
     h2h: nextMatches,
     picks_by_uid: nextPicksByUid,
+    good_captain_summary: buildGoodCaptainSummary(nextPicksByUid),
   };
 }
 
@@ -1401,6 +1402,52 @@ function buildChipsUsedSummary(picksByUid) {
   });
 }
 
+function buildGoodCaptainSummary(picksByUid) {
+  const grouped = new Map();
+
+  for (const uid of UID_LIST) {
+    const payload = picksByUid?.[uid] || null;
+    const captainUsed = payload?.captain_used || {};
+    if (!captainUsed?.used || !captainUsed?.captain_name) continue;
+
+    const captainName = String(captainUsed.captain_name || "").trim();
+    if (!captainName) continue;
+    const day = Number(captainUsed.day || 0) || null;
+    const captainPoints = Number(captainUsed.captain_points || 0);
+    const key = `${day || 0}__${captainName}__${captainPoints}`;
+    const current = grouped.get(key) || {
+      captain_name: captainName,
+      captain_points: captainPoints,
+      day,
+      managers: [],
+    };
+
+    current.captain_points = Math.max(Number(current.captain_points || 0), captainPoints);
+    current.managers.push({
+      uid: normalizeUid(uid),
+      team_name: String(payload?.team_name || UID_MAP[uidToNumber(uid)] || `#${uid}`),
+    });
+    grouped.set(key, current);
+  }
+
+  return Array.from(grouped.values())
+    .map((item) => ({
+      ...item,
+      managers: (item.managers || []).sort((a, b) =>
+        String(a?.team_name || "").localeCompare(String(b?.team_name || ""))
+      ),
+    }))
+    .sort((a, b) =>
+      Number(b?.captain_points || 0) - Number(a?.captain_points || 0) ||
+      Number(a?.day || 99) - Number(b?.day || 99) ||
+      String(a?.captain_name || "").localeCompare(String(b?.captain_name || ""))
+    )
+    .map((item, index) => ({
+      ...item,
+      rank: index + 1,
+    }));
+}
+
 async function refreshManagerMetaState(env, existingState = null) {
   const previousState = existingState || await getState(env);
   if (!previousState) {
@@ -1409,6 +1456,8 @@ async function refreshManagerMetaState(env, existingState = null) {
 
   const bootstrap = await fetchJson("/bootstrap-static/");
   const events = bootstrap.events || [];
+  const elements = buildElementsMap(bootstrap);
+  const eventLiveCache = {};
   const [currentEvent, currentEventName] = getCurrentEvent(events);
   const eventMetaById = buildEventMetaById(events);
   const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(currentEventName || previousState?.current_event_name || "");
@@ -1457,7 +1506,7 @@ async function refreshManagerMetaState(env, existingState = null) {
       ? (captainChipEvent?.event ? currentWeek : null)
       : (Number(previous.captain_week || 0) || null);
     const captainUsed = hasHistoryData
-      ? buildCaptainUsageFromHistoryOnly(historyData, currentWeek, currentEvent, eventMetaById, previous.captain_used || null)
+      ? await buildCaptainUsageSummary(uidNumber, historyData, currentWeek, currentEvent, eventMetaById, elements, eventLiveCache)
       : previous.captain_used || {
           used: false,
           label: "None",
@@ -1503,6 +1552,7 @@ async function refreshManagerMetaState(env, existingState = null) {
 
   const ownershipSummary = buildOwnershipSummary(nextPicksByUid);
   const chipsUsedSummary = buildChipsUsedSummary(nextPicksByUid);
+  const goodCaptainSummary = buildGoodCaptainSummary(nextPicksByUid);
   const nextTransferTrends = {
     ...(previousState?.transfer_trends || {}),
     ownership_top: ownershipSummary.top10,
@@ -1541,6 +1591,7 @@ async function refreshManagerMetaState(env, existingState = null) {
     picks_by_uid: nextPicksByUid,
     transfer_trends: nextTransferTrends,
     chips_used_summary: chipsUsedSummary,
+    good_captain_summary: goodCaptainSummary,
     refresh_meta: {
       ...(previousState?.refresh_meta || {}),
       meta_updated_at: new Date().toISOString(),
@@ -3102,6 +3153,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
 
   const ownershipSummary = buildOwnershipSummary(picksByUid);
   const chipsUsedSummary = buildChipsUsedSummary(picksByUid);
+  const goodCaptainSummary = buildGoodCaptainSummary(picksByUid);
   for (const uid of UID_LIST) {
     const players = Array.isArray(picksByUid[uid]?.players) ? picksByUid[uid].players : [];
     for (const player of players) {
@@ -3198,6 +3250,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     picks_by_uid: picksByUid,
     transfer_trends: transferTrends,
     chips_used_summary: chipsUsedSummary,
+    good_captain_summary: goodCaptainSummary,
     ownership: ownershipSummary,
     fdr,
     fdr_html: fdr.html,

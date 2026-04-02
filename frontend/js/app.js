@@ -907,53 +907,9 @@ const Render = {
             : '<div class="trend-empty">No chips usage data</div>';
     },
 
-    goodCaptain(picksByUid) {
+    goodCaptain(items) {
         const container = document.getElementById("good-captain-summary");
         if (!container) return;
-
-        const entries = Object.entries(picksByUid || {});
-        const grouped = new Map();
-
-        entries.forEach(([uid, payload]) => {
-            const captainUsed = payload?.captain_used || {};
-            const used = !!captainUsed?.used;
-            if (!used) return;
-
-            const captainName = String(captainUsed?.captain_name || "").trim();
-            if (!captainName) return;
-            const day = Number(captainUsed?.day || extractEventDayNumber(payload?.current_event_name) || 0) || null;
-            const captainPoints = Number(captainUsed?.captain_points || 0);
-            const key = `${day || 0}__${captainName}__${captainPoints}`;
-            const current = grouped.get(key) || {
-                captain_name: captainName,
-                captain_points: captainPoints,
-                day,
-                managers: [],
-            };
-
-            current.captain_points = Math.max(Number(current.captain_points || 0), captainPoints);
-            current.managers.push({
-                uid: String(uid || ""),
-                team_name: String(payload?.team_name || payload?.manager_name || `#${uid}`),
-                logo_url: getManagerLogoUrl(payload?.team_name || payload?.manager_name || `#${uid}`),
-            });
-            grouped.set(key, current);
-        });
-
-        const rows = Array.from(grouped.values())
-            .map((item) => ({
-                ...item,
-                managers: item.managers.sort((a, b) => String(a.team_name || "").localeCompare(String(b.team_name || ""))),
-            }))
-            .sort((a, b) =>
-                Number(b.captain_points || 0) - Number(a.captain_points || 0) ||
-                Number(a.day || 99) - Number(b.day || 99) ||
-                String(a.captain_name || "").localeCompare(String(b.captain_name || ""))
-            )
-            .map((item, index) => ({
-                ...item,
-                rank: index + 1,
-            }));
 
         const formatCaptainPoints = (value) => {
             const num = Number(value || 0);
@@ -961,6 +917,7 @@ const Render = {
             return Number.isInteger(num) ? `${num}` : num.toFixed(1);
         };
 
+        const rows = Array.isArray(items) ? items : [];
         container.innerHTML = rows.length
             ? rows.map((item) => `
                 <div class="good-captain-item">
@@ -973,10 +930,10 @@ const Render = {
                                 <span class="good-captain-day">${item.day ? `Day${item.day}` : "Day?"}</span>
                             </div>
                             <div class="good-captain-avatars">
-                                ${item.managers.map((manager) => `
+                                ${(Array.isArray(item.managers) ? item.managers : []).map((manager) => `
                                     <img
                                         class="good-captain-avatar"
-                                        src="${escapeHtml(manager.logo_url || "/LOGO.png")}"
+                                        src="${escapeHtml(getManagerLogoUrl(manager.team_name || manager.uid || ""))}"
                                         alt="${escapeHtml(manager.team_name)} logo"
                                         title="${escapeHtml(manager.team_name)}"
                                         width="36"
@@ -1756,7 +1713,7 @@ const App = {
             Render.h2hList(state?.h2h || []);
             Render.transferTrends(this.latestTransferTrends, this.latestPicksByUid);
             Render.chipsUsed(state?.chips_used_summary || []);
-            Render.goodCaptain(state?.picks_by_uid || {});
+            Render.goodCaptain(state?.good_captain_summary || []);
             Render.specialGuy(state?.picks_by_uid || {});
             Render.rankings(state || {});
             Render.updateTime();
