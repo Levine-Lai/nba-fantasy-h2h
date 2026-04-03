@@ -832,9 +832,9 @@ const Render = {
     transferTrends(data, picksByUid = {}) {
         const transferTable = document.getElementById("trend-transfer-table");
         const ownership = document.getElementById("ownership-top");
-        const transferHead = document.getElementById("trend-transfer-head");
         const transferCard = document.getElementById("trend-transfer-card");
-        if (!transferTable || !ownership || !transferHead || !transferCard) return;
+        const ownershipCard = document.getElementById("ownership-card");
+        if (!transferTable || !ownership || !transferCard || !ownershipCard) return;
 
         const formatOneDecimal = (value) => {
             const num = Number(value);
@@ -847,33 +847,38 @@ const Render = {
         const managerCount = Number(data?.ownership_manager_count || 26);
         const direction = App.transferDirection === "out" ? "out" : "in";
         const activeItems = direction === "out" ? weeklyOut : weeklyIn;
+        const transferPeak = Math.max(1, ...activeItems.map((item) => Number(item.transfers || item.count || 0)));
 
-        transferCard.classList.toggle("diagram-mode", direction === "diagram");
-        transferTable.classList.toggle("diagram-mode", direction === "diagram");
-        transferHead.style.display = direction === "diagram" ? "none" : "";
+        transferCard.classList.remove("diagram-mode");
+        transferTable.classList.remove("diagram-mode");
 
         transferTable.innerHTML = direction === "diagram"
             ? renderTransferDiagram(picksByUid)
             : (
                 activeItems.length
                     ? activeItems.map((item) => `
-                        <div class="trend-table-row">
-                            <span class="trend-player-name">${escapeHtml(item.name)}</span>
-                            <span class="trend-cell-number">${formatOneDecimal(item.cost)}</span>
-                            <span class="trend-cell-number">${formatOneDecimal(item.form)}</span>
-                            <span class="trend-cell-number">${formatOneDecimal(item.value)}</span>
-                            <span class="trend-number">${Number(item.transfers || item.count || 0)}</span>
+                        <div class="trend-bar-row" title="Cost ${formatOneDecimal(item.cost)} | Form ${formatOneDecimal(item.form)} | Value ${formatOneDecimal(item.value)}">
+                            <div class="trend-bar-name">${escapeHtml(item.name)}</div>
+                            <div class="trend-bar-track-wrap">
+                                <div class="trend-bar-track trend-bar-track-blue">
+                                    <div class="trend-bar-fill trend-bar-fill-blue" style="width:${(Math.max(0, Number(item.transfers || item.count || 0)) / transferPeak) * 100}%"></div>
+                                </div>
+                            </div>
+                            <div class="trend-bar-value">${Number(item.transfers || item.count || 0)}</div>
                         </div>
                     `).join("")
                     : '<div class="trend-empty">No weekly transfer trend data</div>'
             );
         ownership.innerHTML = ownershipTop.length
             ? ownershipTop.map((item) => `
-                <div class="trend-table-row ownership-row">
-                    <span class="trend-player-name">${escapeHtml(item.name)}</span>
-                    <span class="trend-cell-number">${formatOneDecimal(item.cost)}</span>
-                    <span class="trend-number">${Number(item.holder_count || 0)}/${managerCount}</span>
-                    <span class="trend-number">${Number(item.ownership_percent || 0).toFixed(1)}%</span>
+                <div class="trend-bar-row" title="Held ${Number(item.holder_count || 0)}/${managerCount} | Cost ${formatOneDecimal(item.cost)}">
+                    <div class="trend-bar-name">${escapeHtml(item.name)}</div>
+                    <div class="trend-bar-track-wrap">
+                        <div class="trend-bar-track trend-bar-track-purple">
+                            <div class="trend-bar-fill trend-bar-fill-purple" style="width:${Math.max(0, Math.min(100, Number(item.ownership_percent || 0)))}%"></div>
+                        </div>
+                    </div>
+                    <div class="trend-bar-value trend-bar-value-percent">${Number(item.ownership_percent || 0).toFixed(1)}%</div>
                 </div>
             `).join("")
             : '<div class="trend-empty">No ownership data</div>';

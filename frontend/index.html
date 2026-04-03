@@ -71,24 +71,6 @@
                 <div class="loading"><div class="spinner"></div>Loading...</div>
             </div>
             <div class="trend-wrap">
-                <div class="trend-head">
-                    <div class="trend-title">Weekly Transfers</div>
-                    <div class="trend-switch" id="transfer-direction-switch">
-                        <button class="trend-switch-btn active" data-transfer-direction="in" type="button">In</button>
-                        <button class="trend-switch-btn" data-transfer-direction="out" type="button">Out</button>
-                        <button class="trend-switch-btn" data-transfer-direction="diagram" type="button" hidden>Diagram</button>
-                    </div>
-                </div>
-                <div class="trend-table" id="trend-transfer-card">
-                    <div class="trend-table-head" id="trend-transfer-head">
-                        <span>Name</span>
-                        <span>Cost</span>
-                        <span>Form</span>
-                        <span>Value</span>
-                        <span>Transfers</span>
-                    </div>
-                    <div id="trend-transfer-table" class="trend-table-body"></div>
-                </div>
                 <div class="trend-title">Chips Used</div>
                 <div id="chips-used-summary" class="chips-summary-card">
                     <div class="trend-empty">Loading chips data...</div>
@@ -97,15 +79,20 @@
                 <div id="good-captain-summary" class="good-captain-card">
                     <div class="trend-empty">Loading captain choices...</div>
                 </div>
-                <div class="trend-title">Ownership Top 10</div>
-                <div class="trend-table">
-                    <div class="trend-table-head ownership-table-head">
-                        <span>Name</span>
-                        <span>Cost</span>
-                        <span>Held</span>
-                        <span>Ownership</span>
+                <div class="trend-head">
+                    <div class="trend-title">Weekly Transfers</div>
+                    <div class="trend-switch" id="transfer-direction-switch">
+                        <button class="trend-switch-btn active" data-transfer-direction="in" type="button">In</button>
+                        <button class="trend-switch-btn" data-transfer-direction="out" type="button">Out</button>
+                        <button class="trend-switch-btn" data-transfer-direction="diagram" type="button" hidden>Diagram</button>
                     </div>
-                    <div id="ownership-top" class="trend-table-body"></div>
+                </div>
+                <div id="trend-transfer-card" class="trend-bar-card">
+                    <div id="trend-transfer-table" class="trend-bar-list"></div>
+                </div>
+                <div class="trend-title">Ownership Top 10</div>
+                <div id="ownership-card" class="trend-bar-card trend-bar-card-purple">
+                    <div id="ownership-top" class="trend-bar-list"></div>
                 </div>
                 <div class="trend-title">Special Guy (Average Team Select%)</div>
                 <div id="special-guy-summary" class="special-guy-card">
