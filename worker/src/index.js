@@ -3932,13 +3932,17 @@ function buildWeeklyCurve(rows, eventMetaById) {
     });
 }
 
-function buildOverallRankCurve(rows) {
+function buildOverallRankCurve(rows, eventMetaById) {
   return (rows || [])
     .map((row) => {
       const event = Number(row?.event || 0);
       const rank = Number(row?.overall_rank || 0);
       if (!event || !Number.isFinite(rank) || rank <= 0) return null;
-      return { event, rank };
+      return {
+        event,
+        rank,
+        gw: Number(eventMetaById?.[event]?.gw || 0) || null,
+      };
     })
     .filter(Boolean)
     .sort((a, b) => Number(a?.event || 0) - Number(b?.event || 0));
@@ -4281,7 +4285,7 @@ async function buildSeasonSummaryPayload(uidInput) {
       region_name: String(entryData?.player_region_name || "").trim() || null,
       subtitle: `${teamName} 的这一季，先从总分、排名、Captain 与转会节奏开始讲。现在这版更像一份能跑通真实数据链路的内测故事册，后面我们可以继续把句子打磨得更有味道。`,
       opening_message: openingMessage,
-      or_curve: buildOverallRankCurve(rows),
+      or_curve: buildOverallRankCurve(rows, eventMetaById),
       tags: [
         `第 ${seasonCount} 赛季`,
         `${qualifiedTransfers.length} 次非芯片转会`,

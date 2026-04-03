@@ -171,11 +171,17 @@
     min-height: 560px;
     padding-top: 0;
     z-index: 1;
+    transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.9s ease;
 }
 
 .season-summary-shell.intro-leaving .season-summary-book,
 .season-summary-shell.has-profile .season-summary-book {
     z-index: 7;
+}
+
+.season-summary-shell.profile-entering .season-summary-book {
+    transform: translateX(56px) scale(0.985);
+    opacity: 0.22;
 }
 
 .season-summary-pages {
@@ -336,17 +342,10 @@
     stroke-width: 1.6;
 }
 
-.season-summary-cover-tick,
-.season-summary-cover-axis-label {
+.season-summary-cover-tick {
     fill: #64748b;
     font-size: 18px;
     font-weight: 800;
-}
-
-.season-summary-cover-axis-label {
-    fill: #334155;
-    font-size: 20px;
-    font-weight: 900;
 }
 
 .season-summary-main,
@@ -578,7 +577,7 @@
 .season-summary-footer {
     position: absolute;
     inset: 0;
-    z-index: 5;
+    z-index: 20;
     pointer-events: none;
 }
 

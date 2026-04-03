@@ -1,6 +1,6 @@
 (function () {
     const PAGE_COUNT = 6;
-    const INTRO_EXIT_MS = 900;
+    const INTRO_EXIT_MS = 860;
     const state = {
         currentPage: 0,
         lastUid: "",
@@ -17,36 +17,6 @@
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#39;");
-    }
-
-    function chartPath(values, width, height, options = {}) {
-        const list = Array.isArray(values) && values.length ? values : [1800, 1500, 1300, 980, 860, 720, 698];
-        const min = Number.isFinite(Number(options.min)) ? Number(options.min) : Math.min(...list);
-        const max = Number.isFinite(Number(options.max)) ? Number(options.max) : Math.max(...list);
-        const span = Math.max(1, max - min);
-        const invert = !!options.invert;
-        return list.map((value, index) => {
-            const x = 24 + (index * (width - 48)) / Math.max(1, list.length - 1);
-            const normalized = invert ? (max - value) / span : (value - min) / span;
-            const y = height - 22 - normalized * (height - 44);
-            return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
-        }).join(" ");
-    }
-
-    function buildRankTicks(values, count = 5) {
-        const list = (Array.isArray(values) ? values : [])
-            .map((item) => Number(item || 0))
-            .filter((value) => Number.isFinite(value) && value > 0);
-        if (!list.length) return [0];
-        const max = Math.max(...list);
-        if (max <= 0) return [0];
-        const ticks = [];
-        for (let i = 0; i < count; i += 1) {
-            const ratio = i / Math.max(1, count - 1);
-            const value = Math.round(max * ratio);
-            ticks.push(value);
-        }
-        return [...new Set(ticks)];
     }
 
     function refs() {
@@ -82,6 +52,10 @@
 
     function setIntroLeaving(enabled) {
         refs().shell?.classList.toggle("intro-leaving", !!enabled);
+    }
+
+    function setProfileEntering(enabled) {
+        refs().shell?.classList.toggle("profile-entering", !!enabled);
     }
 
     function updateIndicator() {
@@ -173,28 +147,85 @@
         `;
     }
 
+    function buildCurvePoints(points, options = {}) {
+        const list = Array.isArray(points) && points.length ? points : [];
+        if (!list.length) return [];
+        const left = Number(options.left ?? 64);
+        const right = Number(options.right ?? 856);
+        const top = Number(options.top ?? 42);
+        const bottom = Number(options.bottom ?? 526);
+        const xMin = Math.min(...list.map((item) => Number(item?.event || 0)));
+        const xMax = Math.max(...list.map((item) => Number(item?.event || 0)));
+        const yMax = Number(options.yMax ?? Math.max(...list.map((item) => Number(item?.rank || 0)), 1));
+        const xSpan = Math.max(1, xMax - xMin);
+        const ySpan = Math.max(1, yMax);
+
+        return list.map((item) => {
+            const event = Number(item?.event || 0);
+            const rank = Number(item?.rank || 0);
+            const x = left + ((event - xMin) / xSpan) * (right - left);
+            const y = top + (rank / ySpan) * (bottom - top);
+            return {
+                x,
+                y,
+                event,
+                rank,
+                gw: Number(item?.gw || 0) || null,
+            };
+        });
+    }
+
+    function buildLinePath(points) {
+        return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
+    }
+
+    function buildAreaPath(points, bottom = 526) {
+        if (!points.length) return "";
+        const line = buildLinePath(points);
+        const first = points[0];
+        const last = points[points.length - 1];
+        return `${line} L ${last.x.toFixed(2)} ${bottom} L ${first.x.toFixed(2)} ${bottom} Z`;
+    }
+
+    function buildRankTicks(maxRank, count = 5) {
+        const safeMax = Math.max(1, Number(maxRank || 0));
+        const ticks = [];
+        for (let i = 0; i < count; i += 1) {
+            ticks.push(Math.round((safeMax * i) / Math.max(1, count - 1)));
+        }
+        return [...new Set(ticks)];
+    }
+
+    function sampleXAxisTicks(points, desiredCount = 7) {
+        if (!points.length) return [];
+        if (points.length <= desiredCount) return points;
+        const sampled = [];
+        for (let i = 0; i < desiredCount; i += 1) {
+            const index = Math.round((i * (points.length - 1)) / Math.max(1, desiredCount - 1));
+            sampled.push(points[index]);
+        }
+        return sampled;
+    }
+
     function renderOrCurvePanel(profile) {
         const rawPoints = Array.isArray(profile?.cover?.or_curve) && profile.cover.or_curve.length
             ? profile.cover.or_curve
             : [
-                { event: 1, rank: 1800 },
-                { event: 20, rank: 1500 },
-                { event: 45, rank: 1300 },
-                { event: 78, rank: 980 },
-                { event: 101, rank: 860 },
-                { event: 126, rank: 720 },
-                { event: 154, rank: 698 },
+                { event: 1, gw: 1, rank: 1800 },
+                { event: 20, gw: 4, rank: 1500 },
+                { event: 45, gw: 8, rank: 1300 },
+                { event: 78, gw: 12, rank: 980 },
+                { event: 101, gw: 16, rank: 860 },
+                { event: 126, gw: 20, rank: 720 },
+                { event: 154, gw: 24, rank: 698 },
             ];
-        const rankValues = rawPoints.map((item) => Number(item?.rank || 0)).filter((value) => value > 0);
-        const eventValues = rawPoints.map((item) => Number(item?.event || 0)).filter((value) => value > 0);
-        const maxRank = Math.max(...rankValues, 1);
-        const curvePath = chartPath(rankValues, 880, 560, { min: 0, max: maxRank, invert: true });
-        const rankTicks = buildRankTicks(rankValues, 5);
-        const eventTicks = [...new Set([
-            eventValues[0],
-            eventValues[Math.floor(eventValues.length / 2)],
-            eventValues[eventValues.length - 1],
-        ].filter((value) => Number.isFinite(value) && value > 0))];
+        const maxRank = Math.max(...rawPoints.map((item) => Number(item?.rank || 0)), 1);
+        const points = buildCurvePoints(rawPoints, { yMax: maxRank, left: 64, right: 856, top: 42, bottom: 526 });
+        const linePath = buildLinePath(points);
+        const areaPath = buildAreaPath(points, 526);
+        const rankTicks = buildRankTicks(maxRank, 5);
+        const xTicks = sampleXAxisTicks(points, 7);
+
         return `
             <aside class="season-summary-cover-panel">
                 <div class="season-summary-cover-chart">
@@ -211,30 +242,21 @@
                             </linearGradient>
                         </defs>
                         <g class="season-summary-cover-grid">
-                            <line x1="20" y1="80" x2="860" y2="80"></line>
-                            <line x1="20" y1="180" x2="860" y2="180"></line>
-                            <line x1="20" y1="280" x2="860" y2="280"></line>
-                            <line x1="20" y1="380" x2="860" y2="380"></line>
-                            <line x1="20" y1="480" x2="860" y2="480"></line>
+                            ${rankTicks.map((tick) => {
+                                const y = 42 + (Number(tick || 0) / Math.max(1, maxRank)) * (526 - 42);
+                                return `<line x1="64" y1="${y.toFixed(2)}" x2="856" y2="${y.toFixed(2)}"></line>`;
+                            }).join("")}
+                            ${xTicks.map((point) => `<line x1="${point.x.toFixed(2)}" y1="42" x2="${point.x.toFixed(2)}" y2="526"></line>`).join("")}
                         </g>
-                        <line class="season-summary-cover-axis" x1="24" y1="22" x2="24" y2="538"></line>
-                        <line class="season-summary-cover-axis" x1="24" y1="538" x2="856" y2="538"></line>
-                        ${rankTicks.map((tick, index) => {
-                            const y = 538 - (index * 458) / Math.max(1, rankTicks.length - 1);
-                            return `
-                                <text class="season-summary-cover-tick rank" x="10" y="${y + 4}" text-anchor="end">${escapeHtml(tick.toLocaleString("en-US"))}</text>
-                            `;
+                        <line class="season-summary-cover-axis" x1="64" y1="42" x2="64" y2="526"></line>
+                        <line class="season-summary-cover-axis" x1="64" y1="42" x2="856" y2="42"></line>
+                        ${rankTicks.map((tick) => {
+                            const y = 42 + (Number(tick || 0) / Math.max(1, maxRank)) * (526 - 42);
+                            return `<text class="season-summary-cover-tick rank" x="48" y="${y + 6}" text-anchor="end">${escapeHtml(tick.toLocaleString("en-US"))}</text>`;
                         }).join("")}
-                        ${eventTicks.map((tick, index) => {
-                            const x = 24 + (index * 832) / Math.max(1, eventTicks.length - 1);
-                            return `
-                                <text class="season-summary-cover-tick event" x="${x}" y="556" text-anchor="middle">E${escapeHtml(tick)}</text>
-                            `;
-                        }).join("")}
-                        <text class="season-summary-cover-axis-label y" x="24" y="282" text-anchor="middle" transform="rotate(-90 24 282)">OR</text>
-                        <text class="season-summary-cover-axis-label x" x="120" y="554" text-anchor="middle">Event</text>
-                        <path d="${curvePath} L 856 538 L 24 538 Z" fill="url(#season-summary-cover-fill)" opacity="0.7"></path>
-                        <path d="${curvePath}" fill="none" stroke="url(#season-summary-cover-line)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"></path>
+                        ${xTicks.map((point) => `<text class="season-summary-cover-tick gw" x="${point.x.toFixed(2)}" y="28" text-anchor="middle">${escapeHtml(point.gw || "")}</text>`).join("")}
+                        <path d="${areaPath}" fill="url(#season-summary-cover-fill)" opacity="0.7"></path>
+                        <path d="${linePath}" fill="none" stroke="url(#season-summary-cover-line)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </div>
             </aside>
@@ -269,6 +291,18 @@
                 ${renderOrCurvePanel(profile)}
             </section>
         `;
+    }
+
+    function chartPath(values, width, height) {
+        const list = Array.isArray(values) && values.length ? values : [48, 54, 51, 60, 57, 63, 67];
+        const min = Math.min(...list);
+        const max = Math.max(...list);
+        const span = Math.max(1, max - min);
+        return list.map((value, index) => {
+            const x = 22 + (index * (width - 44)) / Math.max(1, list.length - 1);
+            const y = height - 18 - ((value - min) / span) * (height - 36);
+            return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+        }).join(" ");
     }
 
     function renderPages(profile) {
@@ -379,8 +413,14 @@
         state.currentPage = 0;
         updateIndicator();
         setIntroLeaving(true);
-        await new Promise((resolve) => window.setTimeout(resolve, INTRO_EXIT_MS));
         setHasProfile(true);
+        setProfileEntering(true);
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                setProfileEntering(false);
+            });
+        });
+        await new Promise((resolve) => window.setTimeout(resolve, INTRO_EXIT_MS));
         setIntroLeaving(false);
         setIntroLoading(false);
         setStatus("");
@@ -409,6 +449,7 @@
             console.error("Season summary load failed:", error);
             setIntroLeaving(false);
             setIntroLoading(false);
+            setProfileEntering(false);
             setHasProfile(false);
             setStatus(getLoadErrorMessage(error), "error");
         }
