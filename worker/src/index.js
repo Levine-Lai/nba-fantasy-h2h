@@ -3932,18 +3932,16 @@ function buildWeeklyCurve(rows, eventMetaById) {
     });
 }
 
-function buildOverallRankCurve(rows, eventMetaById) {
-  const rankByGw = new Map();
-  for (const row of rows || []) {
-    const eventId = Number(row?.event || 0);
-    const gw = Number(eventMetaById?.[eventId]?.gw || 0);
-    const rank = Number(row?.overall_rank || 0);
-    if (!gw || !Number.isFinite(rank) || rank <= 0) continue;
-    rankByGw.set(gw, rank);
-  }
-  return Array.from(rankByGw.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([gw, rank]) => ({ gw, rank }));
+function buildOverallRankCurve(rows) {
+  return (rows || [])
+    .map((row) => {
+      const event = Number(row?.event || 0);
+      const rank = Number(row?.overall_rank || 0);
+      if (!event || !Number.isFinite(rank) || rank <= 0) return null;
+      return { event, rank };
+    })
+    .filter(Boolean)
+    .sort((a, b) => Number(a?.event || 0) - Number(b?.event || 0));
 }
 
 function getManagerDisplayName(uidNumber, historyData, entryData = null) {
@@ -4238,18 +4236,7 @@ async function buildSeasonSummaryPayload(uidInput) {
   const chinaLeague = (entryData?.leagues?.classic || []).find((league) =>
     String(league?.name || "").trim().toLowerCase() === "china"
   ) || null;
-  const chinaRank = getLatestPositiveValue([
-    chinaLeague?.entry_rank,
-    chinaLeague?.rank,
-    ...(Array.isArray(chinaLeague?.active_phases)
-      ? chinaLeague.active_phases.map((phase) => phase?.rank)
-      : []),
-    entryData?.summary_region_rank,
-    entryData?.summary_overall_rank_country,
-    entryData?.summary_country_rank,
-    historyData?.summary_region_rank,
-    historyData?.summary_overall_rank_country,
-  ]) || null;
+  const chinaRank = Number(chinaLeague?.entry_rank || 0) || null;
   const rankDelta = previousSeasonRank && overallRank ? previousSeasonRank - overallRank : null;
   const openingMessage = seasonCount <= 1
     ? (
@@ -4262,9 +4249,9 @@ async function buildSeasonSummaryPayload(uidInput) {
         rankDelta === null
           ? "恭喜你陪这个游戏走过了第二个年头。"
           : rankDelta > 0
-            ? `恭喜你陪这个游戏走过了第二个年头，居然还在上个赛季的基础上进步了 ${formatDisplayNumber(rankDelta)} 名，可喜可贺。`
+            ? `恭喜你陪这个游戏走过了第二个年头，居然还在上个赛季的基础上进步了 ${formatDisplayNumber(rankDelta)} 名，可喜可贺！`
             : rankDelta < 0
-              ? `恭喜你陪这个游戏走过了第二个年头，可惜比上个赛季退步了 ${formatDisplayNumber(Math.abs(rankDelta))} 名，再接再厉。`
+              ? `恭喜你陪这个游戏走过了第二个年头，可惜比上个赛季还退步了 ${formatDisplayNumber(Math.abs(rankDelta))} 名，再接再厉！`
               : "恭喜你陪这个游戏走过了第二个年头，而且和上个赛季保持住了同样的名次。"
       )
       : (
@@ -4294,7 +4281,7 @@ async function buildSeasonSummaryPayload(uidInput) {
       region_name: String(entryData?.player_region_name || "").trim() || null,
       subtitle: `${teamName} 的这一季，先从总分、排名、Captain 与转会节奏开始讲。现在这版更像一份能跑通真实数据链路的内测故事册，后面我们可以继续把句子打磨得更有味道。`,
       opening_message: openingMessage,
-      or_curve: buildOverallRankCurve(rows, eventMetaById),
+      or_curve: buildOverallRankCurve(rows),
       tags: [
         `第 ${seasonCount} 赛季`,
         `${qualifiedTransfers.length} 次非芯片转会`,

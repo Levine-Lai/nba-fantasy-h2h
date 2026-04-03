@@ -21,8 +21,8 @@
 
     function chartPath(values, width, height, options = {}) {
         const list = Array.isArray(values) && values.length ? values : [1800, 1500, 1300, 980, 860, 720, 698];
-        const min = Math.min(...list);
-        const max = Math.max(...list);
+        const min = Number.isFinite(Number(options.min)) ? Number(options.min) : Math.min(...list);
+        const max = Number.isFinite(Number(options.max)) ? Number(options.max) : Math.max(...list);
         const span = Math.max(1, max - min);
         const invert = !!options.invert;
         return list.map((value, index) => {
@@ -33,18 +33,17 @@
         }).join(" ");
     }
 
-    function buildRankTicks(values, count = 4) {
+    function buildRankTicks(values, count = 5) {
         const list = (Array.isArray(values) ? values : [])
             .map((item) => Number(item || 0))
             .filter((value) => Number.isFinite(value) && value > 0);
-        if (!list.length) return [];
-        const min = Math.min(...list);
+        if (!list.length) return [0];
         const max = Math.max(...list);
-        if (min === max) return [min];
+        if (max <= 0) return [0];
         const ticks = [];
         for (let i = 0; i < count; i += 1) {
             const ratio = i / Math.max(1, count - 1);
-            const value = Math.round(max - ((max - min) * ratio));
+            const value = Math.round(max * ratio);
             ticks.push(value);
         }
         return [...new Set(ticks)];
@@ -178,22 +177,23 @@
         const rawPoints = Array.isArray(profile?.cover?.or_curve) && profile.cover.or_curve.length
             ? profile.cover.or_curve
             : [
-                { gw: 1, rank: 1800 },
-                { gw: 4, rank: 1500 },
-                { gw: 8, rank: 1300 },
-                { gw: 12, rank: 980 },
-                { gw: 16, rank: 860 },
-                { gw: 20, rank: 720 },
-                { gw: 24, rank: 698 },
+                { event: 1, rank: 1800 },
+                { event: 20, rank: 1500 },
+                { event: 45, rank: 1300 },
+                { event: 78, rank: 980 },
+                { event: 101, rank: 860 },
+                { event: 126, rank: 720 },
+                { event: 154, rank: 698 },
             ];
         const rankValues = rawPoints.map((item) => Number(item?.rank || 0)).filter((value) => value > 0);
-        const gwValues = rawPoints.map((item) => Number(item?.gw || 0)).filter((value) => value > 0);
-        const curvePath = chartPath(rankValues, 880, 560, { invert: true });
+        const eventValues = rawPoints.map((item) => Number(item?.event || 0)).filter((value) => value > 0);
+        const maxRank = Math.max(...rankValues, 1);
+        const curvePath = chartPath(rankValues, 880, 560, { min: 0, max: maxRank, invert: true });
         const rankTicks = buildRankTicks(rankValues, 5);
-        const gwTicks = [...new Set([
-            gwValues[0],
-            gwValues[Math.floor(gwValues.length / 2)],
-            gwValues[gwValues.length - 1],
+        const eventTicks = [...new Set([
+            eventValues[0],
+            eventValues[Math.floor(eventValues.length / 2)],
+            eventValues[eventValues.length - 1],
         ].filter((value) => Number.isFinite(value) && value > 0))];
         return `
             <aside class="season-summary-cover-panel">
@@ -220,19 +220,19 @@
                         <line class="season-summary-cover-axis" x1="24" y1="22" x2="24" y2="538"></line>
                         <line class="season-summary-cover-axis" x1="24" y1="538" x2="856" y2="538"></line>
                         ${rankTicks.map((tick, index) => {
-                            const y = 80 + (index * 400) / Math.max(1, rankTicks.length - 1);
+                            const y = 538 - (index * 458) / Math.max(1, rankTicks.length - 1);
                             return `
                                 <text class="season-summary-cover-tick rank" x="10" y="${y + 4}" text-anchor="end">${escapeHtml(tick.toLocaleString("en-US"))}</text>
                             `;
                         }).join("")}
-                        ${gwTicks.map((tick, index) => {
-                            const x = 24 + (index * 832) / Math.max(1, gwTicks.length - 1);
+                        ${eventTicks.map((tick, index) => {
+                            const x = 24 + (index * 832) / Math.max(1, eventTicks.length - 1);
                             return `
-                                <text class="season-summary-cover-tick gw" x="${x}" y="556" text-anchor="middle">GW${escapeHtml(tick)}</text>
+                                <text class="season-summary-cover-tick event" x="${x}" y="556" text-anchor="middle">E${escapeHtml(tick)}</text>
                             `;
                         }).join("")}
-                        <text class="season-summary-cover-axis-label y" x="16" y="40" text-anchor="start">OR</text>
-                        <text class="season-summary-cover-axis-label x" x="840" y="556" text-anchor="end">GW</text>
+                        <text class="season-summary-cover-axis-label y" x="24" y="282" text-anchor="middle" transform="rotate(-90 24 282)">OR</text>
+                        <text class="season-summary-cover-axis-label x" x="120" y="554" text-anchor="middle">Event</text>
                         <path d="${curvePath} L 856 538 L 24 538 Z" fill="url(#season-summary-cover-fill)" opacity="0.7"></path>
                         <path d="${curvePath}" fill="none" stroke="url(#season-summary-cover-line)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
