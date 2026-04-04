@@ -304,35 +304,28 @@
             const dayNumber = Number(item?.day || 0);
             return dayNumber > 0 ? String(dayNumber) : "-";
         }
-        return String(item?.label || "");
+        return String(item?.full_label || item?.label || "");
     }
 
     function renderTransferBarChart(items, options = {}) {
-        const entries = (Array.isArray(items) && items.length
-            ? items
-            : [{ label: "-", count: 0 }]
-        ).map((item) => ({
+        const entries = (Array.isArray(items) && items.length ? items : [{ label: "-", count: 0 }]).map((item) => ({
             label: buildTransferLabel(item, options.mode || "time"),
             count: Number(item?.count || 0),
         }));
-
         const maxCount = Math.max(...entries.map((item) => item.count), 1);
         const ticks = buildNiceTicks(maxCount, 4);
         const tickCeiling = Math.max(1, ticks[ticks.length - 1] || maxCount);
         const viewWidth = 480;
-        const viewHeight = 286;
-        const left = 52;
+        const viewHeight = 304;
+        const left = 56;
         const right = 452;
-        const top = 32;
-        const bottom = 208;
+        const top = 44;
+        const bottom = 226;
         const plotWidth = right - left;
         const plotHeight = bottom - top;
         const slotWidth = plotWidth / Math.max(entries.length, 1);
-        const barWidth = Math.max(16, Math.min(48, slotWidth * 0.6));
+        const barWidth = Math.max(16, Math.min(42, slotWidth * 0.52));
         const radius = Math.min(barWidth / 2, 14);
-        const title = options.title || "";
-        const xAxisLabel = options.xAxisLabel || "";
-        const yAxisLabel = options.yAxisLabel || "";
 
         return `
             <div class="season-summary-transfer-panel season-summary-transfer-panel-${escapeHtml(options.theme || "purple")}">
@@ -346,8 +339,8 @@
                         </g>
                         <line class="season-summary-transfer-axis" x1="${left}" y1="${top}" x2="${left}" y2="${bottom}"></line>
                         <line class="season-summary-transfer-axis" x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}"></line>
-                        <text class="season-summary-transfer-axis-label y" x="${left}" y="${top - 12}" text-anchor="start">${escapeHtml(yAxisLabel)}</text>
-                        <text class="season-summary-transfer-axis-label x" x="${right}" y="${bottom + 44}" text-anchor="end">${escapeHtml(xAxisLabel)}</text>
+                        <text class="season-summary-transfer-axis-label y" x="${left}" y="${top - 16}" text-anchor="start">${escapeHtml(options.yAxisLabel || "")}</text>
+                        <text class="season-summary-transfer-axis-label x" x="${right}" y="${bottom + 48}" text-anchor="end">${escapeHtml(options.xAxisLabel || "")}</text>
                         ${ticks.map((tick) => {
                             const y = top + (1 - (Number(tick || 0) / tickCeiling)) * plotHeight;
                             return `<text class="season-summary-transfer-tick y" x="${left - 10}" y="${y + 4}" text-anchor="end">${escapeHtml(tick)}</text>`;
@@ -357,18 +350,18 @@
                             const height = item.count > 0 ? Math.max(8, (item.count / tickCeiling) * plotHeight) : 0;
                             const rectX = centerX - barWidth / 2;
                             const rectY = bottom - height;
-                            const countY = Math.max(top + 10, rectY - 8);
+                            const countY = Math.max(24, rectY - 10);
                             return `
                                 <g class="season-summary-transfer-bar">
                                     <text class="season-summary-transfer-bar-value" x="${centerX}" y="${countY}" text-anchor="middle">${escapeHtml(item.count)}</text>
                                     <rect x="${rectX.toFixed(2)}" y="${rectY.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${height.toFixed(2)}" rx="${radius.toFixed(2)}" ry="${radius.toFixed(2)}"></rect>
-                                    <text class="season-summary-transfer-tick x" x="${centerX}" y="${bottom + 20}" text-anchor="middle">${escapeHtml(item.label)}</text>
+                                    <text class="season-summary-transfer-tick x" x="${centerX}" y="${bottom + 22}" text-anchor="middle">${escapeHtml(item.label)}</text>
                                 </g>
                             `;
                         }).join("")}
                     </svg>
                 </div>
-                <div class="season-summary-transfer-panel-title">${escapeHtml(title)}</div>
+                <div class="season-summary-transfer-panel-title">${escapeHtml(options.title || "")}</div>
             </div>
         `;
     }
@@ -378,10 +371,10 @@
             player_name: String(item?.player_name || ""),
             days_held: Number(item?.days_held || 0),
         }));
-        const maxDays = Math.max(...rows.map((item) => item.days_held), 1);
-        const ticks = buildNiceTicks(maxDays, 4);
-        const tickCeiling = Math.max(1, ticks[ticks.length - 1] || maxDays);
-        const axisColumns = `repeat(${Math.max(2, ticks.length)}, minmax(0, 1fr))`;
+        const tickCeiling = 155;
+        const ticks = [0, 50, 100, 155];
+        const axisColumns = `repeat(${ticks.length}, minmax(0, 1fr))`;
+
         return `
             <div class="season-summary-transfer-panel season-summary-transfer-panel-pink season-summary-transfer-panel-table">
                 <div class="season-summary-transfer-panel-body season-summary-transfer-panel-body-wide">
@@ -406,24 +399,10 @@
                         ${ticks.map((tick) => `<span>${escapeHtml(tick)}</span>`).join("")}
                     </div>
                     <div class="season-summary-transfer-axis-label-row bottom">
-                        <span class="season-summary-transfer-axis-label x">${escapeHtml("天数")}</span>
+                        <span class="season-summary-transfer-axis-label x">天数</span>
                     </div>
                 </div>
-                <div class="season-summary-transfer-panel-title">（持有球员天数）</div>
-            </div>
-        `;
-    }
-
-    function renderTransferSummary(rows) {
-        const compactRows = (Array.isArray(rows) ? rows : []).slice(0, 4);
-        return `
-            <div class="season-summary-transfer-summary-grid">
-                ${compactRows.map((item) => `
-                    <div class="season-summary-transfer-summary-card">
-                        <div class="season-summary-transfer-summary-label">${escapeHtml(item?.[0])}</div>
-                        <div class="season-summary-transfer-summary-value">${escapeHtml(item?.[1])}</div>
-                    </div>
-                `).join("")}
+                <div class="season-summary-transfer-panel-title">持有球员天数</div>
             </div>
         `;
     }
@@ -433,12 +412,23 @@
         return `
             <section class="season-summary-page season-summary-page-transfer">
                 <div class="season-summary-main season-summary-transfer-main">
-                    ${renderTransferSummary(transfers.rows || [])}
                     <div class="season-summary-transfer-copy-space"></div>
                 </div>
                 <aside class="season-summary-side season-summary-transfer-dashboard">
-                    ${renderTransferBarChart(transfers.day_distribution || [], { theme: "purple", mode: "day", title: "（转会Gameday分布）", xAxisLabel: "Day", yAxisLabel: "次数" })}
-                    ${renderTransferBarChart(transfers.time_distribution || [], { theme: "blue", mode: "time", title: "（转会时间段分布）", xAxisLabel: "北京时间", yAxisLabel: "次数" })}
+                    ${renderTransferBarChart(transfers.day_distribution || [], {
+                        theme: "purple",
+                        mode: "day",
+                        title: "转会Gameday分布",
+                        xAxisLabel: "Day",
+                        yAxisLabel: "次数",
+                    })}
+                    ${renderTransferBarChart(transfers.time_distribution || [], {
+                        theme: "blue",
+                        mode: "time",
+                        title: "转会时间段分布",
+                        xAxisLabel: "北京时间",
+                        yAxisLabel: "次数",
+                    })}
                     ${renderHoldRankingChart(transfers.hold_ranking || [])}
                 </aside>
             </section>

@@ -513,54 +513,24 @@
 }
 
 .season-summary-page-transfer {
-    grid-template-columns: minmax(212px, 0.38fr) minmax(0, 1.62fr);
+    grid-template-columns: minmax(0, 0.25fr) minmax(0, 0.75fr);
     gap: 14px;
 }
 
 .season-summary-transfer-main {
-    gap: 14px;
-}
-
-.season-summary-transfer-summary-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-}
-
-.season-summary-transfer-summary-card {
-    min-height: 96px;
-    padding: 12px 14px;
-    border: 1px solid #e5edf5;
-    border-radius: 22px;
-    background: rgba(255, 255, 255, 0.92);
-    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.05);
-}
-
-.season-summary-transfer-summary-label {
-    font-size: 11px;
-    font-weight: 900;
-    letter-spacing: 0.04em;
-    color: #64748b;
-}
-
-.season-summary-transfer-summary-value {
-    margin-top: 10px;
-    font-size: clamp(18px, 1.8vw, 30px);
-    line-height: 1.1;
-    font-weight: 900;
-    letter-spacing: -0.04em;
-    color: #0f172a;
+    min-height: 0;
 }
 
 .season-summary-transfer-copy-space {
     flex: 1 1 auto;
     min-height: 0;
+    border-radius: 24px;
 }
 
 .season-summary-transfer-dashboard {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: minmax(0, 0.86fr) minmax(0, 1.14fr);
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.04fr) minmax(0, 1.24fr);
+    grid-template-rows: 1fr;
     gap: 12px;
 }
 
@@ -591,7 +561,7 @@
     flex: 0 0 auto;
     padding-top: 6px;
     text-align: center;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 900;
     letter-spacing: 0.02em;
     color: #334155;
@@ -653,7 +623,6 @@
 }
 
 .season-summary-transfer-panel-table {
-    grid-column: 1 / -1;
     padding: 12px 14px 10px;
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 247, 251, 0.96));
@@ -969,7 +938,7 @@
     }
 
     .season-summary-page-transfer {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 0.22fr) minmax(0, 0.78fr);
     }
 
     .season-summary-cover-panel {
@@ -1083,36 +1052,17 @@
 
     .season-summary-page-transfer {
         grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 0.25fr) minmax(0, 0.75fr);
         gap: 10px;
     }
 
-    .season-summary-transfer-summary-grid {
-        gap: 8px;
-    }
-
-    .season-summary-transfer-summary-card {
-        min-height: 82px;
-        padding: 10px 11px;
-        border-radius: 18px;
-    }
-
-    .season-summary-transfer-summary-label {
-        font-size: 10px;
-    }
-
-    .season-summary-transfer-summary-value {
-        margin-top: 8px;
-        font-size: 18px;
-        line-height: 1.18;
-    }
-
     .season-summary-transfer-copy-space {
-        display: none;
+        min-height: 0;
     }
 
     .season-summary-transfer-dashboard {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        grid-template-rows: minmax(0, 148px) minmax(0, 1fr);
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 0.88fr) minmax(0, 0.88fr) minmax(0, 1.24fr);
         gap: 8px;
     }
 
