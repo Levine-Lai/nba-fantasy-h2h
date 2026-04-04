@@ -1,5 +1,5 @@
 (function () {
-    const PAGE_COUNT = 6;
+    const PAGE_COUNT = 5;
     const INTRO_EXIT_MS = 860;
     const state = {
         currentPage: 0,
@@ -163,11 +163,9 @@
         return list.map((item) => {
             const event = Number(item?.event || 0);
             const rank = Number(item?.rank || 0);
-            const x = left + ((event - xMin) / xSpan) * (right - left);
-            const y = top + (rank / ySpan) * (bottom - top);
             return {
-                x,
-                y,
+                x: left + ((event - xMin) / xSpan) * (right - left),
+                y: top + (rank / ySpan) * (bottom - top),
                 event,
                 rank,
                 gw: Number(item?.gw || 0) || null,
@@ -187,22 +185,27 @@
         return `${line} L ${last.x.toFixed(2)} ${bottom} L ${first.x.toFixed(2)} ${bottom} Z`;
     }
 
-    function buildRankTicks(maxRank, count = 5) {
+    function buildRankTicks(maxRank, targetTickCount = 5) {
         const safeMax = Math.max(1, Number(maxRank || 0));
+        const roughStep = safeMax / Math.max(1, targetTickCount - 1);
+        const magnitude = 10 ** Math.max(0, Math.floor(Math.log10(Math.max(1, roughStep))));
+        const candidates = [1, 2, 5, 10].map((factor) => factor * magnitude);
+        const step = candidates.find((value) => value >= roughStep) || candidates[candidates.length - 1];
+        const ceiling = Math.ceil(safeMax / step) * step;
         const ticks = [];
-        for (let i = 0; i < count; i += 1) {
-            ticks.push(Math.round((safeMax * i) / Math.max(1, count - 1)));
+        for (let value = 0; value <= ceiling; value += step) {
+            ticks.push(value);
         }
-        return [...new Set(ticks)];
+        return ticks;
     }
 
     function sampleXAxisTicks(points, desiredCount = 7) {
         if (!points.length) return [];
         if (points.length <= desiredCount) return points;
         const sampled = [];
-        for (let i = 0; i < desiredCount; i += 1) {
-            const index = Math.round((i * (points.length - 1)) / Math.max(1, desiredCount - 1));
-            sampled.push(points[index]);
+        for (let index = 0; index < desiredCount; index += 1) {
+            const pointIndex = Math.round((index * (points.length - 1)) / Math.max(1, desiredCount - 1));
+            sampled.push(points[pointIndex]);
         }
         return sampled;
     }
@@ -243,7 +246,7 @@
                         </defs>
                         <g class="season-summary-cover-grid">
                             ${rankTicks.map((tick) => {
-                                const y = 42 + (Number(tick || 0) / Math.max(1, maxRank)) * (526 - 42);
+                                const y = 42 + (Number(tick || 0) / Math.max(1, rankTicks[rankTicks.length - 1] || maxRank)) * (526 - 42);
                                 return `<line x1="64" y1="${y.toFixed(2)}" x2="856" y2="${y.toFixed(2)}"></line>`;
                             }).join("")}
                             ${xTicks.map((point) => `<line x1="${point.x.toFixed(2)}" y1="42" x2="${point.x.toFixed(2)}" y2="526"></line>`).join("")}
@@ -251,12 +254,12 @@
                         <line class="season-summary-cover-axis" x1="64" y1="42" x2="64" y2="526"></line>
                         <line class="season-summary-cover-axis" x1="64" y1="42" x2="856" y2="42"></line>
                         ${rankTicks.map((tick) => {
-                            const y = 42 + (Number(tick || 0) / Math.max(1, maxRank)) * (526 - 42);
+                            const y = 42 + (Number(tick || 0) / Math.max(1, rankTicks[rankTicks.length - 1] || maxRank)) * (526 - 42);
                             return `<text class="season-summary-cover-tick rank" x="48" y="${y + 6}" text-anchor="end">${escapeHtml(tick.toLocaleString("en-US"))}</text>`;
                         }).join("")}
                         ${xTicks.map((point) => `<text class="season-summary-cover-tick gw" x="${point.x.toFixed(2)}" y="28" text-anchor="middle">${escapeHtml(point.gw || "")}</text>`).join("")}
-                        <path d="${areaPath}" fill="url(#season-summary-cover-fill)" opacity="0.7"></path>
-                        <path d="${linePath}" fill="none" stroke="url(#season-summary-cover-line)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="${areaPath}" fill="url(#season-summary-cover-fill)" opacity="0.58"></path>
+                        <path d="${linePath}" fill="none" stroke="url(#season-summary-cover-line)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </div>
             </aside>
@@ -265,8 +268,7 @@
 
     function renderCoverPage(profile) {
         const cover = profile?.cover || {};
-        const realName = cover.real_name || profile.managerName || "";
-        const englishName = [cover.first_name, cover.last_name].filter(Boolean).join(" ").trim() || realName;
+        const englishName = [cover.first_name, cover.last_name].filter(Boolean).join(" ").trim() || profile.managerName || "";
         const stats = Array.isArray(cover.stats) ? cover.stats : [];
 
         return `
@@ -293,50 +295,9 @@
         `;
     }
 
-    function chartPath(values, width, height) {
-        const list = Array.isArray(values) && values.length ? values : [48, 54, 51, 60, 57, 63, 67];
-        const min = Math.min(...list);
-        const max = Math.max(...list);
-        const span = Math.max(1, max - min);
-        return list.map((value, index) => {
-            const x = 22 + (index * (width - 44)) / Math.max(1, list.length - 1);
-            const y = height - 18 - ((value - min) / span) * (height - 36);
-            return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
-        }).join(" ");
-    }
-
     function renderPages(profile) {
-        const curvePath = chartPath(profile?.overview?.curve || [], 860, 190);
         return `
             ${renderCoverPage(profile)}
-
-            <section class="season-summary-page">
-                <div class="season-summary-main">
-                    <div class="season-summary-page-title">赛季总览</div>
-                    ${renderStatsGrid(profile.overview?.cards || [])}
-                    <div class="season-summary-card">
-                        <div class="season-summary-mini-title">Season Curve</div>
-                        <div class="season-summary-chart">
-                            <svg viewBox="0 0 860 190" preserveAspectRatio="none" aria-hidden="true">
-                                <defs>
-                                    <linearGradient id="season-summary-line" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" stop-color="#2563eb"></stop>
-                                        <stop offset="100%" stop-color="#10b981"></stop>
-                                    </linearGradient>
-                                </defs>
-                                <path d="${curvePath}" fill="none" stroke="url(#season-summary-line)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-                <aside class="season-summary-side">
-                    <div class="season-summary-rail">
-                        <div class="season-summary-mini-title">${escapeHtml(profile.overview?.sideTitle || "Overview")}</div>
-                        ${renderBullets(profile.overview?.sideBullets || [])}
-                        ${renderKpis(profile.overview?.sideKpis || [])}
-                    </div>
-                </aside>
-            </section>
 
             <section class="season-summary-page">
                 <div class="season-summary-main">
@@ -400,10 +361,10 @@
     function getLoadErrorMessage(error) {
         const text = String(error?.message || error || "");
         if (/failed to fetch|networkerror|load failed/i.test(text)) {
-            return "本地 API 没有连上，请先启动 worker 的 wrangler dev";
+            return "本地 API 没有连上，请先启动 worker 的 wrangler dev。";
         }
         if (/404|not found/i.test(text)) {
-            return "这个 Fantasy ID 没查到数据，可以换一个试试";
+            return "这个 Fantasy ID 没查到数据，可以换一个再试。";
         }
         return text || "加载失败";
     }
@@ -430,7 +391,7 @@
     async function loadSummary(uid) {
         const normalizedUid = String(uid || "").trim();
         if (!normalizedUid) {
-            setStatus("请输入 Fantasy ID", "error");
+            setStatus("请输入你的 Fantasy ID", "error");
             refs().uidInput?.focus();
             return;
         }
@@ -471,23 +432,7 @@
             goToPage(state.currentPage + 1);
         });
 
-        document.addEventListener("click", (event) => {
-            const navButton = event.target.closest(".nav-tab");
-            if (!navButton) return;
-            const page = String(navButton.dataset.page || "home");
-            if (page === "season-summary") {
-                updateUrl(state.lastUid || "");
-            } else {
-                const url = new URL(window.location.href);
-                url.searchParams.delete("page");
-                url.searchParams.delete("uid");
-                window.history.replaceState({}, "", url.toString());
-            }
-        });
-
         document.addEventListener("keydown", (event) => {
-            const seasonPage = document.getElementById("page-season-summary");
-            if (seasonPage && !seasonPage.classList.contains("active")) return;
             if (event.key === "ArrowLeft") goToPage(state.currentPage - 1);
             if (event.key === "ArrowRight") goToPage(state.currentPage + 1);
         });

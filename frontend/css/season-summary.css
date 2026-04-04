@@ -361,7 +361,9 @@
 .season-summary-cover-tick {
     fill: #64748b;
     font-size: 18px;
-    font-weight: 800;
+    font-family: "Avenir Next", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.01em;
 }
 
 .season-summary-main,

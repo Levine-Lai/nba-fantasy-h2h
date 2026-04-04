@@ -4009,52 +4009,135 @@ function describeCaptainStyle(captainCount, favoriteCaptainName) {
   return `这一季还没有留下 Captain 记录，反而让这页多了点“按兵不动”的味道。`;
 }
 
-function buildTransferHoldSummary(qualifiedTransfers, eventOrder, currentOrder, elements) {
-  const open = new Map();
-  const spells = [];
-  const sorted = [...(qualifiedTransfers || [])].sort((a, b) =>
+function extractPickedElementIds(picksPayload) {
+  return [...new Set(
+    (Array.isArray(picksPayload?.picks) ? picksPayload.picks : [])
+      .map((pick) => Number(pick?.element || 0))
+      .filter((elementId) => elementId > 0)
+  )];
+}
+
+function sortTransfersChronologically(transfers) {
+  return [...(transfers || [])].sort((a, b) =>
     Number(a?.event || 0) - Number(b?.event || 0) ||
+    String(a?.time || "").localeCompare(String(b?.time || "")) ||
     Number(a?.index || 0) - Number(b?.index || 0)
   );
+}
 
-  for (const transfer of sorted) {
-    const order = Number(eventOrder.get(Number(transfer?.event || 0)) || 0);
-    const outId = Number(transfer?.element_out || 0);
-    const inId = Number(transfer?.element_in || 0);
+function formatTwoHourSlotLabel(hour) {
+  const safeHour = Number(hour);
+  if (!Number.isFinite(safeHour) || safeHour < 0) return null;
+  const startHour = Math.floor(safeHour / 2) * 2;
+  const endHour = Math.min(23, startHour + 1);
+  return `${String(startHour).padStart(2, "0")}:00-${String(endHour).padStart(2, "0")}:59`;
+}
 
-    if (outId && open.has(outId)) {
-      const start = open.get(outId);
-      spells.push({
-        player_name: start.player_name,
-        start_label: start.start_label,
-        end_label: transfer.label,
-        length: Math.max(1, order - Number(start.order || 0) + 1),
-      });
-      open.delete(outId);
+function getBeijingHourFromIso(isoValue) {
+  if (!isoValue) return null;
+  const date = new Date(isoValue);
+  if (Number.isNaN(date.getTime())) return null;
+  const hourText = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    hour: "2-digit",
+    hour12: false,
+  }).format(date);
+  const hour = Number(hourText);
+  return Number.isFinite(hour) ? hour : null;
+}
+
+function buildTransferPreferenceSummary(transfers) {
+  const dayCounter = new Map();
+  const slotCounter = new Map();
+
+  for (const transfer of transfers || []) {
+    const day = Number(transfer?.day || 0);
+    if (day > 0) {
+      dayCounter.set(day, Number(dayCounter.get(day) || 0) + 1);
     }
 
-    if (inId && !open.has(inId)) {
-      open.set(inId, {
-        order,
-        player_name: elements[inId]?.name || `#${inId}`,
-        start_label: transfer.label,
-      });
+    const slotLabel = formatTwoHourSlotLabel(getBeijingHourFromIso(transfer?.time));
+    if (slotLabel) {
+      slotCounter.set(slotLabel, Number(slotCounter.get(slotLabel) || 0) + 1);
     }
   }
 
-  for (const [, start] of open.entries()) {
-    spells.push({
-      player_name: start.player_name,
-      start_label: start.start_label,
-      end_label: "现在",
-      length: Math.max(1, Number(currentOrder || 0) - Number(start.order || 0) + 1),
-    });
+  const favoriteDayEntry = [...dayCounter.entries()]
+    .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0) || Number(a[0] || 0) - Number(b[0] || 0))[0] || null;
+  const favoriteSlotEntry = [...slotCounter.entries()]
+    .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0) || String(a[0] || "").localeCompare(String(b[0] || "")))[0] || null;
+
+  return {
+    favorite_day: favoriteDayEntry ? {
+      day: Number(favoriteDayEntry[0] || 0),
+      count: Number(favoriteDayEntry[1] || 0),
+      label: `Day${Number(favoriteDayEntry[0] || 0)}`,
+    } : null,
+    favorite_time_slot: favoriteSlotEntry ? {
+      label: String(favoriteSlotEntry[0] || ""),
+      count: Number(favoriteSlotEntry[1] || 0),
+    } : null,
+  };
+}
+
+async function buildLongestHeldPlayerSummary(uidNumber, latestEventId, rowEventIds, transfers, elements) {
+  const eventIds = [...new Set((rowEventIds || []).map((eventId) => Number(eventId || 0)).filter((eventId) => eventId > 0))].sort((a, b) => a - b);
+  const finalEventId = Number(latestEventId || eventIds[eventIds.length - 1] || 0);
+  if (!finalEventId || !eventIds.length) return null;
+
+  const picksRes = await fetchJsonSafe(`/entry/${uidNumber}/event/${finalEventId}/picks/`, 1);
+  if (!picksRes.ok || !Array.isArray(picksRes.data?.picks)) return null;
+
+  const roster = new Set(extractPickedElementIds(picksRes.data));
+  if (!roster.size) return null;
+
+  const transfersByEvent = new Map();
+  for (const transfer of sortTransfersChronologically(transfers)) {
+    const eventId = Number(transfer?.event || 0);
+    if (!eventId || !eventIds.includes(eventId)) continue;
+    if (!transfersByEvent.has(eventId)) transfersByEvent.set(eventId, []);
+    transfersByEvent.get(eventId).push(transfer);
   }
 
-  return spells.sort((a, b) =>
-    Number(b?.length || 0) - Number(a?.length || 0) ||
-    String(a?.player_name || "").localeCompare(String(b?.player_name || ""))
-  )[0] || null;
+  const snapshotByEvent = new Map();
+  snapshotByEvent.set(finalEventId, new Set(roster));
+
+  for (let index = eventIds.length - 1; index > 0; index -= 1) {
+    const currentEventId = Number(eventIds[index] || 0);
+    const previousEventId = Number(eventIds[index - 1] || 0);
+    const currentTransfers = transfersByEvent.get(currentEventId) || [];
+    for (let transferIndex = currentTransfers.length - 1; transferIndex >= 0; transferIndex -= 1) {
+      const transfer = currentTransfers[transferIndex] || {};
+      const inId = Number(transfer?.element_in || 0);
+      const outId = Number(transfer?.element_out || 0);
+      if (inId > 0) roster.delete(inId);
+      if (outId > 0) roster.add(outId);
+    }
+    snapshotByEvent.set(previousEventId, new Set(roster));
+  }
+
+  const totals = new Map();
+  for (const eventId of eventIds) {
+    const snapshot = snapshotByEvent.get(eventId);
+    if (!snapshot) continue;
+    for (const elementId of snapshot) {
+      const existing = totals.get(elementId) || {
+        player_name: elements[elementId]?.name || `#${elementId}`,
+        days_held: 0,
+        first_event: eventId,
+        last_event: eventId,
+      };
+      existing.days_held += 1;
+      existing.last_event = eventId;
+      totals.set(elementId, existing);
+    }
+  }
+
+  return [...totals.values()]
+    .sort((a, b) =>
+      Number(b?.days_held || 0) - Number(a?.days_held || 0) ||
+      String(a?.player_name || "").localeCompare(String(b?.player_name || ""))
+    )[0] || null;
 }
 
 async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eventMetaById) {
@@ -4122,11 +4205,10 @@ async function buildSeasonSummaryPayload(uidInput) {
   const entryData = entryRes.ok ? entryRes.data : null;
   const elements = buildElementsMap(bootstrap);
   const eventMetaById = buildEventMetaById(bootstrap.events || []);
-  const sortedEventIds = (bootstrap.events || []).map((item) => Number(item?.id || 0)).filter(Boolean).sort((a, b) => a - b);
-  const eventOrder = new Map(sortedEventIds.map((eventId, index) => [eventId, index + 1]));
 
   const rows = getSortedHistoryRows(historyData);
   const latestRow = rows[rows.length - 1] || {};
+  const rowEventIds = rows.map((row) => Number(row?.event || 0)).filter(Boolean);
   const totalSeasonPoints = Math.max(
     formatFantasyScore(rows.reduce((sum, row) => sum + Number(row?.points || 0), 0)),
     formatFantasyScore(latestRow?.total_points || 0)
@@ -4163,6 +4245,7 @@ async function buildSeasonSummaryPayload(uidInput) {
         event: eventId,
         gw,
         day,
+        time: String(transfer?.time || ""),
         label: toGwDayLabel(gw, day),
         is_chip_bulk_move: chipName === "wildcard" || chipName === "wild_card" || chipName === "rich",
         in_name: elements[inId]?.name || `#${inId}`,
@@ -4188,8 +4271,9 @@ async function buildSeasonSummaryPayload(uidInput) {
   const favoriteIncoming = [...incomingCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
   const favoriteOutgoing = [...outgoingCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
   const favoriteReturner = [...returningCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
-  const currentEventOrder = Number(eventOrder.get(Number(latestRow?.event || sortedEventIds[sortedEventIds.length - 1] || 0)) || sortedEventIds.length || 1);
-  const longestHold = buildTransferHoldSummary(qualifiedTransfers, eventOrder, currentEventOrder, elements);
+  const latestEventId = Number(latestRow?.event || rowEventIds[rowEventIds.length - 1] || 0);
+  const longestHold = await buildLongestHeldPlayerSummary(uidNumber, latestEventId, rowEventIds, rawTransfers, elements);
+  const transferPreferences = buildTransferPreferenceSummary(qualifiedTransfers);
 
   const captainEvents = extractChipHistoryRecords(historyData)
     .map((item) => {
@@ -4332,12 +4416,16 @@ async function buildSeasonSummaryPayload(uidInput) {
         ["操作周数", `${formatDisplayNumber(transferWeeksActive)} 周有过动作`],
         ["扣分情况", `${transferPenaltyPoints > 0 ? "-" : ""}${formatDisplayNumber(transferPenaltyPoints)} 分`],
         ["最常换入", favoriteIncoming ? `${favoriteIncoming[0]} · ${favoriteIncoming[1]} 次` : "暂无明显偏好"],
+        ["最爱换人日", transferPreferences.favorite_day ? `${transferPreferences.favorite_day.label} · ${formatDisplayNumber(transferPreferences.favorite_day.count)} 次` : "暂无明显偏好"],
+        ["最爱换人时段", transferPreferences.favorite_time_slot ? `${transferPreferences.favorite_time_slot.label} · ${formatDisplayNumber(transferPreferences.favorite_time_slot.count)} 次` : "暂无明显偏好"],
       ],
       quote: describeTransferStyle(qualifiedTransfers.length, transferWeeksActive, transferPenaltyPoints),
       sideTitle: "转会侧写",
       sideBullets: [
         favoriteOutgoing ? `这一季最常送走的人是 ${favoriteOutgoing[0]}。` : "目前没有明显反复卖出的对象。",
         favoriteReturner ? `${favoriteReturner[0]} 被你反复带回来了 ${favoriteReturner[1]} 次，很像真正的“回头草”。` : "暂时还没出现特别明显的回购球员。",
+        transferPreferences.favorite_day ? `你最喜欢在 ${transferPreferences.favorite_day.label} 换人。` : "暂时还看不出你固定偏爱的换人日。",
+        transferPreferences.favorite_time_slot ? `最常操作的时间段是北京时间 ${transferPreferences.favorite_time_slot.label}。` : "换人时间段还没有形成稳定偏好。",
         "这一页已经完全基于真实 transfers/history 接口，不依赖首页缓存。",
       ],
     },
@@ -4361,18 +4449,18 @@ async function buildSeasonSummaryPayload(uidInput) {
     roster: {
       lead: "这一页的完整版将来会接“持有多久、替补遗憾、冷门高光”。当前内测版先用真实的转会轨迹，去勾勒你更偏爱的那类球员与关系线。",
       rows: [
-        ["最长持有（转会后）", longestHold ? `${longestHold.player_name} · 约 ${formatDisplayNumber(longestHold.length)} 个比赛日 · ${longestHold.start_label} 到 ${longestHold.end_label}` : "还没有足够的转会轨迹来估算"],
+        ["持有最久", longestHold ? `${longestHold.player_name} · 共持有 ${formatDisplayNumber(longestHold.days_held)} 天` : "还没有足够的阵容快照来估算"],
         ["最常换出", favoriteOutgoing ? `${favoriteOutgoing[0]} · ${favoriteOutgoing[1]} 次` : "暂无明显倾向"],
         ["回头草", favoriteReturner ? `${favoriteReturner[0]} · ${favoriteReturner[1]} 次重新带回` : "这一季暂时没有明显回购对象"],
       ],
       badges: [
         favoriteIncoming ? `偏爱 ${favoriteIncoming[0]}` : "偏好待生成",
-        longestHold ? "转会后长期陪跑" : "等待更多轨迹",
+        longestHold ? `${longestHold.player_name} 是赛季常客` : "等待更多轨迹",
         favoriteReturner ? "会回头看旧爱" : "回头草未出现",
       ],
       sideTitle: "阵容偏好（初版）",
       sideBullets: [
-        "这一页目前还是“转会轨迹版”，还没接逐周阵容快照。",
+        "这一页现在已经会按每个 event 的真实 picks 快照回推持有轨迹，不再只靠转会记录估算。",
         "后续补上每周 picks 缓存后，就能继续做最长持有、替补遗憾和低持有率高光。",
       ],
     },
