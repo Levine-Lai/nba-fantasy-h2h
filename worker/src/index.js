@@ -4028,12 +4028,12 @@ function sortTransfersChronologically(transfers) {
 function buildTimeSlotMeta(hour) {
   const safeHour = Number(hour);
   if (!Number.isFinite(safeHour) || safeHour < 0) return null;
-  const startHour = Math.floor(safeHour / 2) * 2;
-  const endHour = Math.min(23, startHour + 1);
+  const startHour = safeHour < 8 ? 0 : (safeHour < 16 ? 8 : 16);
+  const endHour = startHour + 8;
   return {
     start_hour: startHour,
     label: `${String(startHour).padStart(2, "0")}-${String(endHour).padStart(2, "0")}`,
-    full_label: `${String(startHour).padStart(2, "0")}:00-${String(endHour).padStart(2, "0")}:59`,
+    full_label: `${String(startHour).padStart(2, "0")}:00-${String(endHour).padStart(2, "0")}:00`,
   };
 }
 
@@ -4053,6 +4053,8 @@ function getBeijingHourFromIso(isoValue) {
 function buildTransferPreferenceSummary(transfers) {
   const dayCounter = new Map();
   const slotCounter = new Map();
+  const fixedDays = [1, 2, 3, 4, 5, 6, 7];
+  const fixedSlots = [0, 8, 16];
 
   for (const transfer of transfers || []) {
     const day = Number(transfer?.day || 0);
@@ -4066,25 +4068,21 @@ function buildTransferPreferenceSummary(transfers) {
     }
   }
 
-  const dayDistribution = [...dayCounter.entries()]
-    .sort((a, b) => Number(a[0] || 0) - Number(b[0] || 0))
-    .map(([day, count]) => ({
-      day: Number(day || 0),
-      label: `Day${Number(day || 0)}`,
-      count: Number(count || 0),
-    }));
+  const dayDistribution = fixedDays.map((day) => ({
+    day,
+    label: `Day${day}`,
+    count: Number(dayCounter.get(day) || 0),
+  }));
 
-  const timeDistribution = [...slotCounter.entries()]
-    .sort((a, b) => Number(a[0] || 0) - Number(b[0] || 0))
-    .map(([startHour, count]) => {
-      const meta = buildTimeSlotMeta(startHour);
-      return {
-        start_hour: Number(startHour || 0),
-        label: meta?.label || "",
-        full_label: meta?.full_label || "",
-        count: Number(count || 0),
-      };
-    });
+  const timeDistribution = fixedSlots.map((startHour) => {
+    const meta = buildTimeSlotMeta(startHour);
+    return {
+      start_hour: Number(startHour || 0),
+      label: meta?.label || "",
+      full_label: meta?.full_label || "",
+      count: Number(slotCounter.get(startHour) || 0),
+    };
+  });
 
   const favoriteDayEntry = [...dayCounter.entries()]
     .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0) || Number(a[0] || 0) - Number(b[0] || 0))[0] || null;

@@ -513,7 +513,7 @@
 }
 
 .season-summary-page-transfer {
-    grid-template-columns: minmax(240px, 0.56fr) minmax(0, 1.44fr);
+    grid-template-columns: minmax(212px, 0.38fr) minmax(0, 1.62fr);
     gap: 14px;
 }
 
@@ -560,13 +560,15 @@
 .season-summary-transfer-dashboard {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: minmax(0, 0.82fr) minmax(0, 1.18fr);
+    grid-template-rows: minmax(0, 0.86fr) minmax(0, 1.14fr);
     gap: 12px;
 }
 
 .season-summary-transfer-panel {
+    display: flex;
+    flex-direction: column;
     min-height: 0;
-    padding: 10px 12px 8px;
+    padding: 10px 12px 10px;
     border: 1px solid #e5edf5;
     border-radius: 24px;
     background: #fff;
@@ -574,10 +576,25 @@
     overflow: hidden;
 }
 
+.season-summary-transfer-panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
 .season-summary-transfer-panel svg {
     display: block;
     width: 100%;
     height: 100%;
+}
+
+.season-summary-transfer-panel-title {
+    flex: 0 0 auto;
+    padding-top: 6px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    color: #334155;
 }
 
 .season-summary-transfer-panel-purple {
@@ -616,6 +633,14 @@
     letter-spacing: 0.01em;
 }
 
+.season-summary-transfer-axis-label {
+    fill: #475569;
+    font-family: "Avenir Next", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
 .season-summary-transfer-bar rect {
     fill: var(--transfer-panel-fill);
 }
@@ -629,49 +654,90 @@
 
 .season-summary-transfer-panel-table {
     grid-column: 1 / -1;
-    padding: 12px 14px;
+    padding: 12px 14px 10px;
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 247, 251, 0.96));
 }
 
-.season-summary-transfer-table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
+.season-summary-transfer-panel-body-wide {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.season-summary-transfer-table tbody tr:not(:last-child) {
-    border-bottom: 1px solid rgba(244, 114, 182, 0.18);
+.season-summary-transfer-axis-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 18px;
 }
 
-.season-summary-transfer-table td {
-    padding: 8px 0;
-    vertical-align: middle;
+.season-summary-transfer-axis-label-row.bottom {
+    justify-content: flex-end;
 }
 
-.season-summary-transfer-table .rank {
-    width: 36px;
-    font-size: 15px;
-    font-weight: 900;
-    color: #db2777;
+.season-summary-transfer-hold-list {
+    display: grid;
+    gap: 8px;
+    flex: 1 1 auto;
 }
 
-.season-summary-transfer-table .player {
-    padding-right: 10px;
+.season-summary-transfer-hold-row {
+    display: grid;
+    grid-template-columns: minmax(90px, 118px) minmax(0, 1fr) 38px;
+    gap: 10px;
+    align-items: center;
+}
+
+.season-summary-transfer-hold-player {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 800;
     color: #0f172a;
 }
 
-.season-summary-transfer-table .days {
-    width: 58px;
+.season-summary-transfer-hold-bar-track {
+    position: relative;
+    height: 18px;
+    border-radius: 999px;
+    background: rgba(244, 114, 182, 0.14);
+    overflow: hidden;
+}
+
+.season-summary-transfer-hold-bar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(244, 114, 182, 0.72), rgba(236, 72, 153, 0.96));
+}
+
+.season-summary-transfer-hold-value {
     text-align: right;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 900;
     color: #be185d;
+}
+
+.season-summary-transfer-hold-axis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: center;
+    gap: 0;
+    padding-left: min(118px, 26%);
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.season-summary-transfer-hold-axis span {
+    position: relative;
+    text-align: left;
+}
+
+.season-summary-transfer-hold-axis span:last-child {
+    text-align: right;
 }
 
 .season-summary-badges {
@@ -1051,11 +1117,20 @@
     }
 
     .season-summary-transfer-panel {
-        padding: 8px 8px 6px;
+        padding: 8px 8px 8px;
         border-radius: 18px;
     }
 
+    .season-summary-transfer-panel-title {
+        padding-top: 5px;
+        font-size: 11px;
+    }
+
     .season-summary-transfer-tick {
+        font-size: 10px;
+    }
+
+    .season-summary-transfer-axis-label {
         font-size: 10px;
     }
 
@@ -1067,17 +1142,23 @@
         padding: 8px 10px;
     }
 
-    .season-summary-transfer-table td {
-        padding: 7px 0;
+    .season-summary-transfer-hold-row {
+        grid-template-columns: minmax(70px, 86px) minmax(0, 1fr) 30px;
+        gap: 6px;
     }
 
-    .season-summary-transfer-table .rank,
-    .season-summary-transfer-table .days {
-        font-size: 13px;
+    .season-summary-transfer-hold-player,
+    .season-summary-transfer-hold-value {
+        font-size: 11px;
     }
 
-    .season-summary-transfer-table .player {
-        font-size: 12px;
+    .season-summary-transfer-hold-bar-track {
+        height: 14px;
+    }
+
+    .season-summary-transfer-hold-axis {
+        padding-left: min(86px, 28%);
+        font-size: 10px;
     }
 
     .season-summary-cover-main {

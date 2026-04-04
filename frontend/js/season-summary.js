@@ -302,9 +302,9 @@
     function buildTransferLabel(item, mode) {
         if (mode === "day") {
             const dayNumber = Number(item?.day || 0);
-            return dayNumber > 0 ? `D${dayNumber}` : "-";
+            return dayNumber > 0 ? String(dayNumber) : "-";
         }
-        return String(item?.label || "").replace(/:00/g, "").replace(/:59/g, "");
+        return String(item?.label || "");
     }
 
     function renderTransferBarChart(items, options = {}) {
@@ -319,67 +319,97 @@
         const maxCount = Math.max(...entries.map((item) => item.count), 1);
         const ticks = buildNiceTicks(maxCount, 4);
         const tickCeiling = Math.max(1, ticks[ticks.length - 1] || maxCount);
-        const viewWidth = 440;
-        const viewHeight = 248;
-        const left = 42;
-        const right = 418;
-        const top = 18;
-        const bottom = 194;
+        const viewWidth = 480;
+        const viewHeight = 286;
+        const left = 52;
+        const right = 452;
+        const top = 32;
+        const bottom = 208;
         const plotWidth = right - left;
         const plotHeight = bottom - top;
         const slotWidth = plotWidth / Math.max(entries.length, 1);
         const barWidth = Math.max(16, Math.min(48, slotWidth * 0.6));
         const radius = Math.min(barWidth / 2, 14);
+        const title = options.title || "";
+        const xAxisLabel = options.xAxisLabel || "";
+        const yAxisLabel = options.yAxisLabel || "";
 
         return `
             <div class="season-summary-transfer-panel season-summary-transfer-panel-${escapeHtml(options.theme || "purple")}">
-                <svg viewBox="0 0 ${viewWidth} ${viewHeight}" preserveAspectRatio="none" aria-hidden="true">
-                    <g class="season-summary-transfer-grid">
+                <div class="season-summary-transfer-panel-body">
+                    <svg viewBox="0 0 ${viewWidth} ${viewHeight}" preserveAspectRatio="none" aria-hidden="true">
+                        <g class="season-summary-transfer-grid">
+                            ${ticks.map((tick) => {
+                                const y = top + (1 - (Number(tick || 0) / tickCeiling)) * plotHeight;
+                                return `<line x1="${left}" y1="${y.toFixed(2)}" x2="${right}" y2="${y.toFixed(2)}"></line>`;
+                            }).join("")}
+                        </g>
+                        <line class="season-summary-transfer-axis" x1="${left}" y1="${top}" x2="${left}" y2="${bottom}"></line>
+                        <line class="season-summary-transfer-axis" x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}"></line>
+                        <text class="season-summary-transfer-axis-label y" x="${left}" y="${top - 12}" text-anchor="start">${escapeHtml(yAxisLabel)}</text>
+                        <text class="season-summary-transfer-axis-label x" x="${right}" y="${bottom + 44}" text-anchor="end">${escapeHtml(xAxisLabel)}</text>
                         ${ticks.map((tick) => {
                             const y = top + (1 - (Number(tick || 0) / tickCeiling)) * plotHeight;
-                            return `<line x1="${left}" y1="${y.toFixed(2)}" x2="${right}" y2="${y.toFixed(2)}"></line>`;
+                            return `<text class="season-summary-transfer-tick y" x="${left - 10}" y="${y + 4}" text-anchor="end">${escapeHtml(tick)}</text>`;
                         }).join("")}
-                    </g>
-                    <line class="season-summary-transfer-axis" x1="${left}" y1="${top}" x2="${left}" y2="${bottom}"></line>
-                    <line class="season-summary-transfer-axis" x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}"></line>
-                    ${ticks.map((tick) => {
-                        const y = top + (1 - (Number(tick || 0) / tickCeiling)) * plotHeight;
-                        return `<text class="season-summary-transfer-tick y" x="${left - 8}" y="${y + 4}" text-anchor="end">${escapeHtml(tick)}</text>`;
-                    }).join("")}
-                    ${entries.map((item, index) => {
-                        const centerX = left + slotWidth * index + slotWidth / 2;
-                        const height = item.count > 0 ? Math.max(8, (item.count / tickCeiling) * plotHeight) : 0;
-                        const rectX = centerX - barWidth / 2;
-                        const rectY = bottom - height;
-                        const countY = Math.max(top + 10, rectY - 8);
-                        return `
-                            <g class="season-summary-transfer-bar">
-                                <text class="season-summary-transfer-bar-value" x="${centerX}" y="${countY}" text-anchor="middle">${escapeHtml(item.count)}</text>
-                                <rect x="${rectX.toFixed(2)}" y="${rectY.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${height.toFixed(2)}" rx="${radius.toFixed(2)}" ry="${radius.toFixed(2)}"></rect>
-                                <text class="season-summary-transfer-tick x" x="${centerX}" y="${bottom + 22}" text-anchor="middle">${escapeHtml(item.label)}</text>
-                            </g>
-                        `;
-                    }).join("")}
-                </svg>
+                        ${entries.map((item, index) => {
+                            const centerX = left + slotWidth * index + slotWidth / 2;
+                            const height = item.count > 0 ? Math.max(8, (item.count / tickCeiling) * plotHeight) : 0;
+                            const rectX = centerX - barWidth / 2;
+                            const rectY = bottom - height;
+                            const countY = Math.max(top + 10, rectY - 8);
+                            return `
+                                <g class="season-summary-transfer-bar">
+                                    <text class="season-summary-transfer-bar-value" x="${centerX}" y="${countY}" text-anchor="middle">${escapeHtml(item.count)}</text>
+                                    <rect x="${rectX.toFixed(2)}" y="${rectY.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${height.toFixed(2)}" rx="${radius.toFixed(2)}" ry="${radius.toFixed(2)}"></rect>
+                                    <text class="season-summary-transfer-tick x" x="${centerX}" y="${bottom + 20}" text-anchor="middle">${escapeHtml(item.label)}</text>
+                                </g>
+                            `;
+                        }).join("")}
+                    </svg>
+                </div>
+                <div class="season-summary-transfer-panel-title">${escapeHtml(title)}</div>
             </div>
         `;
     }
 
-    function renderHoldRankingTable(items) {
-        const rows = (Array.isArray(items) ? items : []).slice(0, 6);
+    function renderHoldRankingChart(items) {
+        const rows = (Array.isArray(items) ? items : []).slice(0, 8).map((item) => ({
+            player_name: String(item?.player_name || ""),
+            days_held: Number(item?.days_held || 0),
+        }));
+        const maxDays = Math.max(...rows.map((item) => item.days_held), 1);
+        const ticks = buildNiceTicks(maxDays, 4);
+        const tickCeiling = Math.max(1, ticks[ticks.length - 1] || maxDays);
+        const axisColumns = `repeat(${Math.max(2, ticks.length)}, minmax(0, 1fr))`;
         return `
             <div class="season-summary-transfer-panel season-summary-transfer-panel-pink season-summary-transfer-panel-table">
-                <table class="season-summary-transfer-table" aria-hidden="true">
-                    <tbody>
-                        ${rows.map((item) => `
-                            <tr>
-                                <td class="rank">${escapeHtml(item?.rank)}</td>
-                                <td class="player">${escapeHtml(item?.player_name)}</td>
-                                <td class="days">${escapeHtml(item?.days_held)}</td>
-                            </tr>
-                        `).join("")}
-                    </tbody>
-                </table>
+                <div class="season-summary-transfer-panel-body season-summary-transfer-panel-body-wide">
+                    <div class="season-summary-transfer-axis-label-row">
+                        <span class="season-summary-transfer-axis-label y">球员</span>
+                    </div>
+                    <div class="season-summary-transfer-hold-list">
+                        ${rows.map((item) => {
+                            const widthPercent = Math.max(0, Math.min(100, (item.days_held / tickCeiling) * 100));
+                            return `
+                                <div class="season-summary-transfer-hold-row">
+                                    <div class="season-summary-transfer-hold-player">${escapeHtml(item.player_name)}</div>
+                                    <div class="season-summary-transfer-hold-bar-track">
+                                        <div class="season-summary-transfer-hold-bar" style="width:${widthPercent.toFixed(2)}%"></div>
+                                    </div>
+                                    <div class="season-summary-transfer-hold-value">${escapeHtml(item.days_held)}</div>
+                                </div>
+                            `;
+                        }).join("")}
+                    </div>
+                    <div class="season-summary-transfer-hold-axis" style="grid-template-columns:${axisColumns}">
+                        ${ticks.map((tick) => `<span>${escapeHtml(tick)}</span>`).join("")}
+                    </div>
+                    <div class="season-summary-transfer-axis-label-row bottom">
+                        <span class="season-summary-transfer-axis-label x">${escapeHtml("天数")}</span>
+                    </div>
+                </div>
+                <div class="season-summary-transfer-panel-title">（持有球员天数）</div>
             </div>
         `;
     }
@@ -407,9 +437,9 @@
                     <div class="season-summary-transfer-copy-space"></div>
                 </div>
                 <aside class="season-summary-side season-summary-transfer-dashboard">
-                    ${renderTransferBarChart(transfers.day_distribution || [], { theme: "purple", mode: "day" })}
-                    ${renderTransferBarChart(transfers.time_distribution || [], { theme: "blue", mode: "time" })}
-                    ${renderHoldRankingTable(transfers.hold_ranking || [])}
+                    ${renderTransferBarChart(transfers.day_distribution || [], { theme: "purple", mode: "day", title: "（转会Gameday分布）", xAxisLabel: "Day", yAxisLabel: "次数" })}
+                    ${renderTransferBarChart(transfers.time_distribution || [], { theme: "blue", mode: "time", title: "（转会时间段分布）", xAxisLabel: "北京时间", yAxisLabel: "次数" })}
+                    ${renderHoldRankingChart(transfers.hold_ranking || [])}
                 </aside>
             </section>
         `;
