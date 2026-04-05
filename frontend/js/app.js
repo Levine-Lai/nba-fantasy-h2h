@@ -18,7 +18,12 @@ const API = {
     },
 
     async getState() {
-        return (await this.fetch("/api/state?fresh_h2h=1")).json();
+        try {
+            return (await this.fetch("/api/state?fresh_h2h=1")).json();
+        } catch (error) {
+            console.warn("[API Fallback] /api/state?fresh_h2h=1 failed, retrying cached /api/state", error);
+            return (await this.fetch("/api/state")).json();
+        }
     },
 
     async getGameDetail(fixtureId) {

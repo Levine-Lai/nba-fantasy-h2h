@@ -4579,6 +4579,7 @@ export default {
       if (!state) {
         state = await refreshState(env, { full: true });
       }
+      const cachedState = state;
       const needsManagerMetaRefresh = shouldRefreshManagerMeta(state);
       const shouldRefreshMetaOnDemand =
         needsManagerMetaRefresh &&
@@ -4588,13 +4589,26 @@ export default {
           path.startsWith("/api/picks/")
         );
       if (shouldRefreshMetaOnDemand) {
-        state = await refreshManagerMetaState(env, state);
+        try {
+          state = await refreshManagerMetaState(env, state);
+        } catch (error) {
+          console.error("[state-meta-refresh-failed]", String(error?.message || error || "unknown"));
+          state = cachedState || state;
+        }
       }
       state = normalizeStateChipStatus(state);
 
       if (path === "/api/state") {
         const useFreshH2H = url.searchParams.get("fresh_h2h") === "1";
-        const responseState = useFreshH2H ? normalizeStateChipStatus(await buildFreshHomepageState(state)) : state;
+        let responseState = state;
+        if (useFreshH2H) {
+          try {
+            responseState = normalizeStateChipStatus(await buildFreshHomepageState(state));
+          } catch (error) {
+            console.error("[state-fresh-h2h-failed]", String(error?.message || error || "unknown"));
+            responseState = state;
+          }
+        }
         return jsonResponse(responseState);
       }
       if (path === "/api/fixtures") return jsonResponse(state.fixtures);
