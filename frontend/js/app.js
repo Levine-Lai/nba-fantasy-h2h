@@ -17,6 +17,10 @@ const API = {
         }
     },
 
+    async getStateCached() {
+        return (await this.fetch("/api/state")).json();
+    },
+
     async getState() {
         try {
             return (await this.fetch("/api/state?fresh_h2h=1")).json();
@@ -30,8 +34,9 @@ const API = {
         return (await this.fetch(`/api/fixture/${fixtureId}`)).json();
     },
 
-    async getLineup(uid) {
-        return (await this.fetch(`/api/picks/${uid}`)).json();
+    async getLineup(uid, options = {}) {
+        const useFresh = options?.fresh === true;
+        return (await this.fetch(`/api/picks/${uid}${useFresh ? "?fresh=1" : ""}`)).json();
     },
 
     async getInjuries() {
@@ -1682,10 +1687,26 @@ const App = {
     latestTransferTrends: null,
     latestPicksByUid: {},
 
-    async getLineupCached(uid) {
-        const key = String(uid);
+    applyState(state) {
+        this.latestTransferTrends = state?.transfer_trends || {};
+        this.latestPicksByUid = state?.picks_by_uid || {};
+        Render.eventInfo(state?.current_event_name || "Loading...");
+        Render.gameCount(state?.fixtures?.count || 0);
+        Render.gamesList(state?.fixtures?.games || []);
+        Render.matchCount(Array.isArray(state?.h2h) ? state.h2h.length : 0);
+        Render.h2hList(state?.h2h || []);
+        Render.transferTrends(this.latestTransferTrends, this.latestPicksByUid);
+        Render.chipsUsed(state?.chips_used_summary || []);
+        Render.goodCaptain(state?.good_captain_summary || []);
+        Render.specialGuy(state?.picks_by_uid || {});
+        Render.rankings(state || {});
+        Render.updateTime();
+    },
+
+    async getLineupCached(uid, options = {}) {
+        const key = `${String(uid)}:${options?.fresh === true ? "fresh" : "cached"}`;
         if (!this.lineupCache.has(key)) {
-            this.lineupCache.set(key, API.getLineup(uid).catch((error) => {
+            this.lineupCache.set(key, API.getLineup(uid, options).catch((error) => {
                 this.lineupCache.delete(key);
                 throw error;
             }));
@@ -1713,21 +1734,19 @@ const App = {
     async loadAll() {
         try {
             this.lineupCache.clear();
-            const state = await API.getState();
-            this.latestTransferTrends = state?.transfer_trends || {};
-            this.latestPicksByUid = state?.picks_by_uid || {};
-            Render.eventInfo(state?.current_event_name || "Loading...");
-            Render.gameCount(state?.fixtures?.count || 0);
-            Render.gamesList(state?.fixtures?.games || []);
-            Render.matchCount(Array.isArray(state?.h2h) ? state.h2h.length : 0);
-            Render.h2hList(state?.h2h || []);
-            Render.transferTrends(this.latestTransferTrends, this.latestPicksByUid);
-            Render.chipsUsed(state?.chips_used_summary || []);
-            Render.goodCaptain(state?.good_captain_summary || []);
-            Render.specialGuy(state?.picks_by_uid || {});
-            Render.rankings(state || {});
-            Render.updateTime();
-            this.scheduleAutoRefresh(state);
+            let state = null;
+            try {
+                state = await API.getStateCached();
+                this.applyState(state);
+            } catch (cachedError) {
+                console.warn("Initial cached state load failed:", cachedError);
+            }
+            const freshState = await API.getState();
+            state = freshState || state;
+            if (state) {
+                this.applyState(state);
+                this.scheduleAutoRefresh(state);
+            }
         } catch (error) {
             console.error("LoadAll error:", error);
             this.clearRefreshTimer();
@@ -1744,7 +1763,12 @@ const App = {
         if (isOpen) return;
 
         try {
-            const data = await this.getLineupCached(uid);
+            const baseline = this.latestPicksByUid?.[String(uid)] || {};
+            const needsFresh =
+                !Array.isArray(baseline?.transfer_records) ||
+                baseline.transfer_records.length === 0 ||
+                (!!baseline?.chip_status?.captain_used && !baseline?.captain_used?.captain_name);
+            const data = await this.getLineupCached(uid, { fresh: needsFresh });
             panel.innerHTML = renderTransferRecords(teamName, data.transfer_records || [], side, data.captain_used || null);
             panel.classList.add("active");
         } catch (error) {

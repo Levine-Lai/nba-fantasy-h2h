@@ -1265,6 +1265,21 @@ async function buildFreshHomepageState(baseState) {
 
     const activeChip = String(picksRes.data?.active_chip || "").toLowerCase();
     const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
+    let captainUsed = previous?.captain_used || null;
+    if (activeChip === "phcapt") {
+      const captainPick = picks.find((pick) => pick?.is_captain);
+      const captainDay = Number(currentMeta?.day || 0) || null;
+      const captainPoints = Number(captainPick?.final_points || 0);
+      captainUsed = {
+        used: true,
+        day: captainDay,
+        captain_name: captainPick?.name || previous?.captain_used?.captain_name || null,
+        captain_points: captainPoints,
+        label: captainDay
+          ? `DAY${captainDay}: ${captainPick?.name || previous?.captain_used?.captain_name || "None"} ${captainPoints}`
+          : `Used: ${captainPick?.name || previous?.captain_used?.captain_name || "None"} ${captainPoints}`,
+      };
+    }
     const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
     const freshToday = Number(effectiveScore || 0);
     const summary = previous?.week_total_summary || null;
@@ -1291,9 +1306,11 @@ async function buildFreshHomepageState(baseState) {
       current_event_name: currentEventName,
       captain_week: nextCaptainWeek,
       active_chip: activeChip || null,
+      captain_used: captainUsed,
       chip_status: buildPersistedChipStatus({
         ...previous,
         current_event_name: currentEventName,
+        captain_used: captainUsed,
         captain_week: nextCaptainWeek,
       }, {
         currentWeek,
@@ -1319,6 +1336,72 @@ async function buildFreshHomepageState(baseState) {
         currentWeek,
         activeChip: nextPicksByUid[uid]?.active_chip || "",
       }),
+    };
+  }
+
+  const teams = {};
+  for (const [teamId, meta] of Object.entries(teamsMetaById || {})) {
+    teams[Number(teamId)] = meta?.name || `Team #${teamId}`;
+  }
+  const freshGames = (currentFixtures || []).map((fixture) => {
+    const status = resolveFixtureStatus(fixture);
+    const homeTeamName = teams[Number(fixture?.team_h || 0)] || `Team #${fixture?.team_h}`;
+    const awayTeamName = teams[Number(fixture?.team_a || 0)] || `Team #${fixture?.team_a}`;
+    const homeVisual = getTeamVisualMeta(homeTeamName);
+    const awayVisual = getTeamVisualMeta(awayTeamName);
+    return {
+      id: Number(fixture?.id || 0),
+      team_h: Number(fixture?.team_h || 0),
+      team_a: Number(fixture?.team_a || 0),
+      home_team: homeTeamName,
+      away_team: awayTeamName,
+      home_logo_url: homeVisual.logo_url,
+      away_logo_url: awayVisual.logo_url,
+      home_color: homeVisual.color,
+      away_color: awayVisual.color,
+      home_score: Number(fixture?.team_h_score || 0),
+      away_score: Number(fixture?.team_a_score || 0),
+      started: !!fixture?.started,
+      finished: status.code === "finished",
+      status_code: status.code,
+      status_label: status.label,
+      kickoff: formatKickoffBj(fixture?.kickoff_time),
+      kickoff_time: fixture?.kickoff_time || null,
+    };
+  });
+
+  const freshFixtureDetails = {};
+  for (const fixture of currentFixtures || []) {
+    const homePlayers = [];
+    const awayPlayers = [];
+    for (const [idText, liveData] of Object.entries(liveElements)) {
+      const elementId = Number(idText);
+      const elem = elements[elementId] || {};
+      const player = {
+        id: elementId,
+        name: elem.name || `#${elementId}`,
+        position: elem.position || 0,
+        position_name: elem.position_name || "UNK",
+        ...getPlayerStats(elementId, liveElements, elements),
+      };
+      if (elem.team === Number(fixture?.team_h || 0)) homePlayers.push(player);
+      if (elem.team === Number(fixture?.team_a || 0)) awayPlayers.push(player);
+    }
+    homePlayers.sort((a, b) => Number(b?.fantasy || 0) - Number(a?.fantasy || 0));
+    awayPlayers.sort((a, b) => Number(b?.fantasy || 0) - Number(a?.fantasy || 0));
+    const homeTeamName = teams[Number(fixture?.team_h || 0)] || `Team #${fixture?.team_h}`;
+    const awayTeamName = teams[Number(fixture?.team_a || 0)] || `Team #${fixture?.team_a}`;
+    const homeVisual = getTeamVisualMeta(homeTeamName);
+    const awayVisual = getTeamVisualMeta(awayTeamName);
+    freshFixtureDetails[Number(fixture?.id || 0)] = {
+      home_team: homeTeamName,
+      away_team: awayTeamName,
+      home_logo_url: homeVisual.logo_url,
+      away_logo_url: awayVisual.logo_url,
+      home_color: homeVisual.color,
+      away_color: awayVisual.color,
+      home_players: homePlayers,
+      away_players: awayPlayers,
     };
   }
 
@@ -1368,6 +1451,14 @@ async function buildFreshHomepageState(baseState) {
     current_event_name: currentEventName || baseState?.current_event_name,
     h2h: nextMatches,
     picks_by_uid: nextPicksByUid,
+    fixtures: {
+      count: freshGames.length,
+      games: freshGames,
+    },
+    fixture_details: {
+      ...(baseState?.fixture_details || {}),
+      ...freshFixtureDetails,
+    },
     good_captain_summary: buildGoodCaptainSummary(nextPicksByUid),
   };
 }
