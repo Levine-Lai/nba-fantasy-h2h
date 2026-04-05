@@ -293,25 +293,53 @@ function getBeijingHour(date = new Date()) {
     }).format(date));
 }
 
+function getFixtureRefreshWindowInfo(games, now = Date.now()) {
+    const kickoffTimes = (Array.isArray(games) ? games : [])
+        .map((game) => (game?.kickoff_time ? Date.parse(game.kickoff_time) : NaN))
+        .filter((value) => Number.isFinite(value))
+        .sort((a, b) => a - b);
+
+    if (!kickoffTimes.length) {
+        return {
+            hasGames: false,
+            active: false,
+            beforeStart: false,
+            afterEnd: false,
+            hasUnfinished: false,
+            startMs: null,
+            endMs: null,
+        };
+    }
+
+    const startMs = kickoffTimes[0];
+    const latestKickoffMs = kickoffTimes[kickoffTimes.length - 1];
+    const endMs = latestKickoffMs + (5 * 60 * 60 * 1000) + (15 * 60 * 1000);
+    const nowMs = Number(now || Date.now());
+    const hasUnfinished = games.some((game) => !game?.finished);
+    return {
+        hasGames: true,
+        active: nowMs >= startMs && nowMs <= endMs,
+        beforeStart: nowMs < startMs,
+        afterEnd: nowMs > endMs,
+        hasUnfinished,
+        startMs,
+        endMs,
+    };
+}
+
 function getNextRefreshDelay(fixtures) {
     const games = Array.isArray(fixtures?.games) ? fixtures.games : [];
     if (!games.length) return null;
 
-    const bjHour = getBeijingHour(new Date());
-    const inRefreshWindow = bjHour >= 7 && bjHour < 14;
-    const hasUnfinishedGames = games.some((game) => !game?.finished);
-    if (!inRefreshWindow || !hasUnfinishedGames) return null;
-
-    const kickoffTimes = games
-        .map((game) => (game?.kickoff_time ? Date.parse(game.kickoff_time) : NaN))
-        .filter((value) => Number.isFinite(value));
-    const earliestKickoff = kickoffTimes.length ? Math.min(...kickoffTimes) : null;
-    const now = Date.now();
-
-    if (earliestKickoff && now < earliestKickoff) {
-        return Math.max(30000, earliestKickoff - now);
+    const windowInfo = getFixtureRefreshWindowInfo(games, Date.now());
+    if (!windowInfo.hasGames) return null;
+    if (windowInfo.beforeStart && windowInfo.startMs) {
+        return Math.max(30000, windowInfo.startMs - Date.now());
     }
-
+    if (!windowInfo.active) return null;
+    if (!windowInfo.hasUnfinished && windowInfo.endMs) {
+        return Math.max(30000, Math.min(120000, windowInfo.endMs - Date.now()));
+    }
     return 120000;
 }
 
@@ -1804,7 +1832,7 @@ const App = {
         Render.modalLoading("game-modal", "game-body", "game-title");
         try {
             const localPayload = this.latestFixtureDetails?.[String(fixtureId)] || this.latestFixtureDetails?.[Number(fixtureId)];
-            if (localPayload && Object.keys(localPayload).length) {
+            if (localPayload && Array.isArray(localPayload.home_players) && Array.isArray(localPayload.away_players)) {
                 Render.gameDetail(localPayload);
                 return;
             }

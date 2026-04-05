@@ -7,6 +7,8 @@ const PLAYER_REFERENCE_CACHE_KEY = "player_reference_state";
 const TEAM_ATTACK_DEFENSE_CACHE_KEY = "team_attack_defense_state";
 const INJURY_CACHE_TTL_MS = 60 * 60 * 1000;
 const UID_CHUNK_SIZE = 6;
+const REFRESH_ESTIMATED_GAME_DURATION_MS = 5 * 60 * 60 * 1000;
+const REFRESH_POSTGAME_BUFFER_MS = 15 * 60 * 1000;
 const UID_LIST = [
   "5410",
   "3455",
@@ -229,14 +231,67 @@ function debugUid(stage, uid, payload) {
   console.log(`[uid-debug][${normalizeUid(uid)}][${stage}] ${serialized}`);
 }
 
-function isBeijingRefreshWindow(value = Date.now()) {
-  const date = value instanceof Date ? value : new Date(value);
-  const bjHour = Number(new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Shanghai",
-    hour: "2-digit",
-    hour12: false,
-  }).format(date));
-  return bjHour >= 7 && bjHour < 14;
+function getFixtureRefreshWindowInfo(fixturesOrGames, value = Date.now()) {
+  const nowMs = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  const items = Array.isArray(fixturesOrGames) ? fixturesOrGames : [];
+  const kickoffTimes = items
+    .map((item) => (item?.kickoff_time ? Date.parse(item.kickoff_time) : NaN))
+    .filter((item) => Number.isFinite(item))
+    .sort((a, b) => a - b);
+
+  if (!kickoffTimes.length) {
+    return {
+      has_games: false,
+      active: false,
+      before_start: false,
+      after_end: false,
+      has_unfinished: false,
+      start_ms: null,
+      end_ms: null,
+    };
+  }
+
+  const startMs = kickoffTimes[0];
+  const latestKickoffMs = kickoffTimes[kickoffTimes.length - 1];
+  const fallbackEndMs = latestKickoffMs + REFRESH_ESTIMATED_GAME_DURATION_MS + REFRESH_POSTGAME_BUFFER_MS;
+  const hasUnfinished = items.some((item) => resolveFixtureStatus(item).code !== "finished");
+  return {
+    has_games: true,
+    active: nowMs >= startMs && nowMs <= fallbackEndMs,
+    before_start: nowMs < startMs,
+    after_end: nowMs > fallbackEndMs,
+    has_unfinished: hasUnfinished,
+    start_ms: startMs,
+    end_ms: fallbackEndMs,
+  };
+}
+
+function isDynamicRefreshWindow(fixturesOrGames, value = Date.now()) {
+  return getFixtureRefreshWindowInfo(fixturesOrGames, value).active;
+}
+
+async function getCurrentRefreshWindowContext(value = Date.now()) {
+  const bootstrap = await fetchJson("/bootstrap-static/", 1);
+  const events = Array.isArray(bootstrap?.events) ? bootstrap.events : [];
+  const [currentEvent, currentEventName] = getCurrentEvent(events);
+  if (!currentEvent) {
+    return {
+      active: false,
+      current_event: null,
+      current_event_name: null,
+      fixtures: [],
+      window: getFixtureRefreshWindowInfo([], value),
+    };
+  }
+  const fixturesRaw = await fetchJson(`/fixtures/?event=${currentEvent}`, 1);
+  const fixtures = Array.isArray(fixturesRaw) ? fixturesRaw : [];
+  return {
+    active: isDynamicRefreshWindow(fixtures, value),
+    current_event: currentEvent,
+    current_event_name: currentEventName,
+    fixtures,
+    window: getFixtureRefreshWindowInfo(fixtures, value),
+  };
 }
 
 function buildPreviousPicksByUid(previousState) {
@@ -1176,7 +1231,7 @@ function shouldRefreshManagerMeta(state, value = Date.now()) {
   if (!Array.isArray(state?.h2h) || state.h2h.length === 0) return true;
   if (!state?.picks_by_uid || typeof state.picks_by_uid !== "object") return true;
 
-  if (!isBeijingRefreshWindow(value)) return false;
+  if (!isDynamicRefreshWindow(state?.fixtures?.games || [], value)) return false;
   return getBeijingDateKey(state.refresh_meta.meta_updated_at) !== getBeijingDateKey(value);
 }
 
@@ -1461,6 +1516,106 @@ async function buildFreshHomepageState(baseState) {
     },
     chips_used_summary: buildChipsUsedSummary(nextPicksByUid),
     good_captain_summary: buildGoodCaptainSummary(nextPicksByUid),
+  };
+}
+
+async function buildCurrentFixturePayload(baseState = null) {
+  const bootstrap = await fetchJson("/bootstrap-static/", 1);
+  const events = Array.isArray(bootstrap?.events) ? bootstrap.events : [];
+  const [currentEvent, currentEventName] = getCurrentEvent(events);
+  if (!currentEvent) {
+    return {
+      current_event: null,
+      current_event_name: baseState?.current_event_name || null,
+      fixtures: {
+        count: 0,
+        games: [],
+      },
+      fixture_details: {},
+    };
+  }
+
+  const [liveRaw, fixturesRaw] = await Promise.all([
+    fetchJson(`/event/${currentEvent}/live/`, 1),
+    fetchJson(`/fixtures/?event=${currentEvent}`, 1),
+  ]);
+  const elements = buildElementsMap(bootstrap);
+  const liveElements = buildLiveElementsMap(liveRaw);
+  const teams = {};
+  for (const t of bootstrap?.teams || []) teams[t.id] = t.name;
+  const fixtures = Array.isArray(fixturesRaw) ? fixturesRaw : [];
+  const games = fixtures.map((fixture) => {
+    const status = resolveFixtureStatus(fixture);
+    const homeTeamName = teams[Number(fixture?.team_h || 0)] || `Team #${fixture?.team_h}`;
+    const awayTeamName = teams[Number(fixture?.team_a || 0)] || `Team #${fixture?.team_a}`;
+    const homeVisual = getTeamVisualMeta(homeTeamName);
+    const awayVisual = getTeamVisualMeta(awayTeamName);
+    return {
+      id: Number(fixture?.id || 0),
+      team_h: Number(fixture?.team_h || 0),
+      team_a: Number(fixture?.team_a || 0),
+      home_team: homeTeamName,
+      away_team: awayTeamName,
+      home_logo_url: homeVisual.logo_url,
+      away_logo_url: awayVisual.logo_url,
+      home_color: homeVisual.color,
+      away_color: awayVisual.color,
+      home_score: Number(fixture?.team_h_score || 0),
+      away_score: Number(fixture?.team_a_score || 0),
+      started: !!fixture?.started,
+      finished: status.code === "finished",
+      status_code: status.code,
+      status_label: status.label,
+      kickoff: formatKickoffBj(fixture?.kickoff_time),
+      kickoff_time: fixture?.kickoff_time || null,
+    };
+  });
+
+  const fixtureDetails = {};
+  for (const fixture of fixtures) {
+    const homePlayers = [];
+    const awayPlayers = [];
+    for (const [idText, liveData] of Object.entries(liveElements)) {
+      const elementId = Number(idText);
+      const elem = elements[elementId] || {};
+      const stats = liveData?.stats;
+      if (!stats) continue;
+      const player = {
+        id: elementId,
+        name: elem.name || `#${elementId}`,
+        position: elem.position || 0,
+        position_name: elem.position_name || "UNK",
+        ...getPlayerStats(elementId, liveElements, elements),
+      };
+      if (Number(elem.team || 0) === Number(fixture?.team_h || 0)) homePlayers.push(player);
+      if (Number(elem.team || 0) === Number(fixture?.team_a || 0)) awayPlayers.push(player);
+    }
+    homePlayers.sort((a, b) => Number(b?.fantasy || 0) - Number(a?.fantasy || 0));
+    awayPlayers.sort((a, b) => Number(b?.fantasy || 0) - Number(a?.fantasy || 0));
+    const homeTeamName = teams[Number(fixture?.team_h || 0)] || `Team #${fixture?.team_h}`;
+    const awayTeamName = teams[Number(fixture?.team_a || 0)] || `Team #${fixture?.team_a}`;
+    const homeVisual = getTeamVisualMeta(homeTeamName);
+    const awayVisual = getTeamVisualMeta(awayTeamName);
+    fixtureDetails[Number(fixture?.id || 0)] = {
+      home_team: homeTeamName,
+      away_team: awayTeamName,
+      home_logo_url: homeVisual.logo_url,
+      away_logo_url: awayVisual.logo_url,
+      home_color: homeVisual.color,
+      away_color: awayVisual.color,
+      home_players: homePlayers,
+      away_players: awayPlayers,
+    };
+  }
+
+  return {
+    current_event: currentEvent,
+    current_event_name: currentEventName,
+    fixtures: {
+      count: games.length,
+      games,
+    },
+    fixture_details: fixtureDetails,
   };
 }
 
@@ -4898,7 +5053,12 @@ export default {
       if (path === "/api/classic-rankings") return jsonResponse(state.classic_rankings || []);
       if (path.startsWith("/api/fixture/")) {
         const id = Number(path.split("/").pop());
-        return jsonResponse(state.fixture_details[String(id)] || state.fixture_details[id] || {});
+        let payload = state.fixture_details[String(id)] || state.fixture_details[id] || {};
+        if (!payload || !payload.home_players) {
+          const freshFixtures = await buildCurrentFixturePayload(state);
+          payload = freshFixtures.fixture_details[String(id)] || freshFixtures.fixture_details[id] || {};
+        }
+        return jsonResponse(payload);
       }
       if (path.startsWith("/api/picks/")) {
         const uid = normalizeUid(Number(path.split("/").pop()));
@@ -4991,10 +5151,16 @@ export default {
         ctx.waitUntil(getTeamAttackDefensePayload(env, { force: true }));
       }
     }
-    if (!isBeijingRefreshWindow(scheduledAt)) return;
     ctx.waitUntil((async () => {
+      const refreshContext = await getCurrentRefreshWindowContext(scheduledAt);
+      if (!refreshContext.active) return;
       let state = await getState(env);
       if (!state) {
+        await refreshState(env, { full: true });
+        return;
+      }
+      const currentEventChanged = Number(state?.current_event || 0) !== Number(refreshContext.current_event || 0);
+      if (currentEventChanged) {
         await refreshState(env, { full: true });
         return;
       }
