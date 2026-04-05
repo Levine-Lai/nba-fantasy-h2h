@@ -1744,6 +1744,19 @@ async function refreshManagerMetaState(env, existingState = null) {
       Array.isArray(previous?.raw_transfers) ? previous.raw_transfers : []
     );
     const hasHistoryData = !!historyData;
+    const chipDayMap = hasHistoryData
+      ? getChipDayMapFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
+      : {};
+    const transferSummary = hasHistoryData && Array.isArray(transfersData)
+      ? buildWeeklyTransferSummary(transfersData, currentWeek, eventMetaById, elements, chipDayMap)
+      : {
+          records: Array.isArray(previous.transfer_records) ? previous.transfer_records : [],
+          total_transfer_count: Number(previous.transfer_count || 0),
+          penalty_transfer_count: Number(previous.penalty_transfer_count || previous.transfer_count || 0),
+          gd1_transfer_count: Number(previous.gd1_transfer_count || 0),
+          gd1_missing_penalty: Number(previous.gd1_missing_penalty || 0),
+          penalty_score: Number(previous.penalty_score || 0),
+        };
     transfersByUid[uid] = transfersData;
 
     const wildcardDay = hasHistoryData
@@ -1755,7 +1768,7 @@ async function refreshManagerMetaState(env, existingState = null) {
     const richEvent = hasHistoryData
       ? getSeasonChipEvent(historyData, ["rich"])
       : Number(previous.rich_day || 0) || null;
-    const gd1MissingPenalty = Number(previous.gd1_missing_penalty || 0);
+    const gd1MissingPenalty = Number(transferSummary.gd1_missing_penalty || 0);
     const historyWeek = hasHistoryData
       ? calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
       : null;
