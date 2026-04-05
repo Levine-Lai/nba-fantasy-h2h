@@ -1,5 +1,5 @@
 (function () {
-    const PAGE_COUNT = 6;
+    const PAGE_COUNT = 5;
     const INTRO_EXIT_MS = 860;
     const state = {
         currentPage: 0,
@@ -62,6 +62,9 @@
         document.querySelectorAll(".season-summary-page").forEach((page, index) => {
             page.classList.toggle("active", index === state.currentPage);
         });
+        const { prevBtn, nextBtn } = refs();
+        if (prevBtn) prevBtn.disabled = state.currentPage <= 0;
+        if (nextBtn) nextBtn.disabled = state.currentPage >= PAGE_COUNT - 1;
     }
 
     function goToPage(nextPage) {
@@ -100,9 +103,9 @@
             <div class="season-summary-grid-3">
                 ${(Array.isArray(cards) ? cards : []).map((item) => `
                     <div class="season-summary-card">
-                        <div class="season-summary-stat-label">${escapeHtml(item[0])}</div>
-                        <div class="season-summary-stat-value">${escapeHtml(item[1])}</div>
-                        <div class="season-summary-stat-note">${escapeHtml(item[2] || "")}</div>
+                        <div class="season-summary-stat-label">${escapeHtml(item?.[0])}</div>
+                        <div class="season-summary-stat-value">${escapeHtml(item?.[1])}</div>
+                        <div class="season-summary-stat-note">${escapeHtml(item?.[2] || "")}</div>
                     </div>
                 `).join("")}
             </div>
@@ -114,8 +117,8 @@
             <div class="season-summary-row-list">
                 ${(Array.isArray(rows) ? rows : []).map((item) => `
                     <div class="season-summary-row">
-                        <div class="season-summary-row-key">${escapeHtml(item[0])}</div>
-                        <div class="season-summary-row-value">${escapeHtml(item[1])}</div>
+                        <div class="season-summary-row-key">${escapeHtml(item?.[0])}</div>
+                        <div class="season-summary-row-value">${escapeHtml(item?.[1])}</div>
                     </div>
                 `).join("")}
             </div>
@@ -131,8 +134,8 @@
             <div class="season-summary-kpi-grid">
                 ${(Array.isArray(items) ? items : []).map((item) => `
                     <div class="season-summary-kpi">
-                        <div class="season-summary-mini-title">${escapeHtml(item[0])}</div>
-                        <strong>${escapeHtml(item[1])}</strong>
+                        <div class="season-summary-mini-title">${escapeHtml(item?.[0])}</div>
+                        <strong>${escapeHtml(item?.[1])}</strong>
                     </div>
                 `).join("")}
             </div>
@@ -163,11 +166,9 @@
         return list.map((item) => {
             const event = Number(item?.event || 0);
             const rank = Number(item?.rank || 0);
-            const x = left + ((event - xMin) / xSpan) * (right - left);
-            const y = top + (rank / ySpan) * (bottom - top);
             return {
-                x,
-                y,
+                x: left + ((event - xMin) / xSpan) * (right - left),
+                y: top + (rank / ySpan) * (bottom - top),
                 event,
                 rank,
                 gw: Number(item?.gw || 0) || null,
@@ -187,22 +188,27 @@
         return `${line} L ${last.x.toFixed(2)} ${bottom} L ${first.x.toFixed(2)} ${bottom} Z`;
     }
 
-    function buildRankTicks(maxRank, count = 5) {
-        const safeMax = Math.max(1, Number(maxRank || 0));
+    function buildNiceTicks(maxValue, targetTickCount = 5) {
+        const safeMax = Math.max(1, Number(maxValue || 0));
+        const roughStep = safeMax / Math.max(1, targetTickCount - 1);
+        const magnitude = 10 ** Math.max(0, Math.floor(Math.log10(Math.max(1, roughStep))));
+        const candidates = [1, 2, 5, 10].map((factor) => factor * magnitude);
+        const step = candidates.find((value) => value >= roughStep) || candidates[candidates.length - 1];
+        const ceiling = Math.ceil(safeMax / step) * step;
         const ticks = [];
-        for (let i = 0; i < count; i += 1) {
-            ticks.push(Math.round((safeMax * i) / Math.max(1, count - 1)));
+        for (let value = 0; value <= ceiling; value += step) {
+            ticks.push(value);
         }
-        return [...new Set(ticks)];
+        return ticks;
     }
 
     function sampleXAxisTicks(points, desiredCount = 7) {
         if (!points.length) return [];
         if (points.length <= desiredCount) return points;
         const sampled = [];
-        for (let i = 0; i < desiredCount; i += 1) {
-            const index = Math.round((i * (points.length - 1)) / Math.max(1, desiredCount - 1));
-            sampled.push(points[index]);
+        for (let index = 0; index < desiredCount; index += 1) {
+            const pointIndex = Math.round((index * (points.length - 1)) / Math.max(1, desiredCount - 1));
+            sampled.push(points[pointIndex]);
         }
         return sampled;
     }
@@ -223,8 +229,9 @@
         const points = buildCurvePoints(rawPoints, { yMax: maxRank, left: 64, right: 856, top: 42, bottom: 526 });
         const linePath = buildLinePath(points);
         const areaPath = buildAreaPath(points, 526);
-        const rankTicks = buildRankTicks(maxRank, 5);
+        const rankTicks = buildNiceTicks(maxRank, 5);
         const xTicks = sampleXAxisTicks(points, 7);
+        const yMax = Math.max(1, rankTicks[rankTicks.length - 1] || maxRank);
 
         return `
             <aside class="season-summary-cover-panel">
@@ -243,7 +250,7 @@
                         </defs>
                         <g class="season-summary-cover-grid">
                             ${rankTicks.map((tick) => {
-                                const y = 42 + (Number(tick || 0) / Math.max(1, maxRank)) * (526 - 42);
+                                const y = 42 + (Number(tick || 0) / yMax) * (526 - 42);
                                 return `<line x1="64" y1="${y.toFixed(2)}" x2="856" y2="${y.toFixed(2)}"></line>`;
                             }).join("")}
                             ${xTicks.map((point) => `<line x1="${point.x.toFixed(2)}" y1="42" x2="${point.x.toFixed(2)}" y2="526"></line>`).join("")}
@@ -251,12 +258,12 @@
                         <line class="season-summary-cover-axis" x1="64" y1="42" x2="64" y2="526"></line>
                         <line class="season-summary-cover-axis" x1="64" y1="42" x2="856" y2="42"></line>
                         ${rankTicks.map((tick) => {
-                            const y = 42 + (Number(tick || 0) / Math.max(1, maxRank)) * (526 - 42);
-                            return `<text class="season-summary-cover-tick rank" x="48" y="${y + 6}" text-anchor="end">${escapeHtml(tick.toLocaleString("en-US"))}</text>`;
+                            const y = 42 + (Number(tick || 0) / yMax) * (526 - 42);
+                            return `<text class="season-summary-cover-tick rank" x="48" y="${y + 6}" text-anchor="end">${escapeHtml(Number(tick || 0).toLocaleString("en-US"))}</text>`;
                         }).join("")}
                         ${xTicks.map((point) => `<text class="season-summary-cover-tick gw" x="${point.x.toFixed(2)}" y="28" text-anchor="middle">${escapeHtml(point.gw || "")}</text>`).join("")}
-                        <path d="${areaPath}" fill="url(#season-summary-cover-fill)" opacity="0.7"></path>
-                        <path d="${linePath}" fill="none" stroke="url(#season-summary-cover-line)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="${areaPath}" fill="url(#season-summary-cover-fill)" opacity="0.58"></path>
+                        <path d="${linePath}" fill="none" stroke="url(#season-summary-cover-line)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </div>
             </aside>
@@ -265,8 +272,7 @@
 
     function renderCoverPage(profile) {
         const cover = profile?.cover || {};
-        const realName = cover.real_name || profile.managerName || "";
-        const englishName = [cover.first_name, cover.last_name].filter(Boolean).join(" ").trim() || realName;
+        const englishName = [cover.first_name, cover.last_name].filter(Boolean).join(" ").trim() || profile.managerName || "";
         const stats = Array.isArray(cover.stats) ? cover.stats : [];
 
         return `
@@ -279,8 +285,8 @@
                     <div class="season-summary-cover-stats">
                         ${stats.map((item) => `
                             <div class="season-summary-cover-stat">
-                                <div class="season-summary-cover-stat-label">${escapeHtml(item[0])}</div>
-                                <div class="season-summary-cover-stat-value">${escapeHtml(item[1])}</div>
+                                <div class="season-summary-cover-stat-label">${escapeHtml(item?.[0])}</div>
+                                <div class="season-summary-cover-stat-value">${escapeHtml(item?.[1])}</div>
                             </div>
                         `).join("")}
                     </div>
@@ -293,75 +299,158 @@
         `;
     }
 
-    function chartPath(values, width, height) {
-        const list = Array.isArray(values) && values.length ? values : [48, 54, 51, 60, 57, 63, 67];
-        const min = Math.min(...list);
-        const max = Math.max(...list);
-        const span = Math.max(1, max - min);
-        return list.map((value, index) => {
-            const x = 22 + (index * (width - 44)) / Math.max(1, list.length - 1);
-            const y = height - 18 - ((value - min) / span) * (height - 36);
-            return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
-        }).join(" ");
+    function buildTransferLabel(item, mode) {
+        if (mode === "day") {
+            const dayNumber = Number(item?.day || 0);
+            return dayNumber > 0 ? String(dayNumber) : "-";
+        }
+        return String(item?.full_label || item?.label || "");
+    }
+
+    function renderTransferBarChart(items, options = {}) {
+        const entries = (Array.isArray(items) && items.length ? items : [{ label: "-", count: 0 }]).map((item) => ({
+            label: buildTransferLabel(item, options.mode || "time"),
+            count: Number(item?.count || 0),
+        }));
+        const maxCount = Math.max(...entries.map((item) => item.count), 1);
+        const ticks = buildNiceTicks(maxCount, 4);
+        const tickCeiling = Math.max(1, ticks[ticks.length - 1] || maxCount);
+        const viewWidth = 480;
+        const viewHeight = 304;
+        const left = 56;
+        const right = 452;
+        const top = 44;
+        const bottom = 226;
+        const plotWidth = right - left;
+        const plotHeight = bottom - top;
+        const slotWidth = plotWidth / Math.max(entries.length, 1);
+        const barWidth = Math.max(16, Math.min(42, slotWidth * 0.52));
+        const radius = Math.min(barWidth / 2, 14);
+
+        return `
+            <div class="season-summary-transfer-panel season-summary-transfer-panel-${escapeHtml(options.theme || "purple")}">
+                <div class="season-summary-transfer-panel-body">
+                    <svg viewBox="0 0 ${viewWidth} ${viewHeight}" preserveAspectRatio="none" aria-hidden="true">
+                        <g class="season-summary-transfer-grid">
+                            ${ticks.map((tick) => {
+                                const y = top + (1 - (Number(tick || 0) / tickCeiling)) * plotHeight;
+                                return `<line x1="${left}" y1="${y.toFixed(2)}" x2="${right}" y2="${y.toFixed(2)}"></line>`;
+                            }).join("")}
+                        </g>
+                        <line class="season-summary-transfer-axis" x1="${left}" y1="${top}" x2="${left}" y2="${bottom}"></line>
+                        <line class="season-summary-transfer-axis" x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}"></line>
+                        <text class="season-summary-transfer-axis-label y" x="${left}" y="${top - 16}" text-anchor="start">${escapeHtml(options.yAxisLabel || "")}</text>
+                        <text class="season-summary-transfer-axis-label x" x="${right}" y="${bottom + 48}" text-anchor="end">${escapeHtml(options.xAxisLabel || "")}</text>
+                        ${ticks.map((tick) => {
+                            const y = top + (1 - (Number(tick || 0) / tickCeiling)) * plotHeight;
+                            return `<text class="season-summary-transfer-tick y" x="${left - 10}" y="${y + 4}" text-anchor="end">${escapeHtml(tick)}</text>`;
+                        }).join("")}
+                        ${entries.map((item, index) => {
+                            const centerX = left + slotWidth * index + slotWidth / 2;
+                            const height = item.count > 0 ? Math.max(8, (item.count / tickCeiling) * plotHeight) : 0;
+                            const rectX = centerX - barWidth / 2;
+                            const rectY = bottom - height;
+                            const countY = Math.max(24, rectY - 10);
+                            return `
+                                <g class="season-summary-transfer-bar">
+                                    <text class="season-summary-transfer-bar-value" x="${centerX}" y="${countY}" text-anchor="middle">${escapeHtml(item.count)}</text>
+                                    <rect x="${rectX.toFixed(2)}" y="${rectY.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${height.toFixed(2)}" rx="${radius.toFixed(2)}" ry="${radius.toFixed(2)}"></rect>
+                                    <text class="season-summary-transfer-tick x" x="${centerX}" y="${bottom + 22}" text-anchor="middle">${escapeHtml(item.label)}</text>
+                                </g>
+                            `;
+                        }).join("")}
+                    </svg>
+                </div>
+                <div class="season-summary-transfer-panel-title">${escapeHtml(options.title || "")}</div>
+            </div>
+        `;
+    }
+
+    function renderHoldRankingChart(items) {
+        const rows = (Array.isArray(items) ? items : []).slice(0, 8).map((item) => ({
+            player_name: String(item?.player_name || ""),
+            days_held: Number(item?.days_held || 0),
+        }));
+        const tickCeiling = 155;
+        const ticks = [0, 50, 100, 155];
+        const axisColumns = `repeat(${ticks.length}, minmax(0, 1fr))`;
+
+        return `
+            <div class="season-summary-transfer-panel season-summary-transfer-panel-pink season-summary-transfer-panel-table">
+                <div class="season-summary-transfer-panel-body season-summary-transfer-panel-body-wide">
+                    <div class="season-summary-transfer-axis-label-row">
+                        <span class="season-summary-transfer-axis-label y">球员</span>
+                    </div>
+                    <div class="season-summary-transfer-hold-list">
+                        ${rows.map((item) => {
+                            const widthPercent = Math.max(0, Math.min(100, (item.days_held / tickCeiling) * 100));
+                            return `
+                                <div class="season-summary-transfer-hold-row">
+                                    <div class="season-summary-transfer-hold-player">${escapeHtml(item.player_name)}</div>
+                                    <div class="season-summary-transfer-hold-bar-track">
+                                        <div class="season-summary-transfer-hold-bar" style="width:${widthPercent.toFixed(2)}%"></div>
+                                    </div>
+                                    <div class="season-summary-transfer-hold-value">${escapeHtml(item.days_held)}</div>
+                                </div>
+                            `;
+                        }).join("")}
+                    </div>
+                    <div class="season-summary-transfer-hold-axis" style="grid-template-columns:${axisColumns}">
+                        ${ticks.map((tick) => `<span>${escapeHtml(tick)}</span>`).join("")}
+                    </div>
+                    <div class="season-summary-transfer-axis-label-row bottom">
+                        <span class="season-summary-transfer-axis-label x">天数</span>
+                    </div>
+                </div>
+                <div class="season-summary-transfer-panel-title">持有球员天数</div>
+            </div>
+        `;
+    }
+
+    function renderTransferPage(profile) {
+        const transfers = profile?.transfers || {};
+        return `
+            <section class="season-summary-page season-summary-page-transfer">
+                <div class="season-summary-main season-summary-transfer-main">
+                    <div class="season-summary-transfer-copy-space"></div>
+                </div>
+                <aside class="season-summary-side season-summary-transfer-dashboard">
+                    ${renderTransferBarChart(transfers.day_distribution || [], {
+                        theme: "purple",
+                        mode: "day",
+                        title: "转会Gameday分布",
+                        xAxisLabel: "Day",
+                        yAxisLabel: "次数",
+                    })}
+                    ${renderTransferBarChart(transfers.time_distribution || [], {
+                        theme: "blue",
+                        mode: "time",
+                        title: "转会时间段分布",
+                        xAxisLabel: "北京时间",
+                        yAxisLabel: "次数",
+                    })}
+                    ${renderHoldRankingChart(transfers.hold_ranking || [])}
+                </aside>
+            </section>
+        `;
     }
 
     function renderPages(profile) {
-        const curvePath = chartPath(profile?.overview?.curve || [], 860, 190);
         return `
             ${renderCoverPage(profile)}
 
-            <section class="season-summary-page">
-                <div class="season-summary-main">
-                    <div class="season-summary-page-title">赛季总览</div>
-                    ${renderStatsGrid(profile.overview?.cards || [])}
-                    <div class="season-summary-card">
-                        <div class="season-summary-mini-title">Season Curve</div>
-                        <div class="season-summary-chart">
-                            <svg viewBox="0 0 860 190" preserveAspectRatio="none" aria-hidden="true">
-                                <defs>
-                                    <linearGradient id="season-summary-line" x1="0%" y1="0%" x2="100%" y2="0%">
-                                        <stop offset="0%" stop-color="#2563eb"></stop>
-                                        <stop offset="100%" stop-color="#10b981"></stop>
-                                    </linearGradient>
-                                </defs>
-                                <path d="${curvePath}" fill="none" stroke="url(#season-summary-line)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-                <aside class="season-summary-side">
-                    <div class="season-summary-rail">
-                        <div class="season-summary-mini-title">${escapeHtml(profile.overview?.sideTitle || "Overview")}</div>
-                        ${renderBullets(profile.overview?.sideBullets || [])}
-                        ${renderKpis(profile.overview?.sideKpis || [])}
-                    </div>
-                </aside>
-            </section>
-
-            <section class="season-summary-page">
-                <div class="season-summary-main">
-                    <div class="season-summary-page-title">转会情况</div>
-                    ${renderRows(profile.transfers?.rows || [])}
-                    <div class="season-summary-quote">${escapeHtml(profile.transfers?.quote || "")}</div>
-                </div>
-                <aside class="season-summary-side">
-                    <div class="season-summary-rail">
-                        <div class="season-summary-mini-title">${escapeHtml(profile.transfers?.sideTitle || "Transfers")}</div>
-                        ${renderBullets(profile.transfers?.sideBullets || [])}
-                    </div>
-                </aside>
-            </section>
+            ${renderTransferPage(profile)}
 
             <section class="season-summary-page">
                 <div class="season-summary-main">
                     <div class="season-summary-page-title">队长情况</div>
-                    ${renderStatsGrid(profile.captain?.cards || [])}
-                    ${renderRows(profile.captain?.rows || [])}
+                    ${renderStatsGrid(profile?.captain?.cards || [])}
+                    ${renderRows(profile?.captain?.rows || [])}
                 </div>
                 <aside class="season-summary-side">
                     <div class="season-summary-rail">
-                        <div class="season-summary-mini-title">${escapeHtml(profile.captain?.sideTitle || "Captain")}</div>
-                        ${renderBullets(profile.captain?.sideBullets || [])}
+                        <div class="season-summary-mini-title">${escapeHtml(profile?.captain?.sideTitle || "Captain")}</div>
+                        ${renderBullets(profile?.captain?.sideBullets || [])}
                     </div>
                 </aside>
             </section>
@@ -369,13 +458,13 @@
             <section class="season-summary-page">
                 <div class="season-summary-main">
                     <div class="season-summary-page-title">持有球员情况</div>
-                    ${renderRows(profile.roster?.rows || [])}
-                    ${renderBadges(profile.roster?.badges || [])}
+                    ${renderRows(profile?.roster?.rows || [])}
+                    ${renderBadges(profile?.roster?.badges || [])}
                 </div>
                 <aside class="season-summary-side">
                     <div class="season-summary-rail">
-                        <div class="season-summary-mini-title">${escapeHtml(profile.roster?.sideTitle || "Roster")}</div>
-                        ${renderBullets(profile.roster?.sideBullets || [])}
+                        <div class="season-summary-mini-title">${escapeHtml(profile?.roster?.sideTitle || "Roster")}</div>
+                        ${renderBullets(profile?.roster?.sideBullets || [])}
                     </div>
                 </aside>
             </section>
@@ -383,14 +472,14 @@
             <section class="season-summary-page">
                 <div class="season-summary-main">
                     <div class="season-summary-page-title">高光时刻</div>
-                    ${renderStatsGrid(profile.highlights?.cards || [])}
-                    <div class="season-summary-quote">${escapeHtml(profile.highlights?.quote || "")}</div>
+                    ${renderStatsGrid(profile?.highlights?.cards || [])}
+                    <div class="season-summary-quote">${escapeHtml(profile?.highlights?.quote || "")}</div>
                 </div>
                 <aside class="season-summary-side">
                     <div class="season-summary-rail">
-                        <div class="season-summary-mini-title">${escapeHtml(profile.highlights?.sideTitle || "Highlights")}</div>
-                        ${renderBullets(profile.highlights?.sideBullets || [])}
-                        ${renderKpis(profile.highlights?.sideKpis || [])}
+                        <div class="season-summary-mini-title">${escapeHtml(profile?.highlights?.sideTitle || "Highlights")}</div>
+                        ${renderBullets(profile?.highlights?.sideBullets || [])}
+                        ${renderKpis(profile?.highlights?.sideKpis || [])}
                     </div>
                 </aside>
             </section>
@@ -400,10 +489,10 @@
     function getLoadErrorMessage(error) {
         const text = String(error?.message || error || "");
         if (/failed to fetch|networkerror|load failed/i.test(text)) {
-            return "本地 API 没有连上，请先启动 worker 的 wrangler dev";
+            return "本地 API 没有连上，请先启动 worker 的 wrangler dev。";
         }
-        if (/404|not found/i.test(text)) {
-            return "这个 Fantasy ID 没查到数据，可以换一个试试";
+        if (/404|not found|required/i.test(text)) {
+            return "这个 Fantasy ID 没有查到数据，可以换一个再试。";
         }
         return text || "加载失败";
     }
@@ -430,7 +519,7 @@
     async function loadSummary(uid) {
         const normalizedUid = String(uid || "").trim();
         if (!normalizedUid) {
-            setStatus("请输入 Fantasy ID", "error");
+            setStatus("请输入你的 Fantasy ID", "error");
             refs().uidInput?.focus();
             return;
         }
@@ -471,23 +560,7 @@
             goToPage(state.currentPage + 1);
         });
 
-        document.addEventListener("click", (event) => {
-            const navButton = event.target.closest(".nav-tab");
-            if (!navButton) return;
-            const page = String(navButton.dataset.page || "home");
-            if (page === "season-summary") {
-                updateUrl(state.lastUid || "");
-            } else {
-                const url = new URL(window.location.href);
-                url.searchParams.delete("page");
-                url.searchParams.delete("uid");
-                window.history.replaceState({}, "", url.toString());
-            }
-        });
-
         document.addEventListener("keydown", (event) => {
-            const seasonPage = document.getElementById("page-season-summary");
-            if (seasonPage && !seasonPage.classList.contains("active")) return;
             if (event.key === "ArrowLeft") goToPage(state.currentPage - 1);
             if (event.key === "ArrowRight") goToPage(state.currentPage + 1);
         });
