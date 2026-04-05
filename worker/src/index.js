@@ -1459,6 +1459,7 @@ async function buildFreshHomepageState(baseState) {
       ...(baseState?.fixture_details || {}),
       ...freshFixtureDetails,
     },
+    chips_used_summary: buildChipsUsedSummary(nextPicksByUid),
     good_captain_summary: buildGoodCaptainSummary(nextPicksByUid),
   };
 }
@@ -3393,6 +3394,12 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     currentWeek,
     weeklyStandingsPhase
   );
+  const nextChipsUsedSummary = isFullRefresh
+    ? chipsUsedSummary
+    : (Array.isArray(previousState?.chips_used_summary) ? previousState.chips_used_summary : chipsUsedSummary);
+  const nextGoodCaptainSummary = isFullRefresh
+    ? goodCaptainSummary
+    : (Array.isArray(previousState?.good_captain_summary) ? previousState.good_captain_summary : goodCaptainSummary);
 
   return {
     generated_at: new Date().toISOString(),
@@ -3410,8 +3417,8 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     classic_rankings: classicRankings,
     picks_by_uid: picksByUid,
     transfer_trends: transferTrends,
-    chips_used_summary: chipsUsedSummary,
-    good_captain_summary: goodCaptainSummary,
+    chips_used_summary: nextChipsUsedSummary,
+    good_captain_summary: nextGoodCaptainSummary,
     ownership: ownershipSummary,
     fdr,
     fdr_html: fdr.html,
@@ -4675,7 +4682,6 @@ export default {
       const shouldRefreshMetaOnDemand =
         needsManagerMetaRefresh &&
         (
-          path === "/api/state" ||
           path === "/api/trends/transfers" ||
           path.startsWith("/api/picks/")
         );
