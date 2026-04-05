@@ -328,7 +328,7 @@
         const radius = Math.min(barWidth / 2, 14);
 
         return `
-            <div class="season-summary-transfer-panel season-summary-transfer-panel-${escapeHtml(options.theme || "purple")}">
+            <div class="season-summary-transfer-panel season-summary-transfer-panel-${escapeHtml(options.theme || "purple")}${options.panelClass ? ` ${escapeHtml(options.panelClass)}` : ""}">
                 <div class="season-summary-transfer-panel-body">
                     <svg viewBox="0 0 ${viewWidth} ${viewHeight}" preserveAspectRatio="none" aria-hidden="true">
                         <g class="season-summary-transfer-grid">
@@ -366,7 +366,7 @@
         `;
     }
 
-    function renderHoldRankingChart(items) {
+    function renderHoldRankingChart(items, options = {}) {
         const rows = (Array.isArray(items) ? items : []).slice(0, 8).map((item) => ({
             player_name: String(item?.player_name || ""),
             days_held: Number(item?.days_held || 0),
@@ -376,7 +376,7 @@
         const axisColumns = `repeat(${ticks.length}, minmax(0, 1fr))`;
 
         return `
-            <div class="season-summary-transfer-panel season-summary-transfer-panel-pink season-summary-transfer-panel-table">
+            <div class="season-summary-transfer-panel season-summary-transfer-panel-pink season-summary-transfer-panel-table${options.panelClass ? ` ${escapeHtml(options.panelClass)}` : ""}">
                 <div class="season-summary-transfer-panel-body season-summary-transfer-panel-body-wide">
                     <div class="season-summary-transfer-axis-label-row">
                         <span class="season-summary-transfer-axis-label y">球员</span>
@@ -402,7 +402,150 @@
                         <span class="season-summary-transfer-axis-label x">天数</span>
                     </div>
                 </div>
-                <div class="season-summary-transfer-panel-title">持有球员天数</div>
+                <div class="season-summary-transfer-panel-title">${escapeHtml(options.title || "持有球员天数")}</div>
+            </div>
+        `;
+    }
+
+    function formatSummaryNumber(value) {
+        const numeric = Number(value || 0);
+        if (!Number.isFinite(numeric)) return "-";
+        return numeric.toLocaleString("en-US");
+    }
+
+    function getTransferTimeMood(fullLabel) {
+        const label = String(fullLabel || "");
+        if (label === "00:00-08:00") {
+            return "星星和月亮大概真的是你的朋友，不到 ddl 前总还想再看一眼。";
+        }
+        if (label === "08:00-16:00") {
+            return "白天一到位，你往往就已经准备好给阵容做决定。";
+        }
+        if (label === "16:00-24:00") {
+            return "你更愿意把决定留到一天后半段，等消息更完整时再落子。";
+        }
+        return "换人的节奏很像你自己的习惯，慢慢也就有了固定的手感。";
+    }
+
+    function getTransferDayMood(dayLabel) {
+        const label = String(dayLabel || "");
+        if (label === "Day1") return "开局就动手，说明你很少愿意只做旁观者。";
+        if (label === "Day2" || label === "Day3") return "你更喜欢在局面刚展开时提前调整。";
+        if (label === "Day4" || label === "Day5") return "你会先看几眼风向，再决定该不该出手。";
+        if (label === "Day6" || label === "Day7") return "很多决定会被你留到更靠近截止的时候。";
+        return "换人日的选择，慢慢也形成了你自己的节奏。";
+    }
+
+    function renderTransferStory(profile) {
+        const transfers = profile?.transfers || {};
+        const summary = transfers.summary || {};
+        const totalTransfers = Number(summary.total_transfers || 0);
+        const activeWeeks = Number(summary.active_weeks || 0);
+        const seasonWeeks = Number(summary.season_weeks || 0);
+        const penaltyPoints = Number(summary.penalty_points || 0);
+        const penaltyEventCount = Number(summary.penalty_event_count || 0);
+        const transferEveryWeek = !!summary.transfer_every_week;
+        const mostIn = summary.most_in || null;
+        const mostOut = summary.most_out || null;
+        const favoriteReturner = summary.favorite_returner || null;
+        const favoriteDay = summary.favorite_day || null;
+        const favoriteTimeSlot = summary.favorite_time_slot || null;
+        const longestHold = summary.longest_hold || null;
+
+        const cards = [
+            {
+                label: "总转会",
+                value: totalTransfers > 0 ? `${formatSummaryNumber(totalTransfers)}次` : "0次",
+                note: "不含 WC / AS",
+            },
+            {
+                label: "操作周数",
+                value: seasonWeeks > 0 ? `${formatSummaryNumber(activeWeeks)}/${formatSummaryNumber(seasonWeeks)}` : formatSummaryNumber(activeWeeks),
+                note: transferEveryWeek ? "每一周都有动作" : "并不是周周都出手",
+            },
+            {
+                label: "扣分",
+                value: penaltyPoints > 0 ? `${formatSummaryNumber(penaltyPoints)}分` : "0分",
+                note: penaltyPoints > 0 ? `${formatSummaryNumber(penaltyEventCount)} 个比赛日付费` : "这一季还没因转会扣分",
+            },
+            {
+                label: "最长陪伴",
+                value: longestHold ? `${formatSummaryNumber(longestHold.days_held)}天` : "-",
+                note: longestHold ? String(longestHold.player_name || "") : "暂时没有固定常驻",
+            },
+        ];
+
+        const mark = (value) => `<strong>${escapeHtml(value)}</strong>`;
+        const paragraphs = [];
+
+        if (totalTransfers <= 0) {
+            paragraphs.push("这一季你几乎没有动过非芯片转会，更多时候是在等答案自己慢慢浮上来。");
+        } else if (transferEveryWeek && seasonWeeks > 0) {
+            paragraphs.push(
+                `从赛季开始到现在，你在 ${mark(formatSummaryNumber(seasonWeeks))} 个比赛周里都留下了调整。${mark(formatSummaryNumber(totalTransfers))} 次非芯片转会，让“不到截止不收手”这件事在你身上特别明显。`
+            );
+        } else {
+            const weekText = seasonWeeks > 0
+                ? `${mark(formatSummaryNumber(activeWeeks))}/${mark(formatSummaryNumber(seasonWeeks))} 周`
+                : `${mark(formatSummaryNumber(activeWeeks))} 周`;
+            paragraphs.push(
+                `这一季你一共做了 ${mark(formatSummaryNumber(totalTransfers))} 次非芯片转会，其中 ${weekText} 都留下了操作。你更像是看准机会，再把决定慢慢落下的人。`
+            );
+        }
+
+        const preferenceParts = [];
+        if (mostIn?.name) {
+            preferenceParts.push(`${mark(mostIn.name)} 是你最常换入的人，一共来了 ${mark(formatSummaryNumber(mostIn.count))} 次`);
+        }
+        if (mostOut?.name) {
+            preferenceParts.push(`${mark(mostOut.name)} 则最常被你送走，一共离开了 ${mark(formatSummaryNumber(mostOut.count))} 次`);
+        }
+        if (favoriteReturner?.name) {
+            preferenceParts.push(`${mark(favoriteReturner.name)} 还被你回购了 ${mark(formatSummaryNumber(favoriteReturner.count))} 次`);
+        }
+        if (preferenceParts.length) {
+            paragraphs.push(`${preferenceParts.join("，")}。`);
+        }
+
+        if (favoriteTimeSlot?.full_label || favoriteDay?.label) {
+            const timeText = favoriteTimeSlot?.full_label
+                ? `你最喜欢在北京时间 ${mark(favoriteTimeSlot.full_label)} 动手，${getTransferTimeMood(favoriteTimeSlot.full_label)}`
+                : "";
+            const dayText = favoriteDay?.label
+                ? `${mark(favoriteDay.label)} 也是你最常出手的日子，${getTransferDayMood(favoriteDay.label)}`
+                : "";
+            paragraphs.push([timeText, dayText].filter(Boolean).join(" "));
+        }
+
+        if (penaltyPoints > 0 && longestHold?.player_name) {
+            paragraphs.push(
+                `为了这些判断，你一共交出了 ${mark(formatSummaryNumber(penaltyPoints))} 分，代价出现在 ${mark(formatSummaryNumber(penaltyEventCount))} 个比赛日里。${mark(longestHold.player_name)} 陪你待了 ${mark(formatSummaryNumber(longestHold.days_held))} 天，跟着你走过了这一季最长的一段路。`
+            );
+        } else if (penaltyPoints > 0) {
+            paragraphs.push(
+                `为了这些判断，你一共交出了 ${mark(formatSummaryNumber(penaltyPoints))} 分，代价出现在 ${mark(formatSummaryNumber(penaltyEventCount))} 个比赛日里。`
+            );
+        } else if (longestHold?.player_name) {
+            paragraphs.push(
+                `好消息是，这一季你的转会还没有带来额外扣分。${mark(longestHold.player_name)} 陪你待了 ${mark(formatSummaryNumber(longestHold.days_held))} 天，已经很像这份阵容里最熟悉的老朋友。`
+            );
+        }
+
+        return `
+            <div class="season-summary-transfer-copy">
+                <div class="season-summary-page-title">这一季，你是这样换人的</div>
+                <div class="season-summary-transfer-glance">
+                    ${cards.map((card) => `
+                        <div class="season-summary-transfer-glance-card">
+                            <div class="season-summary-transfer-glance-label">${escapeHtml(card.label)}</div>
+                            <div class="season-summary-transfer-glance-value">${escapeHtml(card.value)}</div>
+                            <div class="season-summary-transfer-glance-note">${escapeHtml(card.note)}</div>
+                        </div>
+                    `).join("")}
+                </div>
+                <div class="season-summary-transfer-story-list">
+                    ${paragraphs.map((paragraph) => `<p class="season-summary-transfer-story-paragraph">${paragraph}</p>`).join("")}
+                </div>
             </div>
         `;
     }
@@ -412,7 +555,7 @@
         return `
             <section class="season-summary-page season-summary-page-transfer">
                 <div class="season-summary-main season-summary-transfer-main">
-                    <div class="season-summary-transfer-copy-space"></div>
+                    ${renderTransferStory(profile)}
                 </div>
                 <aside class="season-summary-side season-summary-transfer-dashboard">
                     ${renderTransferBarChart(transfers.day_distribution || [], {
@@ -421,6 +564,7 @@
                         title: "转会Gameday分布",
                         xAxisLabel: "Day",
                         yAxisLabel: "次数",
+                        panelClass: "season-summary-transfer-panel-day",
                     })}
                     ${renderTransferBarChart(transfers.time_distribution || [], {
                         theme: "blue",
@@ -428,8 +572,12 @@
                         title: "转会时间段分布",
                         xAxisLabel: "北京时间",
                         yAxisLabel: "次数",
+                        panelClass: "season-summary-transfer-panel-time",
                     })}
-                    ${renderHoldRankingChart(transfers.hold_ranking || [])}
+                    ${renderHoldRankingChart(transfers.hold_ranking || [], {
+                        title: "持有球员天数",
+                        panelClass: "season-summary-transfer-panel-hold",
+                    })}
                 </aside>
             </section>
         `;

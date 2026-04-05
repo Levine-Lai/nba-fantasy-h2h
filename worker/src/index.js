@@ -4880,6 +4880,12 @@ async function buildSeasonSummaryPayload(uidInput) {
   const holdRanking = await buildLongestHeldPlayerSummary(uidNumber, latestEventId, rowEventIds, rawTransfers, elements);
   const longestHold = holdRanking?.[0] || null;
   const transferPreferences = buildTransferPreferenceSummary(qualifiedTransfers);
+  const seasonWeeksTracked = Math.max(
+    0,
+    ...rowEventIds.map((eventId) => Number(eventMetaById?.[Number(eventId || 0)]?.gw || 0))
+  );
+  const transferPenaltyEvents = rows.filter((row) => Number(row?.event_transfers_cost || 0) > 0).length;
+  const transferEveryWeek = seasonWeeksTracked > 0 && transferWeeksActive >= seasonWeeksTracked;
 
   const captainEvents = extractChipHistoryRecords(historyData)
     .map((item) => {
@@ -5017,6 +5023,40 @@ async function buildSeasonSummaryPayload(uidInput) {
     },
     transfers: {
       lead: "这页先不把你写成冷冰冰的转会计数器，而是先看你这一季到底多爱动手、愿不愿意为节奏付费，以及有没有自己偏爱的回头草。",
+      summary: {
+        total_transfers: Number(qualifiedTransfers.length || 0),
+        active_weeks: Number(transferWeeksActive || 0),
+        season_weeks: Number(seasonWeeksTracked || 0),
+        transfer_every_week: !!transferEveryWeek,
+        penalty_points: Number(transferPenaltyPoints || 0),
+        penalty_event_count: Number(transferPenaltyEvents || 0),
+        most_in: favoriteIncoming ? {
+          name: favoriteIncoming[0],
+          count: Number(favoriteIncoming[1] || 0),
+        } : null,
+        most_out: favoriteOutgoing ? {
+          name: favoriteOutgoing[0],
+          count: Number(favoriteOutgoing[1] || 0),
+        } : null,
+        favorite_returner: favoriteReturner ? {
+          name: favoriteReturner[0],
+          count: Number(favoriteReturner[1] || 0),
+        } : null,
+        favorite_day: transferPreferences.favorite_day ? {
+          day: Number(transferPreferences.favorite_day.day || 0),
+          count: Number(transferPreferences.favorite_day.count || 0),
+          label: transferPreferences.favorite_day.label || "",
+        } : null,
+        favorite_time_slot: transferPreferences.favorite_time_slot ? {
+          label: transferPreferences.favorite_time_slot.label || "",
+          full_label: transferPreferences.favorite_time_slot.full_label || "",
+          count: Number(transferPreferences.favorite_time_slot.count || 0),
+        } : null,
+        longest_hold: longestHold ? {
+          player_name: longestHold.player_name || "",
+          days_held: Number(longestHold.days_held || 0),
+        } : null,
+      },
       day_distribution: transferPreferences.day_distribution || [],
       time_distribution: transferPreferences.time_distribution || [],
       hold_ranking: (holdRanking || []).slice(0, 10).map((item, index) => ({
