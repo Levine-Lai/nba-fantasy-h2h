@@ -1065,47 +1065,77 @@ function isPlayerAvailable(pick, teamsPlayingToday) {
 
 function calculateEffectiveScore(picks, teamsPlayingToday) {
   for (const p of picks) p.is_effective = false;
-  const starters = picks
-    .filter((p) => p.lineup_position <= 5)
-    .sort((a, b) => a.lineup_position - b.lineup_position);
-  const bench = picks
-    .filter((p) => p.lineup_position > 5)
-    .sort((a, b) => a.lineup_position - b.lineup_position);
+  const ordered = [...picks].sort((a, b) => Number(a.lineup_position || 0) - Number(b.lineup_position || 0));
+  const available = ordered.filter((pick) => isPlayerAvailable(pick, teamsPlayingToday));
 
-  const selected = [];
-  let bcCount = 0;
-  let fcCount = 0;
-
-  const addSelected = (pick) => {
-    selected.push(pick);
-    if (pick.position_type === 1) bcCount += 1;
-    if (pick.position_type === 2) fcCount += 1;
+  const compareCandidates = (left, right) => {
+    if (!left) return right;
+    if (!right) return left;
+    if (left.selected.length !== right.selected.length) {
+      return left.selected.length > right.selected.length ? left : right;
+    }
+    const leftBalance = Math.min(left.bcCount, 2) + Math.min(left.fcCount, 2);
+    const rightBalance = Math.min(right.bcCount, 2) + Math.min(right.fcCount, 2);
+    if (leftBalance !== rightBalance) {
+      return leftBalance > rightBalance ? left : right;
+    }
+    if (left.starterCount !== right.starterCount) {
+      return left.starterCount > right.starterCount ? left : right;
+    }
+    const length = Math.min(left.positions.length, right.positions.length);
+    for (let index = 0; index < length; index += 1) {
+      if (left.positions[index] !== right.positions[index]) {
+        return left.positions[index] < right.positions[index] ? left : right;
+      }
+    }
+    return left;
   };
 
-  const allStartersAvailable =
-    starters.length === 5 && starters.every((pick) => isPlayerAvailable(pick, teamsPlayingToday));
-
-  if (allStartersAvailable) {
-    for (const starter of starters) addSelected(starter);
-  } else {
-    for (const starter of starters) {
-      if (!isPlayerAvailable(starter, teamsPlayingToday)) continue;
-      addSelected(starter);
+  const search = (index, selected, bcCount, fcCount, starterCount, positions) => {
+    if (selected.length > 5 || bcCount > 3 || fcCount > 3) return null;
+    if (index >= available.length) {
+      return {
+        selected: [...selected],
+        bcCount,
+        fcCount,
+        starterCount,
+        positions: [...positions],
+      };
     }
 
-    for (const reserve of bench) {
-      if (selected.length >= 5) break;
-      if (!isPlayerAvailable(reserve, teamsPlayingToday)) continue;
-      if (reserve.position_type === 1 && bcCount >= 3) continue;
-      if (reserve.position_type === 2 && fcCount >= 3) continue;
-      addSelected(reserve);
-    }
-  }
+    const current = available[index];
+    let best = search(index + 1, selected, bcCount, fcCount, starterCount, positions);
 
-  for (const pick of selected) pick.is_effective = true;
-  const score = selected.reduce((sum, pick) => sum + Number(pick.final_points || 0), 0);
-  const formation = `${bcCount}BC+${fcCount}FC`;
-  return [Math.floor(score), selected, formation];
+    const nextBcCount = bcCount + (Number(current?.position_type || 0) === 1 ? 1 : 0);
+    const nextFcCount = fcCount + (Number(current?.position_type || 0) === 2 ? 1 : 0);
+    if (nextBcCount <= 3 && nextFcCount <= 3) {
+      selected.push(current);
+      positions.push(Number(current?.lineup_position || 0));
+      const withCurrent = search(
+        index + 1,
+        selected,
+        nextBcCount,
+        nextFcCount,
+        starterCount + (Number(current?.lineup_position || 0) <= 5 ? 1 : 0),
+        positions
+      );
+      positions.pop();
+      selected.pop();
+      best = compareCandidates(withCurrent, best);
+    }
+
+    return best;
+  };
+
+  const best = search(0, [], 0, 0, 0, []) || {
+    selected: [],
+    bcCount: 0,
+    fcCount: 0,
+  };
+  for (const pick of best.selected) pick.is_effective = true;
+  const score = best.selected.reduce((sum, pick) => sum + Number(pick.final_points || 0), 0);
+  const formation = `${Number(best.bcCount || 0)}BC+${Number(best.fcCount || 0)}FC`;
+  return [Math.floor(score), best.selected, formation];
 }
 
 function buildElementsMap(bootstrap) {
@@ -1189,15 +1219,9 @@ function buildLivePicksFromPicksData(picksData, elements, liveElements, teamsMet
       team_name: teamMeta?.name || "",
       team_short: teamMeta?.short_name || "",
       team_logo_url: teamMeta?.logo_url || "/nba-team-logos/_.png",
-      is_effective: multiplier > 0,
+      is_effective: false,
     };
   });
-}
-
-function getOfficialEventScoreFromPicksData(picksData) {
-  const rawPoints = Number(picksData?.entry_history?.points);
-  if (!Number.isFinite(rawPoints) || rawPoints < 0) return null;
-  return Math.round(rawPoints / 10);
 }
 
 function getFormationFromEffectivePlayers(picks) {
@@ -1334,12 +1358,7 @@ async function buildFreshHomepageState(baseState) {
     }
 
     const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
-    const officialToday = getOfficialEventScoreFromPicksData(picksRes.data);
-    const freshToday = Number(
-      officialToday !== null
-        ? officialToday
-        : (calculateEffectiveScore(picks, teamsPlayingToday)[0] || 0)
-    );
+    const [freshToday] = calculateEffectiveScore(picks, teamsPlayingToday);
     const summary = previous?.week_total_summary || null;
     const sameEvent = Number(previous?.current_event || 0) === Number(currentEvent);
     const fallbackWeek = sameEvent
@@ -1862,12 +1881,8 @@ async function refreshManagerMetaState(env, existingState = null) {
           };
         }
       }
-      const officialToday = getOfficialEventScoreFromPicksData(picksData);
-      totalLive = Number(
-        officialToday !== null
-          ? officialToday
-          : (calculateEffectiveScore(players, teamsPlayingToday)[0] || 0)
-      );
+      const [effectiveScore] = calculateEffectiveScore(players, teamsPlayingToday);
+      totalLive = Number(effectiveScore || 0);
       eventTotal = computeWeekTotalFromSummary(weekTotalSummary, totalLive)
         ?? (eventChanged ? Math.max(0, totalLive) : Number(previous?.event_total || totalLive || 0));
       lineupEconomy = buildLineupEconomySummary(players);
@@ -3682,12 +3697,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       }
     }
 
-    const officialToday = getOfficialEventScoreFromPicksData(picksRes.data);
-    const effectiveScore = Number(
-      officialToday !== null
-        ? officialToday
-        : (calculateEffectiveScore(picks, teamsPlayingToday)[0] || 0)
-    );
+    const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
     const lineupEconomy = buildLineupEconomySummary(picks);
     debugUid("merge_data", uid, {
       players: summarizePlayersForDebug(picks),

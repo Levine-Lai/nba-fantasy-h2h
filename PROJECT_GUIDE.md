@@ -34,6 +34,9 @@ functions/
 - 用于比赛进行时
 - 接口：`/api/state?fresh_h2h=1`
 - 只更新比分、fixtures、fixture_details
+- 当前 event 分数按本站自己的有效五人逻辑结算：
+  - 合法阵型只能是 `3BC+2FC` 或 `2BC+3FC`
+  - 先看首发，再按替补顺序补位
 - 不更新 Good Captain / Chips Used / Weekly Transfers / Ownership
 
 ### DDL 静态层
