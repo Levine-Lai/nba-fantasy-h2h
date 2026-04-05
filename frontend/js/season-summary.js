@@ -666,7 +666,7 @@
 
         let paragraphFour = "漫长的赛季，人来人往，你的阵容名单也像车站一样不停有人上车下车。";
         if (longestHold?.player_name) {
-            paragraphFour = `漫长的赛季，人来人往，不知道你有没有猜到，留在你阵容中最久的人是${mark(longestHold.player_name)}呢，相信陪伴走过了${mark(formatSummaryNumber(longestHold.days_held))}天，他已经成为你心中的第一爱酱了。`;
+            paragraphFour = `漫长的赛季，人来人往，不知道你有没有猜到，留在你阵容中最久的人是${mark(longestHold.player_name)}呢，相信陪伴你走过了${mark(formatSummaryNumber(longestHold.days_held))}天，他已经成为你心中的第一爱酱了。`;
         }
 
         return `
@@ -695,6 +695,77 @@
             <section class="season-summary-page season-summary-page-transfer">
                 <div class="season-summary-main season-summary-transfer-main season-summary-transfer-main-full">
                     ${renderTransferStory(profile)}
+                </div>
+            </section>
+        `;
+    }
+
+    function renderCaptainStory(profile) {
+        const captain = profile?.captain || {};
+        const cards = Array.isArray(captain.cards) ? captain.cards : [];
+        const rows = Array.isArray(captain.rows) ? captain.rows : [];
+        const countCard = cards[0] || ["Captain 次数", "-", ""];
+        const totalCard = cards[1] || ["队长总得分", "-", ""];
+        const favoriteCard = cards[2] || ["最爱 Captain", "暂无", ""];
+        const bestRow = rows[0]?.[1] || "暂无 Captain 记录";
+        const worstRow = rows[1]?.[1] || "暂无 Captain 记录";
+        const favoriteValue = String(favoriteCard[1] || "暂无");
+        const favoriteNote = String(favoriteCard[2] || "");
+        const countValue = String(countCard[1] || "-");
+        const totalValue = String(totalCard[1] || "-");
+        const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+
+        const cardsView = [
+            {
+                label: String(countCard[0] || "Captain 次数"),
+                value: countValue,
+                note: String(countCard[2] || ""),
+            },
+            {
+                label: String(totalCard[0] || "队长总得分"),
+                value: totalValue,
+                note: String(totalCard[2] || ""),
+            },
+            {
+                label: "最爱 Captain",
+                value: favoriteValue,
+                note: favoriteNote || "这一季还没有稳定偏爱",
+            },
+        ];
+
+        const paragraphOne = `这一季你一共开过${mark(countValue)}次 Captain，累计拿到了${mark(totalValue)}分。每一次把赌注压在一个人身上，多少都带着一点“今天就看你了”的意味。`;
+        const paragraphTwo = favoriteValue && favoriteValue !== "暂无"
+            ? `${mark(favoriteValue)}是你最常按下去的那位天选之人，${favoriteNote || "看得出来你对他一直很有信心。"}`
+            : "这一季你在 Captain 的选择上并没有长期押注某一个人，更像是在不同的比赛日里顺着感觉做判断。";
+        const paragraphThree = bestRow.includes("暂无")
+            ? "这一页暂时还没有足够的 Captain 记录，等真实数据补齐之后，会更像一份属于你的队长回忆录。"
+            : `最甜的一次 Captain 来自${mark(bestRow)}；而最让人挠头的那次，则是${mark(worstRow)}。高峰和低谷都被记了下来，这才像一个完整的赛季。`;
+
+        return `
+            <div class="season-summary-transfer-copy season-summary-captain-copy">
+                <div class="season-summary-transfer-glance season-summary-captain-glance">
+                    ${cardsView.map((card) => `
+                        <div class="season-summary-transfer-glance-card season-summary-captain-glance-card">
+                            <div class="season-summary-transfer-glance-label">${escapeHtml(card.label)}</div>
+                            <div class="season-summary-transfer-glance-value">${escapeHtml(card.value)}</div>
+                            <div class="season-summary-transfer-glance-note">${escapeHtml(card.note)}</div>
+                        </div>
+                    `).join("")}
+                </div>
+                <div class="season-summary-transfer-story-list season-summary-captain-story-list">
+                    <p class="season-summary-transfer-story-paragraph">${paragraphOne}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphTwo}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphThree}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderCaptainPage(profile) {
+        return `
+            <section class="season-summary-page season-summary-page-captain">
+                <div class="season-summary-main season-summary-transfer-main season-summary-transfer-main-full">
+                    ${renderCaptainStory(profile)}
                 </div>
             </section>
         `;
@@ -737,6 +808,45 @@
             <section class="season-summary-page">
                 <div class="season-summary-main">
                     <div class="season-summary-page-title">高光时刻</div>
+                    ${renderStatsGrid(profile?.highlights?.cards || [])}
+                    <div class="season-summary-quote">${escapeHtml(profile?.highlights?.quote || "")}</div>
+                </div>
+                <aside class="season-summary-side">
+                    <div class="season-summary-rail">
+                        <div class="season-summary-mini-title">${escapeHtml(profile?.highlights?.sideTitle || "Highlights")}</div>
+                        ${renderBullets(profile?.highlights?.sideBullets || [])}
+                        ${renderKpis(profile?.highlights?.sideKpis || [])}
+                    </div>
+                </aside>
+            </section>
+        `;
+    }
+
+    function renderPages(profile) {
+        return `
+            ${renderCoverPage(profile)}
+
+            ${renderTransferPage(profile)}
+
+            ${renderCaptainPage(profile)}
+
+            <section class="season-summary-page">
+                <div class="season-summary-main">
+                    <div class="season-summary-page-title">鎸佹湁鐞冨憳鎯呭喌</div>
+                    ${renderRows(profile?.roster?.rows || [])}
+                    ${renderBadges(profile?.roster?.badges || [])}
+                </div>
+                <aside class="season-summary-side">
+                    <div class="season-summary-rail">
+                        <div class="season-summary-mini-title">${escapeHtml(profile?.roster?.sideTitle || "Roster")}</div>
+                        ${renderBullets(profile?.roster?.sideBullets || [])}
+                    </div>
+                </aside>
+            </section>
+
+            <section class="season-summary-page">
+                <div class="season-summary-main">
+                    <div class="season-summary-page-title">楂樺厜鏃跺埢</div>
                     ${renderStatsGrid(profile?.highlights?.cards || [])}
                     <div class="season-summary-quote">${escapeHtml(profile?.highlights?.quote || "")}</div>
                 </div>

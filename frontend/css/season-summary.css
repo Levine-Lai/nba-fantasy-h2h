@@ -1458,3 +1458,48 @@
         font-size: 1.06em;
     }
 }
+
+.season-summary-nav {
+    inset: auto 0 14px 0;
+    align-items: flex-end;
+    padding: 0 14px;
+    transform: none;
+}
+
+.season-summary-page-captain {
+    grid-template-columns: 1fr;
+    gap: 0;
+}
+
+.season-summary-captain-copy {
+    width: min(100%, 940px);
+    margin: 0 auto;
+}
+
+.season-summary-captain-glance {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.season-summary-captain-glance-card {
+    min-height: 114px;
+}
+
+.season-summary-captain-story-list {
+    padding-top: 6px;
+}
+
+@media (max-width: 768px) {
+    .season-summary-nav {
+        inset: auto 0 10px 0;
+        padding: 0 10px;
+    }
+
+    .season-summary-captain-glance {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .season-summary-captain-glance-card {
+        min-height: 76px;
+    }
+}
