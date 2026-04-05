@@ -497,26 +497,18 @@ function topListFromMap(counter, limit = 10) {
 
 async function buildRecentFantasyMetricsMap(elementIds, elements) {
   const metricsById = {};
-  await mapLimit([...new Set((elementIds || []).map((id) => Number(id || 0)).filter((id) => id > 0))], 4, async (elementId) => {
+  for (const elementId of [...new Set((elementIds || []).map((id) => Number(id || 0)).filter((id) => id > 0))]) {
     const elem = elements?.[elementId] || {};
     const price = Number(elem.now_cost || 0) / 10;
-    let average = 0;
     const bootstrapForm = Number(elem.form || 0) / 10;
-    const summaryRes = await fetchJsonSafe(`/element-summary/${elementId}/`, 1);
-    if (summaryRes.ok && Array.isArray(summaryRes.data?.history) && summaryRes.data.history.length > 0) {
-      const recent = summaryRes.data.history.slice(-5);
-      const total = recent.reduce((sum, row) => sum + Number(row?.total_points || 0) / 10, 0);
-      average = recent.length ? total / recent.length : 0;
-    }
-    if (!(average > 0) && bootstrapForm > 0) {
-      average = bootstrapForm;
-    }
+    const pointsPerGame = Number(elem.points_per_game || 0) / 10;
+    const average = bootstrapForm > 0 ? bootstrapForm : pointsPerGame;
     metricsById[elementId] = {
       cost: Number(price.toFixed(1)),
       form: Number(average.toFixed(1)),
       value: Number((price > 0 ? average / price : 0).toFixed(1)),
     };
-  });
+  }
   return metricsById;
 }
 
