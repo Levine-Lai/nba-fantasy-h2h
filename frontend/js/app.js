@@ -17,30 +17,16 @@ const API = {
         }
     },
 
-    async getStateCached() {
-        return (await this.fetch("/api/state")).json();
-    },
-
     async getState() {
-        try {
-            return (await this.fetch("/api/state?fresh_h2h=1")).json();
-        } catch (error) {
-            console.warn("[API Fallback] /api/state?fresh_h2h=1 failed, retrying cached /api/state", error);
-            return (await this.fetch("/api/state")).json();
-        }
+        return (await this.fetch("/api/state?fresh_h2h=1")).json();
     },
 
     async getGameDetail(fixtureId) {
         return (await this.fetch(`/api/fixture/${fixtureId}`)).json();
     },
 
-    async getLineup(uid, options = {}) {
-        const useFresh = options?.fresh === true;
-        const params = new URLSearchParams();
-        if (useFresh) params.set("fresh", "1");
-        if (options?.panelOnly) params.set("panel", "1");
-        const query = params.toString();
-        return (await this.fetch(`/api/picks/${uid}${query ? `?${query}` : ""}`)).json();
+    async getLineup(uid) {
+        return (await this.fetch(`/api/picks/${uid}`)).json();
     },
 
     async getInjuries() {
@@ -293,53 +279,25 @@ function getBeijingHour(date = new Date()) {
     }).format(date));
 }
 
-function getFixtureRefreshWindowInfo(games, now = Date.now()) {
-    const kickoffTimes = (Array.isArray(games) ? games : [])
-        .map((game) => (game?.kickoff_time ? Date.parse(game.kickoff_time) : NaN))
-        .filter((value) => Number.isFinite(value))
-        .sort((a, b) => a - b);
-
-    if (!kickoffTimes.length) {
-        return {
-            hasGames: false,
-            active: false,
-            beforeStart: false,
-            afterEnd: false,
-            hasUnfinished: false,
-            startMs: null,
-            endMs: null,
-        };
-    }
-
-    const startMs = kickoffTimes[0];
-    const latestKickoffMs = kickoffTimes[kickoffTimes.length - 1];
-    const endMs = latestKickoffMs + (5 * 60 * 60 * 1000) + (15 * 60 * 1000);
-    const nowMs = Number(now || Date.now());
-    const hasUnfinished = games.some((game) => !game?.finished);
-    return {
-        hasGames: true,
-        active: nowMs >= startMs && nowMs <= endMs,
-        beforeStart: nowMs < startMs,
-        afterEnd: nowMs > endMs,
-        hasUnfinished,
-        startMs,
-        endMs,
-    };
-}
-
 function getNextRefreshDelay(fixtures) {
     const games = Array.isArray(fixtures?.games) ? fixtures.games : [];
     if (!games.length) return null;
 
-    const windowInfo = getFixtureRefreshWindowInfo(games, Date.now());
-    if (!windowInfo.hasGames) return null;
-    if (windowInfo.beforeStart && windowInfo.startMs) {
-        return Math.max(30000, windowInfo.startMs - Date.now());
+    const bjHour = getBeijingHour(new Date());
+    const inRefreshWindow = bjHour >= 7 && bjHour < 14;
+    const hasUnfinishedGames = games.some((game) => !game?.finished);
+    if (!inRefreshWindow || !hasUnfinishedGames) return null;
+
+    const kickoffTimes = games
+        .map((game) => (game?.kickoff_time ? Date.parse(game.kickoff_time) : NaN))
+        .filter((value) => Number.isFinite(value));
+    const earliestKickoff = kickoffTimes.length ? Math.min(...kickoffTimes) : null;
+    const now = Date.now();
+
+    if (earliestKickoff && now < earliestKickoff) {
+        return Math.max(30000, earliestKickoff - now);
     }
-    if (!windowInfo.active) return null;
-    if (!windowInfo.hasUnfinished && windowInfo.endMs) {
-        return Math.max(30000, Math.min(120000, windowInfo.endMs - Date.now()));
-    }
+
     return 120000;
 }
 
@@ -1718,31 +1676,11 @@ const App = {
     transferDirection: "in",
     latestTransferTrends: null,
     latestPicksByUid: {},
-    latestFixtureDetails: {},
-    latestCurrentEvent: null,
 
-    applyState(state) {
-        this.latestTransferTrends = state?.transfer_trends || {};
-        this.latestPicksByUid = state?.picks_by_uid || {};
-        this.latestFixtureDetails = state?.fixture_details || {};
-        this.latestCurrentEvent = Number(state?.current_event || 0) || null;
-        Render.eventInfo(state?.current_event_name || "Loading...");
-        Render.gameCount(state?.fixtures?.count || 0);
-        Render.gamesList(state?.fixtures?.games || []);
-        Render.matchCount(Array.isArray(state?.h2h) ? state.h2h.length : 0);
-        Render.h2hList(state?.h2h || []);
-        Render.transferTrends(this.latestTransferTrends, this.latestPicksByUid);
-        Render.chipsUsed(state?.chips_used_summary || []);
-        Render.goodCaptain(state?.good_captain_summary || []);
-        Render.specialGuy(state?.picks_by_uid || {});
-        Render.rankings(state || {});
-        Render.updateTime();
-    },
-
-    async getLineupCached(uid, options = {}) {
-        const key = `${String(uid)}:${options?.fresh === true ? "fresh" : "cached"}:${options?.panelOnly === true ? "panel" : "full"}`;
+    async getLineupCached(uid) {
+        const key = String(uid);
         if (!this.lineupCache.has(key)) {
-            this.lineupCache.set(key, API.getLineup(uid, options).catch((error) => {
+            this.lineupCache.set(key, API.getLineup(uid).catch((error) => {
                 this.lineupCache.delete(key);
                 throw error;
             }));
@@ -1770,19 +1708,21 @@ const App = {
     async loadAll() {
         try {
             this.lineupCache.clear();
-            let state = null;
-            try {
-                state = await API.getStateCached();
-                this.applyState(state);
-            } catch (cachedError) {
-                console.warn("Initial cached state load failed:", cachedError);
-            }
-            const freshState = await API.getState();
-            state = freshState || state;
-            if (state) {
-                this.applyState(state);
-                this.scheduleAutoRefresh(state);
-            }
+            const state = await API.getState();
+            this.latestTransferTrends = state?.transfer_trends || {};
+            this.latestPicksByUid = state?.picks_by_uid || {};
+            Render.eventInfo(state?.current_event_name || "Loading...");
+            Render.gameCount(state?.fixtures?.count || 0);
+            Render.gamesList(state?.fixtures?.games || []);
+            Render.matchCount(Array.isArray(state?.h2h) ? state.h2h.length : 0);
+            Render.h2hList(state?.h2h || []);
+            Render.transferTrends(this.latestTransferTrends, this.latestPicksByUid);
+            Render.chipsUsed(state?.chips_used_summary || []);
+            Render.goodCaptain(state?.good_captain_summary || []);
+            Render.specialGuy(state?.picks_by_uid || {});
+            Render.rankings(state || {});
+            Render.updateTime();
+            this.scheduleAutoRefresh(state);
         } catch (error) {
             console.error("LoadAll error:", error);
             this.clearRefreshTimer();
@@ -1799,31 +1739,12 @@ const App = {
         if (isOpen) return;
 
         try {
-            const normalizedUid = String(uid);
-            const cached = this.latestPicksByUid?.[normalizedUid] || this.latestPicksByUid?.[Number(uid)] || null;
-            const cachedCurrentEvent = Number(cached?.current_event || 0);
-            const currentEvent = Number(this.latestCurrentEvent || 0);
-            const cachedTransfersReady =
-                Array.isArray(cached?.transfer_records) &&
-                (!!cached.transfer_records.length || (cached?.fetch_status?.transfers_ok === true && cachedCurrentEvent === currentEvent));
-            const cachedCaptainReady =
-                !cached?.chip_status?.captain_used ||
-                (!!cached?.captain_used?.used && !!cached?.captain_used?.captain_name);
-            const canUseCached = !!cached && cachedCurrentEvent === currentEvent && cachedTransfersReady && cachedCaptainReady;
-
-            const data = canUseCached
-                ? cached
-                : await this.getLineupCached(uid, { fresh: true, panelOnly: true });
+            const data = await this.getLineupCached(uid);
             panel.innerHTML = renderTransferRecords(teamName, data.transfer_records || [], side, data.captain_used || null);
             panel.classList.add("active");
         } catch (error) {
             console.error("Transfer panel error:", error);
-            const fallback = this.latestPicksByUid?.[String(uid)] || this.latestPicksByUid?.[Number(uid)] || null;
-            if (fallback) {
-                panel.innerHTML = renderTransferRecords(teamName, fallback.transfer_records || [], side, fallback.captain_used || null);
-            } else {
-                panel.innerHTML = `<div class="transfer-panel-title">${escapeHtml(teamName)} This Week</div><div class="trend-empty">Load failed</div>`;
-            }
+            panel.innerHTML = `<div class="transfer-panel-title">${escapeHtml(teamName)} This Week</div><div class="trend-empty">Load failed</div>`;
             panel.classList.add("active");
         }
     },
@@ -1831,11 +1752,6 @@ const App = {
     async showGameDetail(fixtureId) {
         Render.modalLoading("game-modal", "game-body", "game-title");
         try {
-            const localPayload = this.latestFixtureDetails?.[String(fixtureId)] || this.latestFixtureDetails?.[Number(fixtureId)];
-            if (localPayload && Array.isArray(localPayload.home_players) && Array.isArray(localPayload.away_players)) {
-                Render.gameDetail(localPayload);
-                return;
-            }
             Render.gameDetail(await API.getGameDetail(fixtureId));
         } catch (error) {
             console.error(error);
