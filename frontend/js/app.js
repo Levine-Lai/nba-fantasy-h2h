@@ -1686,10 +1686,12 @@ const App = {
     transferDirection: "in",
     latestTransferTrends: null,
     latestPicksByUid: {},
+    latestFixtureDetails: {},
 
     applyState(state) {
         this.latestTransferTrends = state?.transfer_trends || {};
         this.latestPicksByUid = state?.picks_by_uid || {};
+        this.latestFixtureDetails = state?.fixture_details || {};
         Render.eventInfo(state?.current_event_name || "Loading...");
         Render.gameCount(state?.fixtures?.count || 0);
         Render.gamesList(state?.fixtures?.games || []);
@@ -1763,12 +1765,7 @@ const App = {
         if (isOpen) return;
 
         try {
-            const baseline = this.latestPicksByUid?.[String(uid)] || {};
-            const needsFresh =
-                !Array.isArray(baseline?.transfer_records) ||
-                baseline.transfer_records.length === 0 ||
-                (!!baseline?.chip_status?.captain_used && !baseline?.captain_used?.captain_name);
-            const data = await this.getLineupCached(uid, { fresh: needsFresh });
+            const data = await this.getLineupCached(uid, { fresh: true });
             panel.innerHTML = renderTransferRecords(teamName, data.transfer_records || [], side, data.captain_used || null);
             panel.classList.add("active");
         } catch (error) {
@@ -1781,6 +1778,11 @@ const App = {
     async showGameDetail(fixtureId) {
         Render.modalLoading("game-modal", "game-body", "game-title");
         try {
+            const localPayload = this.latestFixtureDetails?.[String(fixtureId)] || this.latestFixtureDetails?.[Number(fixtureId)];
+            if (localPayload && Object.keys(localPayload).length) {
+                Render.gameDetail(localPayload);
+                return;
+            }
             Render.gameDetail(await API.getGameDetail(fixtureId));
         } catch (error) {
             console.error(error);
