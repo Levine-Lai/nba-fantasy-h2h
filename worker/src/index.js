@@ -1348,7 +1348,10 @@ async function buildFreshHomepageState(baseState) {
 
   await mapLimit(targetUids, 4, async (uid) => {
     const previous = nextPicksByUid[uid] || {};
-    const picksRes = await fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 2);
+    const [picksRes, historyRes] = await Promise.all([
+      fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 2),
+      fetchJsonSafe(`/entry/${uid}/history/`, 2),
+    ]);
     if (!picksRes.ok || !Array.isArray(picksRes.data?.picks)) {
       freshScoresByUid[uid] = {
         total_live: Number(previous?.total_live || 0),
@@ -1359,7 +1362,13 @@ async function buildFreshHomepageState(baseState) {
 
     const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
     const [freshToday] = calculateEffectiveScore(picks, teamsPlayingToday);
-    const summary = previous?.week_total_summary || null;
+    let summary = previous?.week_total_summary || null;
+    if (historyRes.ok && historyRes.data && typeof historyRes.data === "object") {
+      const historyWeek = calculateWeekScoresFromHistory(historyRes.data, currentWeek, currentEvent, eventMetaById);
+      if (historyWeek?.has_week_rows) {
+        summary = buildWeekTotalSummary(historyWeek, currentEvent, Number(previous?.gd1_missing_penalty || 0));
+      }
+    }
     const sameEvent = Number(previous?.current_event || 0) === Number(currentEvent);
     const fallbackWeek = sameEvent
       ? Math.max(
@@ -1379,9 +1388,11 @@ async function buildFreshHomepageState(baseState) {
       current_event: currentEvent,
       current_event_name: currentEventName,
       players: picks,
+      week_total_summary: summary,
       fetch_status: {
         ...(previous?.fetch_status || {}),
         picks_ok: true,
+        history_ok: historyRes.ok || previous?.fetch_status?.history_ok === true,
       },
     };
   });
@@ -1759,7 +1770,8 @@ async function refreshManagerMetaState(env, existingState = null) {
     const shouldFetchTransfers =
       eventChanged ||
       previous?.fetch_status?.transfers_ok !== true ||
-      !Array.isArray(previous?.transfer_records);
+      !Array.isArray(previous?.transfer_records) ||
+      !Array.isArray(previous?.raw_transfers);
 
     let picksRes = shouldFetchPicks
       ? await fetchJsonSafe(`/entry/${uidNumber}/event/${currentEvent}/picks/`, 2)
@@ -5218,6 +5230,19 @@ export default {
         } else {
           state = await refreshState(env, { full: false });
         }
+        if (!rawMode || mode === "meta") {
+          const refreshContext = await getCurrentRefreshWindowContext();
+          if (refreshContext.active || refreshContext.window?.after_end) {
+            state = normalizeStateChipStatus(await buildFreshHomepageState(state));
+            state.generated_at = new Date().toISOString();
+            state.refresh_meta = {
+              ...(state?.refresh_meta || {}),
+              live_finalized_event: refreshContext.window?.after_end ? Number(refreshContext.current_event || 0) || null : (state?.refresh_meta?.live_finalized_event || null),
+              live_finalized_at: refreshContext.window?.after_end ? new Date().toISOString() : (state?.refresh_meta?.live_finalized_at || null),
+            };
+            await env.NBA_CACHE.put(CACHE_KEY, JSON.stringify(state));
+          }
+        }
         return jsonResponse({
           success: true,
           mode: !rawMode ? "default" : (mode === "full" ? "full" : (mode === "meta" ? "meta" : "chunk")),
@@ -5392,12 +5417,10 @@ export default {
       }
       const currentEventChanged = Number(state?.current_event || 0) !== Number(refreshContext.current_event || 0);
       if (currentEventChanged) {
-        await refreshManagerMetaState(env, state);
-        return;
+        state = await refreshManagerMetaState(env, state);
       }
-      if (shouldRefreshManagerMeta(state, scheduledAt)) {
-        await refreshManagerMetaState(env, state);
-        return;
+      if (!currentEventChanged && shouldRefreshManagerMeta(state, scheduledAt)) {
+        state = await refreshManagerMetaState(env, state);
       }
       if (refreshContext.active) return;
       const finalizedEvent = Number(state?.refresh_meta?.live_finalized_event || 0);

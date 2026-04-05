@@ -1785,7 +1785,10 @@ const App = {
             try {
                 state = await API.getStateCached();
                 this.applyState(state);
-                shouldFetchFresh = getFixtureRefreshWindowInfo(state?.fixtures?.games || [], Date.now()).active;
+                const refreshWindow = getFixtureRefreshWindowInfo(state?.fixtures?.games || [], Date.now());
+                const finalizedEvent = Number(state?.refresh_meta?.live_finalized_event || 0);
+                const currentEvent = Number(state?.current_event || 0);
+                shouldFetchFresh = refreshWindow.active || (refreshWindow.after_end && currentEvent > 0 && finalizedEvent !== currentEvent);
             } catch (cachedError) {
                 console.warn("Initial cached state load failed:", cachedError);
             }
@@ -1862,6 +1865,19 @@ const App = {
                 (localPayload.home_players.length > 0 || localPayload.away_players.length > 0)
             ) {
                 Render.gameDetail(localPayload);
+                try {
+                    const freshPayload = await API.getGameDetail(fixtureId);
+                    if (
+                        freshPayload &&
+                        Array.isArray(freshPayload.home_players) &&
+                        Array.isArray(freshPayload.away_players) &&
+                        (freshPayload.home_players.length > 0 || freshPayload.away_players.length > 0)
+                    ) {
+                        Render.gameDetail(freshPayload);
+                    }
+                } catch (error) {
+                    console.warn("Game detail fresh update failed:", error);
+                }
                 return;
             }
             Render.gameDetail(await API.getGameDetail(fixtureId));

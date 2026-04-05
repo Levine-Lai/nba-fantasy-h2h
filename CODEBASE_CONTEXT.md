@@ -29,6 +29,7 @@
   - fixtures
   - fixture_details
   - 当前 event 阵容实时分
+- 也会重新读取当前周 `history`，回算 `week_total_summary / week total`
 - 当前 event 阵容实时分只认本站自己的有效五人结算：
   - 合法阵型必须是 `3BC+2FC` 或 `2BC+3FC`
   - 先按首发顺序，再按替补顺序补位

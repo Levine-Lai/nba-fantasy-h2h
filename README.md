@@ -78,6 +78,7 @@ Good Captain 不是“今天谁的球员分最高”，而是：
   - 当天 fixtures
   - 比赛详情 `fixture_details`
   - 当前 event 的阵容实时分
+- 同时会重新读取当前周 `history`，用来重算本周总分，避免首页只更新今日分但周总分仍停留在旧缓存
 - 不再重算：
   - `chips_used_summary`
   - `good_captain_summary`

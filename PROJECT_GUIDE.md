@@ -34,6 +34,7 @@ functions/
 - 用于比赛进行时
 - 接口：`/api/state?fresh_h2h=1`
 - 只更新比分、fixtures、fixture_details
+- 同时会重算当前周总分，避免首页只刷新今日分
 - 当前 event 分数按本站自己的有效五人逻辑结算：
   - 合法阵型只能是 `3BC+2FC` 或 `2BC+3FC`
   - 先看首发，再按替补顺序补位

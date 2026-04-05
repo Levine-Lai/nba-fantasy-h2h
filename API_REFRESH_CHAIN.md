@@ -68,6 +68,7 @@
 - 当前 event 的 `fixtures`
 - 当前 event 的 `fixture_details`
 - 当前 event 阵容实时分
+- 当前周 `history` 对应的 `week_total_summary / week total`
 
 ### 当前 event 阵容实时分怎么结算
 
