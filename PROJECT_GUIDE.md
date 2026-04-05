@@ -1,153 +1,202 @@
-# NBA Fantasy H2H Dashboard - Project Guide
+# 项目维护指引
 
-## 1. 项目目标
+这份文档面向维护者，重点是“平时怎么跑、什么时候刷新、出了问题先查哪条链路”。
 
-本项目用于展示 NBA Fantasy 私人联赛的实时对阵信息，核心目标是：
-
-- 显示每周 H2H 对阵（总分、今日分）
-- 显示球员阵容详情与转会扣分信息
-- 显示 FDR（未来赛程难度）
-- 支持自动刷新与公网部署（Cloudflare Pages + Worker）
-
----
-
-## 2. 目录结构
+## 1. 当前项目结构
 
 ```text
 frontend/
   index.html
   css/style.css
   js/app.js
+  season-summary/
 
 worker/
   src/index.js
   wrangler.toml
   package.json
 
-backend/                # 本地 FastAPI 历史版本（可选保留）
-cache/                  # 本地产物目录（已忽略，可不保留）
+functions/
+  api/[[path]].js
+  season-summary/[[path]].js
 ```
 
-说明：
+当前真正生产使用的后端只有：
 
-- 线上默认使用 `worker/src/index.js` 作为 API 聚合层。
-- 前端通过 `window.__API_BASE__` 指向 Worker 地址。
-
----
-
-## 3. 当前计分规则（已实现）
-
-### 3.1 今日分（Today）
-
-- 今日分基于当前 Event 的实时球员数据计算。
-- 不再把“整周转会扣分”从今日分里再减一次，避免出现异常负分/0分。
-
-### 3.2 周总分（Event Total）
-
-- 周总分：
-  - 找到当前 Gameweek 的 Day1~Day7 对应 events
-  - 累加 `points / 10` 得到周总分基线
-- 转会扣分规则：
-  - 每周免费换人 2 次
-  - 超过 2 次后，每多 1 次扣 100
-  - wildcard 激活时该周不扣分
-- 漏扣修正：
-  - 计算“应扣分”与“history 已扣分(event_transfers_cost/10)”的差额
-  - 仅补扣差额，避免重复扣分
+- `worker/src/index.js`
 
 ---
 
-## 4. 主要接口
+## 2. 平时要记住的刷新分层
 
-Worker 暴露：
+### 实时比分层
 
-- `GET /api/h2h`：主界面对阵卡
-- `GET /api/picks/{uid}`：用户阵容与扣分详情
-- `GET /api/fixtures`：今日赛程（北京时间）
-- `GET /api/fixture/{id}`：单场球员详情
-- `GET /api/fdr`：FDR HTML
-- `POST /api/refresh?token=...`：手动刷新
-- `GET /api/health`：健康检查
+- 用于比赛进行时
+- 接口：`/api/state?fresh_h2h=1`
+- 只更新比分、fixtures、fixture_details
+- 不更新 Good Captain / Chips Used / Weekly Transfers / Ownership
 
----
+### DDL 静态层
 
-## 5. 前端显示规则
+- 用于每天过 DDL 后
+- 接口：`POST /api/refresh?token=...`
+- 统一更新：
+  - picks
+  - transfers
+  - history
+  - chip_status
+  - captain_used
+  - weekly transfers
+  - ownership
+  - good captain
 
-- 主界面对阵卡只显示：
-  - 总分
-  - 今日分
-- 扣分明细仅在“点开详情”后展示。
-- 阵型字符串（如 `2BC+3FC`）不在主界面显示。
+### 赛后落缓存层
 
----
-
-## 6. FDR 说明
-
-- FDR 通过固定赛程表（GW22~GW25）生成。
-- 使用 `fdr-1 ~ fdr-5` 颜色类，颜色样式由 `frontend/css/style.css` 控制。
-- 若前端无颜色，优先检查：
-  - `/api/fdr` 是否返回带 `fdr-x` 类名的 HTML
-  - 前端是否成功加载 `style.css`
+- 当天最后一场比赛结束后 15 分钟
+- 把最终比分写回 KV
+- 之后首页默认读缓存即可
 
 ---
 
-## 7. 部署（Cloudflare）
+## 3. 本地开发
 
-### 7.1 部署 Worker
+### 跑前端
+
+```powershell
+cd F:\NBA\frontend
+python -m http.server 8080
+```
+
+### 跑 Worker
+
+```powershell
+cd F:\NBA\worker
+npx wrangler dev --local-protocol http
+```
+
+### 本地访问
+
+```text
+http://127.0.0.1:8080/index.html
+```
+
+如果想强制指定本地 API：
+
+```text
+http://127.0.0.1:8080/index.html?api_base=http://127.0.0.1:8787
+```
+
+---
+
+## 4. 线上操作
+
+### 部署 Worker
 
 ```powershell
 cd F:\NBA\worker
 npx wrangler deploy
 ```
 
-### 7.2 手动刷新缓存
-
-PowerShell 命令：
+### 手动刷新静态数据
 
 ```powershell
-Invoke-WebRequest -Method POST "https://<your-worker-domain>/api/refresh?token=<REFRESH_TOKEN>"
+Invoke-WebRequest -Method POST "https://nba-fantasy-api.nbafantasy.workers.dev/api/refresh?token=040517"
 ```
 
-## 2026-03-25 架构说明补充
+默认就是 DDL 静态刷新。
 
-- 线上唯一后端为 `worker/src/index.js`。
-- `backend/` 为迁移前的本地 FastAPI 历史版本，不作为线上主逻辑维护。
-- 前端推荐通过同域 `/api/*` 调用 Worker API，不再依赖直接访问 `workers.dev` 域名。
-- 同域 `/api/*` 由 `functions/api/[[path]].js` 转发到 `worker/src/index.js`。
-- Pages 项目需要和 Worker 侧保持一致的绑定：
-  - `NBA_CACHE`
-  - `REFRESH_TOKEN`
-- `/api/fdr` 当前返回 JSON，核心字段包括：
-  - `weeks`
-  - `html`
-  - `weights`
-  - `ranking_source`
-  - `daily_averages`
+---
 
-## 2026-03-25 UI / 数据补充
+## 5. 什么时候应该手动刷新
 
-- 首页 H2H 对阵卡支持点击左右两侧展开本周转会记录，数据来自 `/api/picks/{uid}` 的 `transfer_records`。
-- 首页趋势区域新增 `Ownership Top 20`，由 Worker 基于 league 内全部经理当前阵容实时计算。
-- FDR 表按 `AVG` 从高到低排序。
-- 新增 `/api/h2h-standings`，用于排行榜页面展示“GW22 基线 + 当前周实时结果”的实时 H2H 排名。
-- 新增 `/api/classic-rankings`，用于展示联赛总分排名和联赛周排名。
-- 对阵详情球员卡新增 `ownership_percent` 展示。
-- favicon 当前使用 `frontend/LOGO.jpg`。
+### 过了当天 DDL 后
 
-## 2026-03-25 WC / 页面布局更新
+建议手动刷一次，确保这些模块立刻更新：
 
-- WC 逻辑更新为“仅 WC 当天转会标记为 `WC` 且不计入扣分，其余日期仍按整周累计前 2 次 `FT`、之后 `-100`”。
-- 首页仅保留 `Today's Fixtures` 与 `Live H2H` 两个主模块，`league averages` 移到 H2H 模块下。
-- `排行榜` 页面整合三块内容：实时 H2H 排行榜、Classic Rankings、FDR。
-- 前端查看单个经理阵容时会请求 `/api/picks/{uid}?fresh=1`，确保转会记录和阵容是该 UID 的最新版本，而不是仅依赖 chunk 缓存。
+- Weekly Transfers
+- Ownership
+- Special Guy
+- Chips Used
+- Good Captain
+- 单人小窗里的转会记录和 Captain Used
 
-## 2026-03-26 补充
+### 比赛全部结束后
 
-- `Classic Rankings` 已拆分为两个表：`Overall Ranking` 与 `Weekly Ranking`。
-- `Live H2H Standings` 的 `积分` 列在最右侧展示。
-- `rich`（All-Star）芯片已接入转会豁免逻辑：当日可自由换人、不扣分、也不消耗普通 FT 额度。
-- `/api/picks/{uid}` 新增阵容经济字段 `lineup_economy`，用于前端展示：
-  - `effective_total_cost`
-  - `breakeven_line`
-  - `effective_total_points`
-  - `status`
+如果想立即把最终比分落进缓存，也可以手动再刷一次。
+
+---
+
+## 6. 当前 cron 策略
+
+`worker/wrangler.toml` 现在改成：
+
+- 每 5 分钟触发一次 `scheduled`
+
+但真正是否刷新，由 Worker 代码内部动态判断：
+
+- 当前 event 是否变化
+- 是否已经到比赛实时窗口
+- 是否已经赛后需要落缓存
+
+这比固定北京时间窗口更稳。
+
+---
+
+## 7. 遇到问题先查哪里
+
+### 首页比分慢或错
+
+先查：
+
+- `/api/state`
+- `/api/state?fresh_h2h=1`
+- 当前 event fixtures/live
+
+### Good Captain 人数和 Chips Used 对不上
+
+先查：
+
+- `chips_used_summary`
+- `good_captain_summary`
+- `refresh_meta.meta_event`
+
+### 单人小窗没有数据
+
+先查：
+
+- `/api/picks/{uid}?fresh=1&panel=1`
+
+### 比赛详情一直 loading
+
+先查：
+
+- `/api/fixture/{id}`
+- `fixture_details`
+
+---
+
+## 8. 当前最重要的规则
+
+### 不要再做
+
+- 不要在首页实时补帧里重算 Good Captain
+- 不要在 `/api/picks/{uid}` 请求里顺手触发全员刷新
+- 不要再用固定北京时间窗口硬控刷新
+
+### 继续坚持
+
+- 实时层只做实时比分
+- DDL 层只做静态数据统一刷新
+- 赛后再把最终比分写回缓存
+
+---
+
+## 9. 文档优先级
+
+后续维护时优先看：
+
+1. `README.md`
+2. `API_REFRESH_CHAIN.md`
+3. `CODEBASE_CONTEXT.md`
+
+这三份如果和旧日志冲突，以新的三份为准。

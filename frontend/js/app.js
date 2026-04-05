@@ -21,13 +21,8 @@ const API = {
         return (await this.fetch("/api/state")).json();
     },
 
-    async getState() {
-        try {
-            return (await this.fetch("/api/state?fresh_h2h=1")).json();
-        } catch (error) {
-            console.warn("[API Fallback] /api/state?fresh_h2h=1 failed, retrying cached /api/state", error);
-            return (await this.fetch("/api/state")).json();
-        }
+    async getStateFresh() {
+        return (await this.fetch("/api/state?fresh_h2h=1")).json();
     },
 
     async getGameDetail(fixtureId) {
@@ -1708,6 +1703,7 @@ function setLineupMode(mode = "today") {
 const App = {
     lineupCache: new Map(),
     refreshTimer: null,
+    latestState: null,
     injuriesLoaded: false,
     playerReferenceLoaded: false,
     otherLoaded: false,
@@ -1722,6 +1718,7 @@ const App = {
     latestCurrentEvent: null,
 
     applyState(state) {
+        this.latestState = state || null;
         this.latestTransferTrends = state?.transfer_trends || {};
         this.latestPicksByUid = state?.picks_by_uid || {};
         this.latestFixtureDetails = state?.fixture_details || {};
@@ -1763,22 +1760,43 @@ const App = {
         if (!delay) return;
 
         this.refreshTimer = setTimeout(() => {
-            this.loadAll();
+            this.loadLiveUpdate();
         }, delay);
+    },
+
+    async loadLiveUpdate() {
+        try {
+            const state = await API.getStateFresh();
+            if (state) {
+                this.applyState(state);
+                this.scheduleAutoRefresh(state);
+            }
+        } catch (error) {
+            console.error("Live refresh error:", error);
+            this.scheduleAutoRefresh(this.latestState);
+        }
     },
 
     async loadAll() {
         try {
             this.lineupCache.clear();
             let state = null;
+            let shouldFetchFresh = true;
             try {
                 state = await API.getStateCached();
                 this.applyState(state);
+                shouldFetchFresh = getFixtureRefreshWindowInfo(state?.fixtures?.games || [], Date.now()).active;
             } catch (cachedError) {
                 console.warn("Initial cached state load failed:", cachedError);
             }
-            const freshState = await API.getState();
-            state = freshState || state;
+            if (shouldFetchFresh || !state) {
+                try {
+                    const freshState = await API.getStateFresh();
+                    state = freshState || state;
+                } catch (error) {
+                    console.warn("[API Fallback] /api/state?fresh_h2h=1 failed, keeping cached state", error);
+                }
+            }
             if (state) {
                 this.applyState(state);
                 this.scheduleAutoRefresh(state);
@@ -1811,11 +1829,16 @@ const App = {
                 (!!cached?.captain_used?.used && !!cached?.captain_used?.captain_name);
             const canUseCached = !!cached && cachedCurrentEvent === currentEvent && cachedTransfersReady && cachedCaptainReady;
 
-            const data = canUseCached
-                ? cached
-                : await this.getLineupCached(uid, { fresh: true, panelOnly: true });
-            panel.innerHTML = renderTransferRecords(teamName, data.transfer_records || [], side, data.captain_used || null);
             panel.classList.add("active");
+            if (cached) {
+                panel.innerHTML = renderTransferRecords(teamName, cached.transfer_records || [], side, cached.captain_used || null);
+            } else {
+                panel.innerHTML = `<div class="transfer-panel-title">${escapeHtml(teamName)} This Week</div><div class="loading"><div class="spinner"></div>Loading...</div>`;
+            }
+            if (canUseCached) return;
+
+            const data = await this.getLineupCached(uid, { fresh: true, panelOnly: true });
+            panel.innerHTML = renderTransferRecords(teamName, data.transfer_records || [], side, data.captain_used || null);
         } catch (error) {
             console.error("Transfer panel error:", error);
             const fallback = this.latestPicksByUid?.[String(uid)] || this.latestPicksByUid?.[Number(uid)] || null;
@@ -1832,7 +1855,12 @@ const App = {
         Render.modalLoading("game-modal", "game-body", "game-title");
         try {
             const localPayload = this.latestFixtureDetails?.[String(fixtureId)] || this.latestFixtureDetails?.[Number(fixtureId)];
-            if (localPayload && Array.isArray(localPayload.home_players) && Array.isArray(localPayload.away_players)) {
+            if (
+                localPayload &&
+                Array.isArray(localPayload.home_players) &&
+                Array.isArray(localPayload.away_players) &&
+                (localPayload.home_players.length > 0 || localPayload.away_players.length > 0)
+            ) {
                 Render.gameDetail(localPayload);
                 return;
             }

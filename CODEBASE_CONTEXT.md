@@ -1,113 +1,129 @@
-# Codebase Context
+# 代码库上下文（当前版）
 
-## Current Runtime
+这份文档用于快速提醒后续维护时最重要的上下文，避免再次把实时链路、DDL 静态链路和小窗链路混在一起。
 
-- Frontend entry: `frontend/index.html`
-- Frontend logic: `frontend/js/app.js`
-- Frontend style: `frontend/css/style.css`
-- Live backend source of truth: `worker/src/index.js`
-- Pages same-origin API proxy: `functions/api/[[path]].js`
+## 1. 当前线上真正生效的文件
 
-## Important Architecture Notes
+- 前端入口：`frontend/index.html`
+- 前端逻辑：`frontend/js/app.js`
+- 前端样式：`frontend/css/style.css`
+- Worker：`worker/src/index.js`
+- Pages API 代理：`functions/api/[[path]].js`
 
-- `worker/src/index.js` is the only backend file that matters for production now.
-- `backend/` is the old FastAPI version kept only as historical reference.
-- Homepage uses `/api/state?fresh_h2h=1`.
-- The homepage fresh path should only refresh live score totals.
-- Chips, weekly transfers, and chips summary should come from cached daily meta data, not per-request homepage recomputation.
+`backend/` 只是旧 FastAPI 历史参考，不是当前生产主链路。
 
-## Chips Rules
+## 2. 三条核心数据链
 
-- `Captain`: used if `phcapt` appears in the current week.
-- `Wildcard`: used if `wildcard` or `wild_card` appears from `GW17` onward.
-- `All-Stars`: used if `rich` appears anywhere in the season.
-- Official chip source: `https://nbafantasy.nba.com/api/entry/{entry_id}/history/`
+### A. 首页缓存主链
 
-## Refresh Strategy
+- 接口：`GET /api/state`
+- 作用：首页秒开
+- 特点：只读 KV 主状态，不做重计算
 
-- `chunk` refresh:
-  - updates a small UID batch
-  - cheaper for normal scheduled refresh
-- `meta` refresh:
-  - refreshes all managers' `history`
-  - updates chips and `Chips Used`
-  - this is the lightweight all-manager chip metadata refresh
-- default `/api/refresh?token=...`:
-  - now defaults to the lightweight history-based chip refresh
-  - this is the preferred manual refresh entrypoint
-- `full` refresh:
-  - expensive
-  - should only be used when the whole cache must be rebuilt
+### B. 首页实时补帧链
 
-## Commands
+- 接口：`GET /api/state?fresh_h2h=1`
+- 只在当天有比赛且处于实时窗口时使用
+- 只更新：
+  - H2H 分数
+  - fixtures
+  - fixture_details
+  - 当前 event 阵容实时分
+- 明确不更新：
+  - `chips_used_summary`
+  - `good_captain_summary`
+  - `transfer_trends`
+  - `ownership`
 
-### Deploy Worker
+### C. DDL 静态刷新链
 
-```powershell
-cd F:\NBA\worker
-npx wrangler deploy
-```
+- 接口：`POST /api/refresh?token=...`
+- 这是每天 DDL 后最重要的一次刷新
+- 负责统一更新：
+  - 当前 event 的 `players`
+  - 本周 `transfer_records`
+  - `chip_status`
+  - `captain_used`
+  - `chips_used_summary`
+  - `good_captain_summary`
+  - `transfer_trends`
+  - `ownership_top`
 
-### Default Manual Refresh
+## 3. 动态刷新窗口
 
-```powershell
-Invoke-WebRequest -Method POST "https://nba-fantasy-api.nbafantasy.workers.dev/api/refresh?token=040517"
-```
+不再固定北京时间。
 
-### Meta Only Refresh
+当前逻辑：
 
-```powershell
-Invoke-WebRequest -Method POST "https://nba-fantasy-api.nbafantasy.workers.dev/api/refresh?mode=meta&token=040517"
-```
+- 开始：当天第一场比赛开球
+- 结束：最后一场比赛预计结束后 15 分钟
 
-## Known UI/Data Areas
+Worker cron 现在全天每 5 分钟触发一次，但真正是否刷新由代码内部判断。
 
-- `Weekly Transfers` should show league current-week transfer totals, not global event transfer trends.
-- `Chips Used` sits above `Ownership Top 10`.
-- `Chips Used` is derived from official `/history/` chip state and refreshed in daily meta refresh.
-- `Rankings` currently use a manual `GW23_LAST_STANDINGS` snapshot in `frontend/js/app.js`; update that base table when a new GW closes.
-- Detail modal requests should avoid default `fresh=1` unless a real cache miss/event change happens.
+## 4. Good Captain 的正确定位
 
-## Recent Real-Data Sanity Checks
+Good Captain 是一个“本周 Captain chip 使用榜”：
 
-- `阿甘` (`uid 6412`) has official `rich` usage in event `63`.
-- `酸男` (`uid 14`) current chip status should be:
-  - `Captain ✓`
-  - `WC ✕`
-  - `AS ✕`
-- `柯南` (`uid 6562`) current chip status should be:
-  - `Captain ✓`
-  - `WC ✕`
-  - `AS ✕`
+- 只统计本周真实开过 `phcapt` 的经理
+- 用的是他们真实的 `captain_used`
+- 它属于 DDL 后静态数据，不属于实时补帧
 
-## Files Worth Keeping
+判断时要牢记：
 
-- `README.md`
-- `PROJECT_GUIDE.md`
-- `MODULE_REFRESH_DETAILS.md`
-- `CODEBASE_CONTEXT.md`
-- `functions/api/[[path]].js`
-- `worker/src/index.js`
-- `frontend/`
+- `chips_used_summary` 负责统计“本周有多少人开了 Captain”
+- `good_captain_summary` 负责展示“这些人分别选了谁、得了多少分”
+- 两者必须来自同一条静态刷新链，否则人数一定会漂
 
-## Likely Redundant / Deletion Candidates
+## 5. 当前 Chips 规则
 
-- `backend/__pycache__/`
-  - generated Python cache files, safe to remove
-- `backend/`
-  - removable if you are sure the old FastAPI implementation is no longer needed as reference
-- `logs/`
-  - local runtime artifact directory if you no longer use the old FastAPI stack
-- `cache/`
-  - local cache artifact directory if not used in your current workflow
+- `Captain`：本周内 `history.chips` 出现 `phcapt`
+- `Wildcard`：`GW17+` 出现 `wildcard / wild_card`
+- `All-Stars`：赛季内出现 `rich`
 
-## Deletion Advice
+官方来源统一是：
 
-- Safe first cleanup:
-  - `backend/__pycache__/`
-  - old preview/report docs if no longer needed
-  - old `logs/` contents
-- More aggressive cleanup:
-  - entire `backend/`
-  - entire `cache/`
-- Keep `functions/` unless you also change your Pages/API routing setup.
+- `https://nbafantasy.nba.com/api/entry/{entry_id}/history/`
+
+## 6. 单人小窗的当前原则
+
+单人小窗不应该再触发整套 manager meta 刷新。
+
+当前原则：
+
+1. 优先使用首页已拿到的缓存 `picks_by_uid[uid]`
+2. 如果只是详情不完整，再走：
+   - `GET /api/picks/{uid}?fresh=1&panel=1`
+3. 这条轻量接口只补：
+   - `transfer_records`
+   - `captain_used`
+   - `chip_status`
+
+## 7. 比赛详情的当前原则
+
+- 比赛详情优先用首页已拿到的 `fixture_details`
+- 如果首页没有完整数据，再请求：
+  - `GET /api/fixture/{id}`
+- 当前 event 实时回退必须允许“0 数据球员”也显示出来，不能因为 `stats` 为空就整队被跳过
+
+## 8. 当前最容易踩坑的点
+
+### 不要再做的事
+
+- 不要在 `fresh_h2h` 里重算 `Good Captain`
+- 不要在 `/api/picks/{uid}` 请求路径里顺手触发全员 meta refresh
+- 不要再用固定北京时间窗口控制首页实时刷新
+- 不要让 chunk refresh 改写联赛级 summary
+
+### 应该坚持的事
+
+- 比赛实时态只改比分，不改静态汇总
+- DDL 后静态态一次性更新 chips / transfers / ownership / good captain
+- 赛后再把最终比分写回缓存
+
+## 9. 现在应该优先相信的文档
+
+- 总览：`README.md`
+- 刷新链路：`API_REFRESH_CHAIN.md`
+- 运维与命令：`PROJECT_GUIDE.md`
+
+如果这些文档和旧日志冲突，以这三份新文档为准。
