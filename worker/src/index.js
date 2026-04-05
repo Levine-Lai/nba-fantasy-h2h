@@ -1767,11 +1767,7 @@ async function refreshManagerMetaState(env, existingState = null) {
       eventChanged ||
       previous?.fetch_status?.history_ok !== true ||
       !previous?.chip_status;
-    const shouldFetchTransfers =
-      eventChanged ||
-      previous?.fetch_status?.transfers_ok !== true ||
-      !Array.isArray(previous?.transfer_records) ||
-      !Array.isArray(previous?.raw_transfers);
+    const shouldFetchTransfers = true;
 
     let picksRes = shouldFetchPicks
       ? await fetchJsonSafe(`/entry/${uidNumber}/event/${currentEvent}/picks/`, 2)
