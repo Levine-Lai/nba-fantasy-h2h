@@ -599,6 +599,7 @@
 
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
         const timeSlotLabel = String(favoriteTimeSlot?.full_label || "--");
+        const longestHoldHeadshot = String(longestHold?.headshot_url || "").trim();
         const cards = [
             {
                 label: "总换人次数",
@@ -672,11 +673,23 @@
         return `
             <div class="season-summary-transfer-copy">
                 <div class="season-summary-transfer-glance">
-                    ${cards.map((card) => `
-                        <div class="season-summary-transfer-glance-card">
+                    ${cards.map((card, index) => `
+                        <div class="season-summary-transfer-glance-card${index === 3 && longestHoldHeadshot ? " season-summary-transfer-glance-card-player" : ""}">
                             <div class="season-summary-transfer-glance-label">${escapeHtml(card.label)}</div>
                             <div class="season-summary-transfer-glance-value">${escapeHtml(card.value)}</div>
                             <div class="season-summary-transfer-glance-note">${escapeHtml(card.note)}</div>
+                            ${index === 3 && longestHoldHeadshot ? `
+                                <div class="season-summary-transfer-player-media">
+                                    <img
+                                        class="season-summary-transfer-player-headshot"
+                                        src="${escapeHtml(longestHoldHeadshot)}"
+                                        alt="${escapeHtml(longestHold?.player_name || "球员头像")}"
+                                        loading="lazy"
+                                        referrerpolicy="no-referrer"
+                                        onerror="this.closest('.season-summary-transfer-player-media')?.remove()"
+                                    />
+                                </div>
+                            ` : ""}
                         </div>
                     `).join("")}
                 </div>
@@ -847,6 +860,31 @@
             <section class="season-summary-page">
                 <div class="season-summary-main">
                     <div class="season-summary-page-title">楂樺厜鏃跺埢</div>
+                    ${renderStatsGrid(profile?.highlights?.cards || [])}
+                    <div class="season-summary-quote">${escapeHtml(profile?.highlights?.quote || "")}</div>
+                </div>
+                <aside class="season-summary-side">
+                    <div class="season-summary-rail">
+                        <div class="season-summary-mini-title">${escapeHtml(profile?.highlights?.sideTitle || "Highlights")}</div>
+                        ${renderBullets(profile?.highlights?.sideBullets || [])}
+                        ${renderKpis(profile?.highlights?.sideKpis || [])}
+                    </div>
+                </aside>
+            </section>
+        `;
+    }
+
+    function renderPages(profile) {
+        return `
+            ${renderCoverPage(profile)}
+
+            ${renderTransferPage(profile)}
+
+            ${renderCaptainPage(profile)}
+
+            <section class="season-summary-page">
+                <div class="season-summary-main">
+                    <div class="season-summary-page-title">高光时刻</div>
                     ${renderStatsGrid(profile?.highlights?.cards || [])}
                     <div class="season-summary-quote">${escapeHtml(profile?.highlights?.quote || "")}</div>
                 </div>

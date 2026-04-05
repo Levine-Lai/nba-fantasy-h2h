@@ -1133,8 +1133,11 @@ function calculateEffectiveScore(picks, teamsPlayingToday) {
 function buildElementsMap(bootstrap) {
   const elements = {};
   for (const e of bootstrap?.elements || []) {
+    const playerCode = Number(e.code || 0) || null;
     elements[e.id] = {
       name: e.web_name || `#${e.id}`,
+      player_code: playerCode,
+      headshot_url: playerCode ? `https://cdn.nba.com/headshots/nba/latest/520x380/${playerCode}.png` : null,
       team: e.team,
       position: e.element_type,
       position_name: e.element_type === 1 ? "BC" : e.element_type === 2 ? "FC" : "UNK",
@@ -4774,7 +4777,9 @@ async function buildLongestHeldPlayerSummary(uidNumber, latestEventId, rowEventI
     if (!snapshot) continue;
     for (const elementId of snapshot) {
       const existing = totals.get(elementId) || {
+        element_id: elementId,
         player_name: elements[elementId]?.name || `#${elementId}`,
+        headshot_url: elements[elementId]?.headshot_url || null,
         days_held: 0,
         first_event: eventId,
         last_event: eventId,
@@ -5100,7 +5105,9 @@ async function buildSeasonSummaryPayload(uidInput) {
           count: Number(transferPreferences.favorite_time_slot.count || 0),
         } : null,
         longest_hold: longestHold ? {
+          element_id: Number(longestHold.element_id || 0) || null,
           player_name: longestHold.player_name || "",
+          headshot_url: longestHold.headshot_url || null,
           days_held: Number(longestHold.days_held || 0),
         } : null,
       },

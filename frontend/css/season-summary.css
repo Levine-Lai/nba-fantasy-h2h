@@ -1365,6 +1365,11 @@
     border-radius: 22px;
 }
 
+.season-summary-transfer-glance-card-player {
+    align-items: center;
+    text-align: center;
+}
+
 .season-summary-transfer-main-full .season-summary-transfer-glance-label {
     font-size: 11px;
     letter-spacing: 0.06em;
@@ -1402,6 +1407,22 @@
     color: #0f172a;
 }
 
+.season-summary-transfer-player-media {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+}
+
+.season-summary-transfer-player-headshot {
+    width: 78px;
+    height: 78px;
+    object-fit: cover;
+    border-radius: 20px;
+    border: 1px solid rgba(191, 219, 254, 0.9);
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(226, 232, 240, 0.82));
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
 .season-summary-transfer-dashboard {
     display: none;
 }
@@ -1427,6 +1448,12 @@
         min-height: 82px;
         padding: 10px 10px 9px;
         border-radius: 18px;
+    }
+
+    .season-summary-transfer-player-headshot {
+        width: 58px;
+        height: 58px;
+        border-radius: 16px;
     }
 
     .season-summary-transfer-main-full .season-summary-transfer-glance-label {
