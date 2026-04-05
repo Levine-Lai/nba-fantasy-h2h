@@ -1189,9 +1189,23 @@ function buildLivePicksFromPicksData(picksData, elements, liveElements, teamsMet
       team_name: teamMeta?.name || "",
       team_short: teamMeta?.short_name || "",
       team_logo_url: teamMeta?.logo_url || "/nba-team-logos/_.png",
-      is_effective: false,
+      is_effective: multiplier > 0,
     };
   });
+}
+
+function getOfficialEventScoreFromPicksData(picksData) {
+  const rawPoints = Number(picksData?.entry_history?.points);
+  if (!Number.isFinite(rawPoints) || rawPoints < 0) return null;
+  return Math.round(rawPoints / 10);
+}
+
+function getFormationFromEffectivePlayers(picks) {
+  const effectivePlayers = (Array.isArray(picks) ? picks : []).filter((pick) => !!pick?.is_effective);
+  if (!effectivePlayers.length) return "N/A";
+  const bcCount = effectivePlayers.filter((pick) => Number(pick?.position_type || 0) === 1).length;
+  const fcCount = effectivePlayers.filter((pick) => Number(pick?.position_type || 0) === 2).length;
+  return `${bcCount}BC+${fcCount}FC`;
 }
 
 function getBeijingDateKey(value = Date.now()) {
@@ -1320,8 +1334,12 @@ async function buildFreshHomepageState(baseState) {
     }
 
     const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
-    const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
-    const freshToday = Number(effectiveScore || 0);
+    const officialToday = getOfficialEventScoreFromPicksData(picksRes.data);
+    const freshToday = Number(
+      officialToday !== null
+        ? officialToday
+        : (calculateEffectiveScore(picks, teamsPlayingToday)[0] || 0)
+    );
     const summary = previous?.week_total_summary || null;
     const sameEvent = Number(previous?.current_event || 0) === Number(currentEvent);
     const fallbackWeek = sameEvent
@@ -1844,8 +1862,12 @@ async function refreshManagerMetaState(env, existingState = null) {
           };
         }
       }
-      const [effectiveScore] = calculateEffectiveScore(players, teamsPlayingToday);
-      totalLive = Number(effectiveScore || 0);
+      const officialToday = getOfficialEventScoreFromPicksData(picksData);
+      totalLive = Number(
+        officialToday !== null
+          ? officialToday
+          : (calculateEffectiveScore(players, teamsPlayingToday)[0] || 0)
+      );
       eventTotal = computeWeekTotalFromSummary(weekTotalSummary, totalLive)
         ?? (eventChanged ? Math.max(0, totalLive) : Number(previous?.event_total || totalLive || 0));
       lineupEconomy = buildLineupEconomySummary(players);
@@ -3660,7 +3682,12 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       }
     }
 
-    const [effectiveScore] = calculateEffectiveScore(picks, teamsPlayingToday);
+    const officialToday = getOfficialEventScoreFromPicksData(picksRes.data);
+    const effectiveScore = Number(
+      officialToday !== null
+        ? officialToday
+        : (calculateEffectiveScore(picks, teamsPlayingToday)[0] || 0)
+    );
     const lineupEconomy = buildLineupEconomySummary(picks);
     debugUid("merge_data", uid, {
       players: summarizePlayersForDebug(picks),
@@ -3755,11 +3782,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     const uidNum = uidToNumber(uid);
     const s = standingsByUid[uid] || {};
     const picks = s.picks || [];
-    let formation = "N/A";
-    if (picks.length) {
-      const [, , fmt] = calculateEffectiveScore(picks, teamsPlayingToday);
-      formation = fmt;
-    }
+    const formation = getFormationFromEffectivePlayers(picks);
     picksByUid[uid] = {
       uid: uidNum,
       team_name: UID_MAP[uidNum],
