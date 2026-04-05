@@ -36,7 +36,11 @@ const API = {
 
     async getLineup(uid, options = {}) {
         const useFresh = options?.fresh === true;
-        return (await this.fetch(`/api/picks/${uid}${useFresh ? "?fresh=1" : ""}`)).json();
+        const params = new URLSearchParams();
+        if (useFresh) params.set("fresh", "1");
+        if (options?.panelOnly) params.set("panel", "1");
+        const query = params.toString();
+        return (await this.fetch(`/api/picks/${uid}${query ? `?${query}` : ""}`)).json();
     },
 
     async getInjuries() {
@@ -1687,11 +1691,13 @@ const App = {
     latestTransferTrends: null,
     latestPicksByUid: {},
     latestFixtureDetails: {},
+    latestCurrentEvent: null,
 
     applyState(state) {
         this.latestTransferTrends = state?.transfer_trends || {};
         this.latestPicksByUid = state?.picks_by_uid || {};
         this.latestFixtureDetails = state?.fixture_details || {};
+        this.latestCurrentEvent = Number(state?.current_event || 0) || null;
         Render.eventInfo(state?.current_event_name || "Loading...");
         Render.gameCount(state?.fixtures?.count || 0);
         Render.gamesList(state?.fixtures?.games || []);
@@ -1706,7 +1712,7 @@ const App = {
     },
 
     async getLineupCached(uid, options = {}) {
-        const key = `${String(uid)}:${options?.fresh === true ? "fresh" : "cached"}`;
+        const key = `${String(uid)}:${options?.fresh === true ? "fresh" : "cached"}:${options?.panelOnly === true ? "panel" : "full"}`;
         if (!this.lineupCache.has(key)) {
             this.lineupCache.set(key, API.getLineup(uid, options).catch((error) => {
                 this.lineupCache.delete(key);
@@ -1765,12 +1771,31 @@ const App = {
         if (isOpen) return;
 
         try {
-            const data = await this.getLineupCached(uid, { fresh: true });
+            const normalizedUid = String(uid);
+            const cached = this.latestPicksByUid?.[normalizedUid] || this.latestPicksByUid?.[Number(uid)] || null;
+            const cachedCurrentEvent = Number(cached?.current_event || 0);
+            const currentEvent = Number(this.latestCurrentEvent || 0);
+            const cachedTransfersReady =
+                Array.isArray(cached?.transfer_records) &&
+                (!!cached.transfer_records.length || (cached?.fetch_status?.transfers_ok === true && cachedCurrentEvent === currentEvent));
+            const cachedCaptainReady =
+                !cached?.chip_status?.captain_used ||
+                (!!cached?.captain_used?.used && !!cached?.captain_used?.captain_name);
+            const canUseCached = !!cached && cachedCurrentEvent === currentEvent && cachedTransfersReady && cachedCaptainReady;
+
+            const data = canUseCached
+                ? cached
+                : await this.getLineupCached(uid, { fresh: true, panelOnly: true });
             panel.innerHTML = renderTransferRecords(teamName, data.transfer_records || [], side, data.captain_used || null);
             panel.classList.add("active");
         } catch (error) {
             console.error("Transfer panel error:", error);
-            panel.innerHTML = `<div class="transfer-panel-title">${escapeHtml(teamName)} This Week</div><div class="trend-empty">Load failed</div>`;
+            const fallback = this.latestPicksByUid?.[String(uid)] || this.latestPicksByUid?.[Number(uid)] || null;
+            if (fallback) {
+                panel.innerHTML = renderTransferRecords(teamName, fallback.transfer_records || [], side, fallback.captain_used || null);
+            } else {
+                panel.innerHTML = `<div class="transfer-panel-title">${escapeHtml(teamName)} This Week</div><div class="trend-empty">Load failed</div>`;
+            }
             panel.classList.add("active");
         }
     },

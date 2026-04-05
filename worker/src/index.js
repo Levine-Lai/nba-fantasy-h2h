@@ -1510,9 +1510,16 @@ function buildGoodCaptainSummary(picksByUid) {
   for (const uid of UID_LIST) {
     const payload = picksByUid?.[uid] || null;
     const captainUsed = payload?.captain_used || {};
-    if (!captainUsed?.used || !captainUsed?.captain_name) continue;
+    if (!captainUsed?.used) continue;
 
-    const captainName = String(captainUsed.captain_name || "").trim();
+    const captainName = String(
+      captainUsed?.captain_name ||
+      String(captainUsed?.label || "")
+        .replace(/^DAY\d+:\s*/i, "")
+        .replace(/^Used:\s*/i, "")
+        .replace(/\s+\d+(?:\.\d+)?\s*$/, "")
+        .trim()
+    ).trim();
     if (!captainName) continue;
     const day = Number(captainUsed.day || 0) || null;
     const captainPoints = Number(captainUsed.captain_points || 0);
@@ -1878,14 +1885,15 @@ function buildPersistedChipStatus(payload = {}, options = {}) {
   const currentWeek = Number(options?.currentWeek || getPayloadCurrentWeek(payload, options?.current_event_name || "")) || null;
   const captainWeek = Number(payload?.captain_week || 0) || null;
   const activeChip = String(options?.activeChip || payload?.active_chip || "").toLowerCase();
-  const legacyCaptainUsed = !!(current?.captain_used || payload?.captain_used?.used);
   let captainUsed = false;
   if (activeChip === "phcapt") {
     captainUsed = true;
   } else if (captainWeek && currentWeek) {
     captainUsed = captainWeek === currentWeek;
+  } else if (captainWeek && !currentWeek) {
+    captainUsed = true;
   } else {
-    captainUsed = legacyCaptainUsed;
+    captainUsed = false;
   }
   return {
     captain_used: captainUsed,
@@ -2047,6 +2055,19 @@ async function buildCaptainUsageSummary(
         label: previousCaptainUsed?.label || (chipEvent.day ? `DAY${chipEvent.day}` : "Used"),
       };
     }
+    if (!liveRes.ok) {
+      const dayLabel = chipEvent.day ? `DAY${chipEvent.day}` : "DAY?";
+      const elementId = Number(captainPick.element || 0);
+      const elem = elements[elementId] || {};
+      const captainName = elem.name || previousCaptainUsed?.captain_name || `#${elementId}`;
+      return {
+        used: true,
+        label: `${dayLabel}: ${captainName}${Number.isFinite(Number(previousCaptainUsed?.captain_points)) ? ` ${Number(previousCaptainUsed?.captain_points)}` : ""}`,
+        day: chipEvent.day,
+        captain_name: captainName,
+        captain_points: Number.isFinite(Number(previousCaptainUsed?.captain_points)) ? Number(previousCaptainUsed?.captain_points) : null,
+      };
+    }
     const liveElements = {};
     if (Array.isArray(rawElements)) {
       for (const item of rawElements) liveElements[item.id] = item;
@@ -2067,6 +2088,149 @@ async function buildCaptainUsageSummary(
     day: chipEvent.day,
     captain_name: elem.name || `#${elementId}`,
     captain_points: finalPoints,
+  };
+}
+
+async function buildFreshManagerPanelPayload(baseState, uid) {
+  const normalizedUid = normalizeUid(uid);
+  if (!normalizedUid) return {};
+  const uidNumber = uidToNumber(normalizedUid);
+  const previous = baseState?.picks_by_uid?.[normalizedUid] || {};
+  const bootstrap = await fetchJson("/bootstrap-static/", 1);
+  const events = bootstrap.events || [];
+  const [currentEvent, currentEventName] = getCurrentEvent(events);
+  const eventMetaById = buildEventMetaById(events);
+  const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(currentEventName || previous?.current_event_name || "");
+  const currentWeek = currentMeta.gw || extractGwNumber(currentEventName) || extractGwNumber(currentEvent) || 22;
+  const elements = buildElementsMap(bootstrap);
+  const teamsMetaById = buildTeamsMetaMap(bootstrap);
+  const eventLiveCache = {};
+
+  let [picksRes, historyRes, transfersRes] = await Promise.all([
+    fetchJsonSafe(`/entry/${uidNumber}/event/${currentEvent}/picks/`, 2),
+    fetchJsonSafe(`/entry/${uidNumber}/history/`, 2),
+    fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 2),
+  ]);
+  if (!picksRes.ok) picksRes = await fetchJsonSafe(`/entry/${uidNumber}/event/${currentEvent}/picks/`, 2);
+  if (!historyRes.ok) historyRes = await fetchJsonSafe(`/entry/${uidNumber}/history/`, 2);
+  if (!transfersRes.ok) transfersRes = await fetchJsonSafe(`/entry/${uidNumber}/transfers/`, 2);
+
+  const picksData = picksRes.ok ? picksRes.data : null;
+  const historyData = historyRes.ok && historyRes.data && typeof historyRes.data === "object" ? historyRes.data : null;
+  const transfersData = transfersRes.ok && Array.isArray(transfersRes.data) ? transfersRes.data : [];
+  const hasHistoryData = !!historyData;
+  const chipDayMap = hasHistoryData
+    ? getChipDayMapFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
+    : {};
+  const wildcardDay = hasHistoryData
+    ? getWildcardDayFromHistory(historyData, currentWeek, currentEvent, eventMetaById)
+    : Number(previous.wildcard_day || 0) || null;
+  const wildcardPostGw17Event = hasHistoryData
+    ? getWildcardPostGw17Event(historyData, eventMetaById)
+    : Number(previous.wildcard_post_gw17_event || 0) || null;
+  const richDay = hasHistoryData
+    ? getSeasonChipEvent(historyData, ["rich"])
+    : Number(previous.rich_day || 0) || null;
+  const transferSummary = hasHistoryData && transfersRes.ok
+    ? buildWeeklyTransferSummary(transfersData, currentWeek, eventMetaById, elements, chipDayMap)
+    : {
+        records: Array.isArray(previous.transfer_records) ? previous.transfer_records : [],
+        total_transfer_count: Number(previous.transfer_count || 0),
+        penalty_transfer_count: Number(previous.penalty_transfer_count || previous.transfer_count || 0),
+        gd1_transfer_count: Number(previous.gd1_transfer_count || 0),
+        gd1_missing_penalty: Number(previous.gd1_missing_penalty || 0),
+        penalty_score: Number(previous.penalty_score || 0),
+      };
+  const activeChip = String(picksData?.active_chip || "").toLowerCase();
+  const captainChipEvent = hasHistoryData
+    ? getCaptainChipEvent(historyData, currentWeek, currentEvent, eventMetaById)
+    : null;
+  const captainWeek = hasHistoryData
+    ? (captainChipEvent?.event ? currentWeek : null)
+    : (Number(previous.captain_week || 0) || null);
+  let captainUsed = hasHistoryData
+    ? await buildCaptainUsageSummary(
+        uidNumber,
+        historyData,
+        currentWeek,
+        currentEvent,
+        eventMetaById,
+        elements,
+        eventLiveCache,
+        previous.captain_used || null
+      )
+    : (previous.captain_used || { used: false, label: "None", day: null, captain_name: null, captain_points: null });
+
+  if (activeChip === "phcapt" && Array.isArray(picksData?.picks)) {
+    if (!eventLiveCache[currentEvent]) {
+      const liveRes = await fetchJsonSafe(`/event/${currentEvent}/live/`, 2);
+      if (liveRes.ok) eventLiveCache[currentEvent] = buildLiveElementsMap(liveRes.data);
+    }
+    const currentPicks = buildLivePicksFromPicksData(
+      picksData,
+      elements,
+      eventLiveCache[currentEvent] || {},
+      teamsMetaById
+    );
+    const captainPick = currentPicks.find((pick) => pick?.is_captain);
+    if (captainPick) {
+      const captainDay = Number(captainUsed?.day || currentMeta?.day || 0) || null;
+      const captainPoints = Number(captainPick.final_points || 0);
+      captainUsed = {
+        ...captainUsed,
+        used: true,
+        day: captainDay,
+        captain_name: captainPick.name || captainUsed?.captain_name || null,
+        captain_points: Number.isFinite(captainPoints) ? captainPoints : (captainUsed?.captain_points ?? null),
+        label: captainDay
+          ? `DAY${captainDay}: ${captainPick.name || captainUsed?.captain_name || "None"} ${Number.isFinite(captainPoints) ? captainPoints : (captainUsed?.captain_points ?? "")}`.trim()
+          : `Used: ${captainPick.name || captainUsed?.captain_name || "None"} ${Number.isFinite(captainPoints) ? captainPoints : (captainUsed?.captain_points ?? "")}`.trim(),
+      };
+    }
+  }
+
+  const rawChipStatus = hasHistoryData
+    ? buildChipStatusSummary(historyData, currentWeek, currentEvent, eventMetaById, captainUsed)
+    : buildPersistedChipStatus(previous, { currentWeek, activeChip });
+  const persistedChipStatus = buildPersistedChipStatus({
+    ...previous,
+    current_event_name: currentEventName,
+    active_chip: activeChip || null,
+    captain_used: captainUsed,
+    captain_week: activeChip === "phcapt" ? currentWeek : captainWeek,
+    chip_status: rawChipStatus,
+  }, {
+    currentWeek,
+    activeChip,
+  });
+
+  return {
+    ...previous,
+    uid: uidNumber,
+    team_name: previous.team_name || UID_MAP[uidNumber],
+    current_event: currentEvent,
+    current_event_name: currentEventName,
+    active_chip: activeChip || null,
+    transfer_records: transferSummary.records,
+    transfer_count: Number(transferSummary.total_transfer_count || 0),
+    penalty_transfer_count: Number(transferSummary.penalty_transfer_count || 0),
+    gd1_transfer_count: Number(transferSummary.gd1_transfer_count || 0),
+    gd1_missing_penalty: Number(transferSummary.gd1_missing_penalty || 0),
+    penalty_score: Number(transferSummary.penalty_score || 0),
+    wildcard_day: wildcardDay,
+    wildcard_post_gw17_event: wildcardPostGw17Event ? Number(wildcardPostGw17Event) : null,
+    rich_day: richDay ? Number(richDay) : null,
+    captain_week: activeChip === "phcapt"
+      ? Number(currentWeek || 0) || null
+      : (captainWeek ? Number(captainWeek) : null),
+    captain_used: captainUsed,
+    chip_status: persistedChipStatus,
+    fetch_status: {
+      ...(previous.fetch_status || {}),
+      picks_ok: !!picksRes.ok,
+      history_ok: !!historyRes.ok,
+      transfers_ok: !!transfersRes.ok,
+    },
   };
 }
 
@@ -4740,6 +4904,7 @@ export default {
         const uid = normalizeUid(Number(path.split("/").pop()));
         let payload = state.picks_by_uid[uid] || {};
         const forceFresh = url.searchParams.get("fresh") === "1";
+        const panelOnly = url.searchParams.get("panel") === "1";
         const eventChanged = Number(payload?.current_event || 0) !== Number(state?.current_event || 0);
         const captainDetailsStale =
           Number(payload?.current_event || 0) === Number(state?.current_event || 0) &&
@@ -4748,7 +4913,17 @@ export default {
             !payload?.captain_used?.used ||
             !payload?.captain_used?.captain_name
           );
-        if (forceFresh || eventChanged || !payload.players || payload.players.length === 0 || captainDetailsStale) {
+        const panelNeedsFresh =
+          panelOnly &&
+          (
+            forceFresh ||
+            eventChanged ||
+            !Array.isArray(payload?.transfer_records) ||
+            captainDetailsStale
+          );
+        if (panelNeedsFresh) {
+          payload = await buildFreshManagerPanelPayload(state, uid);
+        } else if (forceFresh || eventChanged || !payload.players || payload.players.length === 0 || captainDetailsStale) {
           const freshState = await buildState(state, [uid]);
           payload = freshState.picks_by_uid[uid] || {};
         }
