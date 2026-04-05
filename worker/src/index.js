@@ -4653,8 +4653,9 @@ function sortTransfersChronologically(transfers) {
 function buildTimeSlotMeta(hour) {
   const safeHour = Number(hour);
   if (!Number.isFinite(safeHour) || safeHour < 0) return null;
-  const startHour = safeHour < 8 ? 0 : (safeHour < 16 ? 8 : 16);
-  const endHour = startHour + 8;
+  const normalizedHour = Math.max(0, Math.min(23, Math.floor(safeHour)));
+  const startHour = Math.floor(normalizedHour / 2) * 2;
+  const endHour = Math.min(24, startHour + 2);
   return {
     start_hour: startHour,
     label: `${String(startHour).padStart(2, "0")}-${String(endHour).padStart(2, "0")}`,
@@ -4679,7 +4680,7 @@ function buildTransferPreferenceSummary(transfers) {
   const dayCounter = new Map();
   const slotCounter = new Map();
   const fixedDays = [1, 2, 3, 4, 5, 6, 7];
-  const fixedSlots = [0, 8, 16];
+  const fixedSlots = Array.from({ length: 12 }, (_, index) => index * 2);
 
   for (const transfer of transfers || []) {
     const day = Number(transfer?.day || 0);

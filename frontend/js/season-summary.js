@@ -583,6 +583,123 @@
         `;
     }
 
+    function renderTransferStory(profile) {
+        const transfers = profile?.transfers || {};
+        const summary = transfers.summary || {};
+        const totalTransfers = Number(summary.total_transfers || 0);
+        const activeWeeks = Number(summary.active_weeks || 0);
+        const seasonWeeks = Number(summary.season_weeks || 24);
+        const penaltyPoints = Number(summary.penalty_points || 0);
+        const transferEveryWeek = !!summary.transfer_every_week;
+        const mostIn = summary.most_in || null;
+        const mostOut = summary.most_out || null;
+        const favoriteDay = summary.favorite_day || null;
+        const favoriteTimeSlot = summary.favorite_time_slot || null;
+        const longestHold = summary.longest_hold || null;
+
+        const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+        const timeSlotLabel = String(favoriteTimeSlot?.full_label || "--");
+        const cards = [
+            {
+                label: "总换人次数",
+                value: `${formatSummaryNumber(totalTransfers)}次`,
+                note: "不含 WC / AS",
+            },
+            {
+                label: "操作周数",
+                value: `${formatSummaryNumber(activeWeeks)}/${formatSummaryNumber(seasonWeeks)}`,
+                note: transferEveryWeek ? "每一周都坚持操作" : "有些周选择按兵不动",
+            },
+            {
+                label: "扣分总计",
+                value: penaltyPoints > 0 ? `-${formatSummaryNumber(penaltyPoints)}` : "0",
+                note: penaltyPoints > 200 ? "这一季下手很果断" : "整体算是谨慎出手",
+            },
+            {
+                label: "偏爱换人时段",
+                value: timeSlotLabel,
+                note: favoriteTimeSlot?.count ? `${formatSummaryNumber(favoriteTimeSlot.count)} 次发生在这个时段` : "这一季还没有明显固定习惯",
+            },
+        ];
+
+        let paragraphOne = `这个赛季总共转会${mark(formatSummaryNumber(totalTransfers))}次，`;
+        paragraphOne += transferEveryWeek
+            ? "并且每一周都坚持换人，相信最终的排名没有辜负你的努力~"
+            : "机智的你选择以逸待劳，并不是把 FT 用完才是最好的选择。";
+        paragraphOne += penaltyPoints > 200
+            ? `整个赛季一共扣过${mark(formatSummaryNumber(penaltyPoints))}分，大胆而奔放的操作决定了你的上限。`
+            : `整个赛季一共扣过${mark(formatSummaryNumber(penaltyPoints))}分，谨慎精确才是你的代名词。`;
+
+        let paragraphTwo = "";
+        if (mostIn?.name && mostOut?.name) {
+            paragraphTwo = `${mark(mostIn.name)}被你换进来了${mark(formatSummaryNumber(mostIn.count))}次，是你心心念念的那个人吗？希望他的表现没有让你失望；而 ${mark(mostOut.name)} 被你送走了${mark(formatSummaryNumber(mostOut.count))}次，想必他的表现你也看在眼里吧。`;
+        } else if (mostIn?.name) {
+            paragraphTwo = `${mark(mostIn.name)}被你换进来了${mark(formatSummaryNumber(mostIn.count))}次，看得出来你总愿意再给他一次机会，希望他的表现没有让你失望。`;
+        } else if (mostOut?.name) {
+            paragraphTwo = `${mark(mostOut.name)}被你送走了${mark(formatSummaryNumber(mostOut.count))}次，能让你反复按下离队键的人，想必早就把耐心消磨得差不多了吧。`;
+        } else {
+            paragraphTwo = "这一季你的转会对象相当分散，没有谁特别频繁地被你换进换出，整个操作风格看起来更像顺势而为。";
+        }
+
+        const favoriteStartHour = Number(String(favoriteTimeSlot?.label || "").split("-")[0]);
+        let timeSentence = "你好像没有把换人习惯固定在某个特定时段，想换就换，也算是一种难得的自由。";
+        if (Number.isFinite(favoriteStartHour)) {
+            if (favoriteStartHour >= 8 && favoriteStartHour < 20) {
+                timeSentence = `你好像更喜欢在${mark(timeSlotLabel)}换人，伤病报告都是小事，心情＞fantasy。`;
+            } else if (favoriteStartHour >= 20 && favoriteStartHour < 24) {
+                timeSentence = `你好像更喜欢在${mark(timeSlotLabel)}换人，谨慎而大胆的选择，等到消息更完整再操作，也不耽误睡觉时间。`;
+            } else if (favoriteStartHour >= 0 && favoriteStartHour < 6) {
+                timeSentence = `你好像更喜欢在${mark(timeSlotLabel)}换人，夜生活才是你的舞台，必须看到我的球员 available 再睡觉。`;
+            } else if (favoriteStartHour >= 6 && favoriteStartHour < 8) {
+                timeSentence = `你好像更喜欢在${mark(timeSlotLabel)}换人，全服最谨慎的玩家，早起闹钟定好，守着 ddl 落子无悔。`;
+            }
+        }
+
+        const favoriteDayNumber = Number(favoriteDay?.day || 0);
+        let daySentence = "";
+        if (favoriteDayNumber >= 1 && favoriteDayNumber <= 3) {
+            daySentence = `${mark(`Day${favoriteDayNumber}`)}也是你最常出手的日子，拿到 FT 就该趁早用。`;
+        } else if (favoriteDayNumber >= 4 && favoriteDayNumber <= 7) {
+            daySentence = `经常把转会留到${mark(`Day${favoriteDayNumber}`)}再出手，不仅规划得当，而且沉得住气。`;
+        }
+        const paragraphThree = [timeSentence, daySentence].filter(Boolean).join("");
+
+        let paragraphFour = "漫长的赛季，人来人往，你的阵容名单也像车站一样不停有人上车下车。";
+        if (longestHold?.player_name) {
+            paragraphFour = `漫长的赛季，人来人往，不知道你有没有猜到，留在你阵容中最久的人是${mark(longestHold.player_name)}呢，相信陪伴走过了${mark(formatSummaryNumber(longestHold.days_held))}天，他已经成为你心中的第一爱酱了。`;
+        }
+
+        return `
+            <div class="season-summary-transfer-copy">
+                <div class="season-summary-transfer-glance">
+                    ${cards.map((card) => `
+                        <div class="season-summary-transfer-glance-card">
+                            <div class="season-summary-transfer-glance-label">${escapeHtml(card.label)}</div>
+                            <div class="season-summary-transfer-glance-value">${escapeHtml(card.value)}</div>
+                            <div class="season-summary-transfer-glance-note">${escapeHtml(card.note)}</div>
+                        </div>
+                    `).join("")}
+                </div>
+                <div class="season-summary-transfer-story-list">
+                    <p class="season-summary-transfer-story-paragraph">${paragraphOne}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphTwo}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphThree}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphFour}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderTransferPage(profile) {
+        return `
+            <section class="season-summary-page season-summary-page-transfer">
+                <div class="season-summary-main season-summary-transfer-main season-summary-transfer-main-full">
+                    ${renderTransferStory(profile)}
+                </div>
+            </section>
+        `;
+    }
+
     function renderPages(profile) {
         return `
             ${renderCoverPage(profile)}
