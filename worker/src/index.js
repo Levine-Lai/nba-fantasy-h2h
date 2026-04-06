@@ -1219,6 +1219,44 @@ function buildLivePicksFromPicksData(picksData, elements, liveElements, teamsMet
   });
 }
 
+function rebuildLivePicksFromCachedPlayers(players, elements, liveElements, teamsMetaById = {}) {
+  return (Array.isArray(players) ? players : []).map((player) => {
+    const elementId = Number(player?.element_id || 0);
+    const elem = elements[elementId] || {};
+    const teamId = Number(elem.team || player?.team_id || 0);
+    const teamMeta = teamsMetaById[teamId] || {};
+    const stats = getPlayerStats(elementId, liveElements, elements);
+    const base = Number(stats?.fantasy || 0);
+    const isCaptain = !!player?.is_captain;
+    const multiplier = Number(player?.multiplier || 1) || 1;
+    const finalPoints = isCaptain ? base * multiplier : base;
+    return {
+      ...player,
+      element_id: elementId,
+      name: elem.name || player?.name || `#${elementId}`,
+      position_type: elem.position || Number(player?.position_type || 0),
+      position_name: elem.position_name || player?.position_name || "UNK",
+      now_cost: Number(elem.now_cost || player?.now_cost || 0),
+      form: Number(elem.form || player?.form || 0),
+      points_per_game: Number(elem.points_per_game || player?.points_per_game || 0),
+      ep_next: Number(elem.ep_next || player?.ep_next || 0),
+      lineup_position: Number(player?.lineup_position || 0),
+      is_captain: isCaptain,
+      is_vice: !!player?.is_vice,
+      multiplier,
+      base_points: base,
+      final_points: finalPoints,
+      stats,
+      injury: parseInjuryStatus(elem) || player?.injury || null,
+      team_id: teamId,
+      team_name: teamMeta?.name || player?.team_name || "",
+      team_short: teamMeta?.short_name || player?.team_short || "",
+      team_logo_url: teamMeta?.logo_url || player?.team_logo_url || "/nba-team-logos/_.png",
+      is_effective: false,
+    };
+  });
+}
+
 function getFormationFromEffectivePlayers(picks) {
   const effectivePlayers = (Array.isArray(picks) ? picks : []).filter((pick) => !!pick?.is_effective);
   if (!effectivePlayers.length) return "N/A";
@@ -1348,10 +1386,45 @@ async function buildFreshHomepageState(baseState) {
       fetchJsonSafe(`/entry/${uid}/history/`, 2),
     ]);
     if (!picksRes.ok || !Array.isArray(picksRes.data?.picks)) {
-      freshScoresByUid[uid] = {
-        total_live: Number(previous?.total_live || 0),
-        event_total: Number(previous?.event_total || 0),
-      };
+      const sameEvent = Number(previous?.current_event || 0) === Number(currentEvent);
+      const previousPlayers = Array.isArray(previous?.players) ? previous.players : [];
+      if (sameEvent && previousPlayers.length) {
+        const rebuiltPlayers = rebuildLivePicksFromCachedPlayers(previousPlayers, elements, liveElements, teamsMetaById);
+        const [freshToday] = calculateEffectiveScore(rebuiltPlayers, teamsPlayingToday);
+        let summary = previous?.week_total_summary || null;
+        if (historyRes.ok && historyRes.data && typeof historyRes.data === "object") {
+          const historyWeek = calculateWeekScoresFromHistory(historyRes.data, currentWeek, currentEvent, eventMetaById);
+          if (historyWeek?.has_week_rows) {
+            summary = buildWeekTotalSummary(historyWeek, currentEvent, Number(previous?.gd1_missing_penalty || 0));
+          }
+        }
+        const fallbackWeek = Math.max(
+          0,
+          Number(previous?.event_total || 0) - Number(previous?.total_live || 0) + freshToday
+        );
+        const freshWeek = computeWeekTotalFromSummary(summary, freshToday) ?? fallbackWeek;
+        freshScoresByUid[uid] = {
+          total_live: freshToday,
+          event_total: freshWeek,
+        };
+        nextPicksByUid[uid] = {
+          ...previous,
+          current_event: currentEvent,
+          current_event_name: currentEventName,
+          players: rebuiltPlayers,
+          week_total_summary: summary,
+          fetch_status: {
+            ...(previous?.fetch_status || {}),
+            picks_ok: false,
+            history_ok: historyRes.ok || previous?.fetch_status?.history_ok === true,
+          },
+        };
+      } else {
+        freshScoresByUid[uid] = {
+          total_live: Number(previous?.total_live || 0),
+          event_total: Number(previous?.event_total || 0),
+        };
+      }
       return;
     }
 

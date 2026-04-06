@@ -1785,11 +1785,11 @@ const App = {
             this.lineupCache.clear();
             let state = null;
             try {
-                state = await API.getStateCached();
-            } catch (cachedError) {
-                console.warn("Initial cached state load failed:", cachedError);
+                state = await API.getStateFresh();
+            } catch (freshError) {
+                console.warn("Initial fresh state load failed:", freshError);
                 try {
-                    state = await API.getStateFresh();
+                    state = await API.getStateCached();
                 } catch (error) {
                     console.warn("[API Fallback] /api/state fallback failed", error);
                 }
