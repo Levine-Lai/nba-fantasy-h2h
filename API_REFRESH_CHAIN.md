@@ -113,6 +113,13 @@ Invoke-WebRequest -Method POST "https://nba-fantasy-api.nbafantasy.workers.dev/a
 
 默认就是静态刷新，不需要额外带 `mode=meta`。
 
+### 当前默认 refresh 的取舍
+
+- 默认 `/api/refresh` 只做静态缓存刷新
+- 不再在同一次 Worker 调用里顺手执行首页 `fresh_h2h`
+- 这样做的原因是：`meta refresh + fresh_h2h` 叠加后很容易触发 Cloudflare 免费版的 subrequest 上限
+- 首页实时比分和比赛详情的“今天态”，现在由 `/api/state` 和 `/api/fixture/{id}` 在读取时自动 fresh
+
 ### 当前负责刷新什么
 
 - 全员当前 event `picks`

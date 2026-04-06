@@ -100,7 +100,13 @@ Good Captain 不是“今天谁的球员分最高”，而是：
   - `chips_used_summary`
   - `good_captain_summary`
   - `transfer_trends`
-  - `ownership_top`
+- `ownership_top`
+
+补充说明：
+
+- 默认 `/api/refresh` 现在只负责静态缓存刷新，不再在同一次调用里顺手跑首页实时 `fresh_h2h`
+- 这样可以避免 Cloudflare 免费版的单次 subrequest 超限
+- 首页是否展示“今天实时数据”，改由 `/api/state` 在比赛窗口内自动判断并返回 fresh 结果
 
 这一步是“每天 DDL 后的一次日更刷新”的主入口。
 

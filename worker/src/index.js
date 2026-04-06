@@ -1740,7 +1740,8 @@ function buildGoodCaptainSummary(picksByUid) {
     }));
 }
 
-async function refreshManagerMetaState(env, existingState = null) {
+async function refreshManagerMetaState(env, existingState = null, options = {}) {
+  const lightweightCaptainDetails = options?.lightweightCaptainDetails !== false;
   const previousState = existingState || await getState(env);
   if (!previousState) {
     return refreshState(env, { full: true });
@@ -1841,7 +1842,7 @@ async function refreshManagerMetaState(env, existingState = null) {
       ? (captainChipEvent?.event ? currentWeek : null)
       : (Number(previous.captain_week || 0) || null);
     const activeChip = String(picksData?.active_chip || (eventChanged ? "" : (previous?.active_chip || ""))).toLowerCase();
-    const shouldResolveCaptainDetails = hasHistoryData && (
+    const shouldResolveCaptainDetails = !lightweightCaptainDetails && hasHistoryData && (
       eventChanged ||
       !previous?.captain_used?.used ||
       !previous?.captain_used?.captain_name ||
@@ -5239,24 +5240,11 @@ export default {
         const mode = String(rawMode || "meta").toLowerCase();
         let state;
         if (!rawMode || mode === "meta") {
-          state = await refreshManagerMetaState(env);
+          state = await refreshManagerMetaState(env, null, { lightweightCaptainDetails: true });
         } else if (mode === "full") {
           state = await refreshState(env, { full: true });
         } else {
           state = await refreshState(env, { full: false });
-        }
-        if (!rawMode || mode === "meta") {
-          const refreshContext = await getCurrentRefreshWindowContext();
-          if (refreshContext.active || refreshContext.window?.after_end) {
-            state = normalizeStateChipStatus(await buildFreshHomepageState(state));
-            state.generated_at = new Date().toISOString();
-            state.refresh_meta = {
-              ...(state?.refresh_meta || {}),
-              live_finalized_event: refreshContext.window?.after_end ? Number(refreshContext.current_event || 0) || null : (state?.refresh_meta?.live_finalized_event || null),
-              live_finalized_at: refreshContext.window?.after_end ? new Date().toISOString() : (state?.refresh_meta?.live_finalized_at || null),
-            };
-            await env.NBA_CACHE.put(CACHE_KEY, JSON.stringify(state));
-          }
         }
         return jsonResponse({
           success: true,
@@ -5442,15 +5430,15 @@ export default {
       const refreshContext = await getCurrentRefreshWindowContext(scheduledAt);
       let state = await getState(env);
       if (!state) {
-        await refreshManagerMetaState(env);
+        await refreshManagerMetaState(env, null, { lightweightCaptainDetails: true });
         return;
       }
       const currentEventChanged = Number(state?.current_event || 0) !== Number(refreshContext.current_event || 0);
       if (currentEventChanged) {
-        state = await refreshManagerMetaState(env, state);
+        state = await refreshManagerMetaState(env, state, { lightweightCaptainDetails: true });
       }
       if (!currentEventChanged && shouldRefreshManagerMeta(state, scheduledAt)) {
-        state = await refreshManagerMetaState(env, state);
+        state = await refreshManagerMetaState(env, state, { lightweightCaptainDetails: true });
       }
       if (refreshContext.active) return;
       const finalizedEvent = Number(state?.refresh_meta?.live_finalized_event || 0);
