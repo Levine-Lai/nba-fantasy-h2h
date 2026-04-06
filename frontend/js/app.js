@@ -94,6 +94,7 @@ const GW23_LAST_STANDINGS = [
 ];
 
 const MAX_TITLE_POINTS_REMAINING = 6;
+const FINAL_H2H_GW = 25;
 const TRANSFER_DIAGRAM_THRESHOLD = 2;
 const TRANSFER_DIAGRAM_OTHERS = "Others";
 
@@ -366,6 +367,7 @@ function buildStaticStandingsRows(state) {
 
 function buildLiveStandingsRows(state) {
     const currentGw = extractGameweekNumber(state?.current_event_name) || 24;
+    const remainingTitlePoints = Math.max(0, (FINAL_H2H_GW - currentGw) * 3);
     const byUid = {};
 
     GW23_LAST_STANDINGS.forEach((row) => {
@@ -426,7 +428,14 @@ function buildLiveStandingsRows(state) {
         .map((row, index) => ({
             ...row,
             rank: index + 1,
-        }));
+        }))
+        .map((row, _, rows) => {
+            const leaderPoints = rows.reduce((max, item) => Math.max(max, Number(item?.points || 0)), 0);
+            return {
+                ...row,
+                contender: Number(row?.points || 0) + remainingTitlePoints >= leaderPoints,
+            };
+        });
 }
 
 function renderStandingsTable(rows, options = {}) {
@@ -445,6 +454,7 @@ function renderStandingsTable(rows, options = {}) {
                         <th>W</th>
                         <th>D</th>
                         <th>L</th>
+                        <th>净胜分</th>
                         <th class="points-col">积分</th>
                     </tr>
                 </thead>
@@ -457,6 +467,7 @@ function renderStandingsTable(rows, options = {}) {
                             <td>${Number(row?.won || 0)}</td>
                             <td>${Number(row?.draw || 0)}</td>
                             <td>${Number(row?.lost || 0)}</td>
+                            <td>${Number(row?.diff || (Number(row?.scored || 0) - Number(row?.conceded || 0)) || 0)}</td>
                             <td class="points-cell">${Number(row?.points || 0)}</td>
                         </tr>
                     `).join("")}
@@ -1078,7 +1089,7 @@ const Render = {
         lastBadge.textContent = "GW23 Final";
         liveBadge.textContent = `GW${currentGw} Live`;
         lastWrap.innerHTML = renderStandingsTable(staticRows, { highlightContenders: true });
-        liveWrap.innerHTML = renderStandingsTable(liveRows);
+        liveWrap.innerHTML = renderStandingsTable(liveRows, { highlightContenders: true });
         renderFdrTableInto("rankings-fdr-header-row", "rankings-fdr-week-badge", "rankings-fdr-body", state?.fdr || {});
     },
 
