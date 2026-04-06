@@ -1,4 +1,59 @@
-﻿const BASE_URL = "https://nbafantasy.nba.com/api";
+import {
+  jsonResponse,
+  fetchJson,
+  fetchJsonSafe,
+  fetchTextUrl,
+  fetchJsonUrl,
+} from "./lib/http.js";
+import {
+  formatKickoffBj,
+  resolveFixtureStatus,
+} from "./lib/fixture-runtime.js";
+import {
+  extractGwNumber,
+  getCurrentEvent,
+  extractHistoryRecords,
+  extractChipHistoryRecords,
+  parseEventMetaFromName,
+  buildEventMetaById,
+  resolveTransferGwDay,
+  getWildcardDayFromHistory,
+  getChipDayMapFromHistory,
+  isWildcardActiveFromHistory,
+  countTransfersInGw,
+  countTransfersInGd1,
+  calculateTransferPenalty,
+} from "./lib/history-domain.js";
+import {
+  calculateWeekScoresFromHistory,
+  parseInjuryStatus,
+  getPlayerStats,
+  buildTeamsPlayingToday,
+  calculateEffectiveScore,
+  buildElementsMap,
+  buildLiveElementsMap,
+  buildTeamsMetaMap,
+  buildLivePicksFromPicksData,
+  rebuildLivePicksFromCachedPlayers,
+  getFormationFromEffectivePlayers,
+  getBeijingDateKey,
+  getBeijingHour,
+  buildWeekTotalSummary,
+  computeWeekTotalFromSummary,
+} from "./lib/live-score.js";
+import {
+  buildFreshHomepageState as buildFreshHomepageStateModule,
+  getHomepageFreshDecision as getHomepageFreshDecisionModule,
+  buildCurrentFixturePayload as buildCurrentFixturePayloadModule,
+} from "./lib/homepage-live.js";
+import {
+  countGoodCaptainManagers as countGoodCaptainManagersModule,
+  shouldRefreshManagerMeta as shouldRefreshManagerMetaModule,
+  buildChipsUsedSummary as buildChipsUsedSummaryModule,
+  buildGoodCaptainSummary as buildGoodCaptainSummaryModule,
+  refreshManagerMetaState as refreshManagerMetaStateModule,
+} from "./lib/manager-meta.js";
+
 const LEAGUE_ID = 1653;
 const CACHE_KEY = "latest_state";
 const CACHE_CURSOR_KEY = "refresh_cursor";
@@ -451,43 +506,6 @@ function buildFdrPayload({ standingsByUid = {}, currentWeek }) {
   };
 }
 
-function formatKickoffBj(isoTime) {
-  if (!isoTime) return "--:--";
-  const dt = new Date(isoTime);
-  if (Number.isNaN(dt.getTime())) return "--:--";
-  
-  // 只返回北京时间的小时和分钟
-  return dt.toLocaleTimeString("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Shanghai",
-  });
-}
-
-function resolveFixtureStatus(fixture) {
-  const kickoffMs = fixture?.kickoff_time ? new Date(fixture.kickoff_time).getTime() : null;
-  const nowMs = Date.now();
-  const finished = !!(fixture?.finished || fixture?.finished_provisional);
-
-  if (finished) {
-    return { code: "finished", label: "已结束" };
-  }
-
-  if (fixture?.started) {
-    if (Number.isFinite(kickoffMs) && nowMs - kickoffMs >= 5 * 60 * 60 * 1000) {
-      return { code: "finished", label: "已结束" };
-    }
-    const minutes = Number(fixture?.minutes || 0);
-    if (minutes > 0) {
-      return { code: "live", label: `进行中 ${minutes}'` };
-    }
-    return { code: "live", label: "进行中" };
-  }
-
-  return { code: "upcoming", label: "未开始" };
-}
-
 function topListFromMap(counter, limit = 10) {
   return [...counter.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -632,84 +650,6 @@ async function buildGlobalTransferTrends(elements) {
   };
 }
 
-function jsonResponse(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "access-control-allow-origin": "*",
-      "access-control-allow-methods": "GET,POST,OPTIONS",
-      "access-control-allow-headers": "content-type,authorization",
-    },
-  });
-}
-
-async function fetchJson(path, retries = 3) {
-  let lastError = null;
-  for (let i = 0; i <= retries; i += 1) {
-    try {
-      const res = await fetch(`${BASE_URL}${path}`, {
-        headers: { "user-agent": "Mozilla/5.0" },
-      });
-      if (!res.ok) throw new Error(`fetch failed ${path}: ${res.status}`);
-      return res.json();
-    } catch (error) {
-      lastError = error;
-      if (i < retries) {
-        await new Promise((resolve) => setTimeout(resolve, 250 * (i + 1)));
-      }
-    }
-  }
-  throw lastError || new Error(`fetch failed ${path}`);
-}
-
-async function fetchJsonSafe(path, retries = 3) {
-  try {
-    const data = await fetchJson(path, retries);
-    return { ok: true, data };
-  } catch (error) {
-    return { ok: false, data: null, error: String(error?.message || error || "fetch failed") };
-  }
-}
-
-async function fetchTextUrl(url, retries = 2) {
-  let lastError = null;
-  for (let i = 0; i <= retries; i += 1) {
-    try {
-      const res = await fetch(url, {
-        headers: { "user-agent": "Mozilla/5.0" },
-      });
-      if (!res.ok) throw new Error(`fetch failed ${url}: ${res.status}`);
-      return await res.text();
-    } catch (error) {
-      lastError = error;
-      if (i < retries) {
-        await new Promise((resolve) => setTimeout(resolve, 250 * (i + 1)));
-      }
-    }
-  }
-  throw lastError || new Error(`fetch failed ${url}`);
-}
-
-async function fetchJsonUrl(url, retries = 2) {
-  let lastError = null;
-  for (let i = 0; i <= retries; i += 1) {
-    try {
-      const res = await fetch(url, {
-        headers: { "user-agent": "Mozilla/5.0" },
-      });
-      if (!res.ok) throw new Error(`fetch failed ${url}: ${res.status}`);
-      return await res.json();
-    } catch (error) {
-      lastError = error;
-      if (i < retries) {
-        await new Promise((resolve) => setTimeout(resolve, 250 * (i + 1)));
-      }
-    }
-  }
-  throw lastError || new Error(`fetch failed ${url}`);
-}
-
 function decodeHtmlEntities(text) {
   return String(text || "")
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code || 0)))
@@ -762,590 +702,96 @@ async function fetchAllStandings(phase) {
   return Array.isArray(fallback.data?.standings?.results) ? fallback.data.standings.results : [];
 }
 
-function extractGwNumber(value) {
-  if (value === null || value === undefined) return null;
-  const text = String(value);
-  const match = text.match(/(\d+)/);
-  return match ? Number(match[1]) : null;
-}
-
-function getCurrentEvent(events) {
-  const current = events.find((e) => e.is_current);
-  if (current) return [current.id, current.name || `GW${current.id}`];
-  const firstUnfinished = events.find((e) => !e.finished);
-  if (firstUnfinished) return [firstUnfinished.id, firstUnfinished.name || `GW${firstUnfinished.id}`];
-  const last = events[events.length - 1];
-  return [last?.id || 1, last?.name || "GW1"];
-}
-
-function fantasyScore(stats) {
-  return Math.floor(
-    (stats?.points_scored || 0) * 1 +
-      (stats?.rebounds || 0) * 1 +
-      (stats?.assists || 0) * 2 +
-      (stats?.steals || 0) * 3 +
-      (stats?.blocks || 0) * 3
-  );
-}
-
-function parseInjuryStatus(elem) {
-  if (!elem) return null;
-  const status = String(elem.status || "").toLowerCase();
-  if (!status || status === "a") return null;
-
-  const news = String(elem.news || "").trim();
-  if (news) {
-    const lower = news.toLowerCase();
-    if (lower.includes("expected")) {
-      return news.slice(0, lower.indexOf("expected")).trim() || "OUT";
-    }
-    return news;
-  }
-
-  if (status === "u") return "Unavailable";
-  if (status === "s") return "Suspended";
-  return "OUT";
-}
-
-function extractHistoryRecords(historyData) {
-  if (!historyData || typeof historyData !== "object") return [];
-  for (const key of ["history", "chips", "card_history", "cards", "events", "results"]) {
-    if (Array.isArray(historyData[key])) return historyData[key];
-  }
-  return [];
-}
-
-function extractChipHistoryRecords(historyData) {
-  if (!historyData || typeof historyData !== "object") return [];
-  if (Array.isArray(historyData.chips)) return historyData.chips;
-  for (const key of ["card_history", "cards", "events", "results", "history"]) {
-    if (Array.isArray(historyData[key])) return historyData[key];
-  }
-  return [];
-}
-
-function parseEventMetaFromName(eventName) {
-  const text = String(eventName || "");
-  // 尝试匹配 "Gameweek 22 - Day 7" 格式
-  let match = text.match(/gameweek\s*(\d+)\s*-\s*day\s*(\d+)/i);
-  if (match) {
-    return { gw: Number(match[1]), day: Number(match[2]) };
-  }
-  // 尝试匹配 "GW22.7" 或 "22.7" 格式
-  match = text.match(/(?:GW)?(\d+)\.(\d+)/i);
-  if (match) {
-    return { gw: Number(match[1]), day: Number(match[2]) };
-  }
-  // 尝试匹配 "GW22 Day7" 格式（没有横线）
-  match = text.match(/(?:GW)?(\d+)[\s-]+day\s*(\d+)/i);
-  if (match) {
-    return { gw: Number(match[1]), day: Number(match[2]) };
-  }
-  return { gw: extractGwNumber(text), day: null };
-}
-
-function buildEventMetaById(events) {
-  const map = {};
-  for (const item of events || []) {
-    const id = Number(item?.id);
-    if (!id) continue;
-    const meta = parseEventMetaFromName(item?.name || "");
-    map[id] = {
-      gw: meta.gw,
-      day: meta.day,
-      name: item?.name || "",
-    };
-  }
-  return map;
-}
-
-function resolveTransferGwDay(transfer, eventMetaById) {
-  const eventId = Number(transfer?.event);
-  const eventMeta = eventMetaById?.[eventId] || {};
-
-  const gw =
-    Number(transfer?.gw || transfer?.gameweek || eventMeta.gw || extractGwNumber(transfer?.event)) || null;
-
-  let day = null;
-  for (const key of ["day", "game_day", "gameday"]) {
-    const value = transfer?.[key];
-    if (value !== undefined && value !== null) {
-      day = Number(value);
-      if (!Number.isNaN(day)) break;
-    }
-  }
-  if (!day && eventMeta.day) day = Number(eventMeta.day);
-  if (!day) {
-    const ev = transfer?.event;
-    if (typeof ev === "number") {
-      const frac = ev - Math.trunc(ev);
-      const parsed = Math.round(frac * 10);
-      if (parsed > 0) day = parsed;
-    } else if (typeof ev === "string" && ev.includes(".")) {
-      const part = ev.split(".", 2)[1];
-      const m = part.match(/(\d+)/);
-      if (m) day = Number(m[1]);
-    }
-  }
-  return { gw, day };
-}
-
-function getWildcardDayFromHistory(historyData, currentGw, currentEvent, eventMetaById) {
-  for (const item of extractChipHistoryRecords(historyData)) {
-    const name = String(item?.name || "").toLowerCase();
-    if (name !== "wildcard" && name !== "wild_card") continue;
-    const itemEvent = item?.event;
-    const eventMeta = eventMetaById?.[Number(itemEvent)] || {};
-    const itemGw = item?.gw || item?.gameweek || eventMeta.gw || extractGwNumber(itemEvent);
-    if (itemGw !== currentGw && itemEvent !== currentEvent) continue;
-    const day = Number(eventMeta.day || item?.day || 0) || null;
-    if (day) return day;
-    if (Number(itemEvent) === Number(currentEvent)) {
-      return Number(eventMetaById?.[Number(currentEvent)]?.day || 0) || null;
-    }
-  }
-  return null;
-}
-
-function getChipDayMapFromHistory(historyData, currentGw, currentEvent, eventMetaById) {
-  const chipDayMap = {};
-  for (const item of extractChipHistoryRecords(historyData)) {
-    const rawName = String(item?.name || "").toLowerCase();
-    if (!rawName) continue;
-    const itemEvent = item?.event;
-    const eventMeta = eventMetaById?.[Number(itemEvent)] || {};
-    const itemGw = item?.gw || item?.gameweek || eventMeta.gw || extractGwNumber(itemEvent);
-    if (itemGw !== currentGw && itemEvent !== currentEvent) continue;
-    const day = Number(eventMeta.day || item?.day || 0) || null;
-    if (!day) continue;
-    chipDayMap[day] = rawName;
-  }
-  return chipDayMap;
-}
-
-function isWildcardActiveFromHistory(historyData, currentGw, currentEvent, eventMetaById) {
-  return getWildcardDayFromHistory(historyData, currentGw, currentEvent, eventMetaById) !== null;
-}
-
-function countTransfersInGw(transfers, currentGw, eventMetaById) {
-  let count = 0;
-  for (const t of transfers || []) {
-    const { gw } = resolveTransferGwDay(t, eventMetaById);
-    if (gw === currentGw) count += 1;
-  }
-  return count;
-}
-
-function countTransfersInGd1(transfers, currentGw, eventMetaById) {
-  let count = 0;
-  for (const t of transfers || []) {
-    const { gw, day } = resolveTransferGwDay(t, eventMetaById);
-    if (gw !== currentGw) continue;
-    if (day === 1) count += 1;
-  }
-  return count;
-}
-
-function calculateTransferPenalty(transferCount) {
-  return Math.max(0, transferCount - 2) * 100;
-}
-
-function calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById) {
-  const rows = Array.isArray(historyData?.current) ? historyData.current : [];
-  let weeklyPoints = 0;
-  let todayPoints = null;
-  let hasWeekRows = false;
-  const pointsByDay = {};
-  const transferCostByDay = {};
-  const pointsByEvent = {};
-  const transferCostByEvent = {};
-  let currentEventTransferCost = 0;
-
-  for (const row of rows) {
-    if (!row || typeof row !== "object") continue;
-    const eventId = Number(row.event);
-    if (!eventId) continue;
-
-    const points = Number(row.points || 0) / 10;
-    const transferCost = Number(row.event_transfers_cost || 0) / 10;
-    if (eventId === currentEvent) {
-      todayPoints = Math.round(points);
-      currentEventTransferCost = Math.round(transferCost);
-    }
-
-    const meta = eventMetaById?.[eventId];
-    if (!meta || meta.gw !== currentWeek) continue;
-
-    hasWeekRows = true;
-    weeklyPoints += points;
-    pointsByEvent[eventId] = Number((pointsByEvent[eventId] || 0) + points);
-    transferCostByEvent[eventId] = Number((transferCostByEvent[eventId] || 0) + transferCost);
-    const day = meta.day || 1;
-    if (!pointsByDay[day]) pointsByDay[day] = 0;
-    pointsByDay[day] += points;
-    if (!transferCostByDay[day]) transferCostByDay[day] = 0;
-    transferCostByDay[day] += transferCost;
-  }
-
+function buildHomepageLiveDeps() {
   return {
-    has_week_rows: hasWeekRows,
-    weekly_points: Math.round(weeklyPoints),
-    today_points: todayPoints,
-    points_by_day: pointsByDay,
-    transfer_cost_by_day: transferCostByDay,
-    points_by_event: pointsByEvent,
-    transfer_cost_by_event: transferCostByEvent,
-    current_event_transfer_cost: currentEventTransferCost,
+    normalizeUid,
+    fetchJson,
+    fetchJsonSafe,
+    getCurrentEvent,
+    buildEventMetaById,
+    parseEventMetaFromName,
+    extractGwNumber,
+    buildWeekEventIds,
+    buildElementsMap,
+    buildTeamsMetaMap,
+    getTeamVisualMeta,
+    buildLiveElementsMap,
+    buildTeamsPlayingToday,
+    resolveFixtureStatus,
+    mapLimit,
+    rebuildLivePicksFromCachedPlayers,
+    calculateEffectiveScore,
+    calculateWeekScoresFromHistory,
+    buildWeekTotalSummary,
+    computeWeekTotalFromSummary,
+    buildLivePicksFromPicksData,
+    getPlayerStats,
+    syncMatchesWithPicksByUid,
+    buildResolvedWinProbabilitySummary,
+    buildWinProbabilitySummary,
+    formatKickoffBj,
+    getFixtureRefreshWindowInfo,
   };
 }
 
-function getPlayerStats(elementId, liveElements, elements) {
-  const live = liveElements[elementId];
-  const elem = elements[elementId] || {};
-  const stats = live?.stats || null;
-  if (!stats) {
-    const fallbackFantasy = Math.round(Number(elem.event_points || 0) / 10);
-    return {
-      points: 0,
-      rebounds: 0,
-      assists: 0,
-      steals: 0,
-      blocks: 0,
-      minutes: 0,
-      fantasy: fallbackFantasy,
-    };
-  }
+function buildManagerMetaDeps() {
   return {
-    points: Number(stats.points_scored || 0),
-    rebounds: Number(stats.rebounds || 0),
-    assists: Number(stats.assists || 0),
-    steals: Number(stats.steals || 0),
-    blocks: Number(stats.blocks || 0),
-    minutes: Number(stats.minutes || 0),
-    fantasy: fantasyScore(stats),
+    CACHE_KEY,
+    UID_LIST,
+    UID_MAP,
+    hasDetailedTrendList,
+    getState,
+    refreshState,
+    fetchJson,
+    fetchJsonSafe,
+    getCurrentEvent,
+    buildElementsMap,
+    buildEventMetaById,
+    parseEventMetaFromName,
+    extractGwNumber,
+    buildLiveElementsMap,
+    buildTeamsMetaMap,
+    getTeamVisualMeta,
+    buildTeamsPlayingToday,
+    buildPreviousPicksByUid,
+    mapLimit,
+    uidToNumber,
+    normalizeUid,
+    buildWeeklyTransferSummary,
+    getChipDayMapFromHistory,
+    getWildcardDayFromHistory,
+    getWildcardPostGw17Event,
+    getSeasonChipEvent,
+    calculateWeekScoresFromHistory,
+    buildWeekTotalSummary,
+    getCaptainChipEvent,
+    buildCaptainUsageSummary,
+    buildCaptainUsageFromHistoryOnly,
+    buildPersistedChipStatus,
+    buildChipStatusSummary,
+    buildLivePicksFromPicksData,
+    calculateEffectiveScore,
+    computeWeekTotalFromSummary,
+    buildLineupEconomySummary,
+    buildOwnershipSummary,
+    buildTransferTrends,
+    syncMatchesWithPicksByUid,
+    resolveFixtureStatus,
+    formatKickoffBj,
+    getPlayerStats,
   };
-}
-
-function buildTeamsPlayingToday(fixtures) {
-  const teamIds = new Set();
-  for (const fixture of fixtures || []) {
-    if (fixture?.team_h) teamIds.add(Number(fixture.team_h));
-    if (fixture?.team_a) teamIds.add(Number(fixture.team_a));
-  }
-  return teamIds;
-}
-
-function hasPlayerRecordedToday(pick) {
-  const stats = pick?.stats || {};
-  const minutes = Number(stats?.minutes || 0);
-  const boxScoreSum =
-    Number(stats?.points || 0) +
-    Number(stats?.rebounds || 0) +
-    Number(stats?.assists || 0) +
-    Number(stats?.steals || 0) +
-    Number(stats?.blocks || 0);
-  const fantasy = Number(stats?.fantasy || pick?.base_points || pick?.final_points || 0);
-  return minutes > 0 || boxScoreSum > 0 || fantasy > 0;
-}
-
-function isPlayerAvailable(pick, teamsPlayingToday) {
-  if (pick.team_id && !teamsPlayingToday.has(Number(pick.team_id))) return false;
-  if (hasPlayerRecordedToday(pick)) return true;
-  if (pick.injury) return false;
-  return true;
-}
-
-function calculateEffectiveScore(picks, teamsPlayingToday) {
-  for (const p of picks) p.is_effective = false;
-  const ordered = [...picks].sort((a, b) => Number(a.lineup_position || 0) - Number(b.lineup_position || 0));
-  const available = ordered.filter((pick) => isPlayerAvailable(pick, teamsPlayingToday));
-
-  const compareCandidates = (left, right) => {
-    if (!left) return right;
-    if (!right) return left;
-    if (left.selected.length !== right.selected.length) {
-      return left.selected.length > right.selected.length ? left : right;
-    }
-    const leftBalance = Math.min(left.bcCount, 2) + Math.min(left.fcCount, 2);
-    const rightBalance = Math.min(right.bcCount, 2) + Math.min(right.fcCount, 2);
-    if (leftBalance !== rightBalance) {
-      return leftBalance > rightBalance ? left : right;
-    }
-    if (left.starterCount !== right.starterCount) {
-      return left.starterCount > right.starterCount ? left : right;
-    }
-    const length = Math.min(left.positions.length, right.positions.length);
-    for (let index = 0; index < length; index += 1) {
-      if (left.positions[index] !== right.positions[index]) {
-        return left.positions[index] < right.positions[index] ? left : right;
-      }
-    }
-    return left;
-  };
-
-  const search = (index, selected, bcCount, fcCount, starterCount, positions) => {
-    if (selected.length > 5 || bcCount > 3 || fcCount > 3) return null;
-    if (index >= available.length) {
-      return {
-        selected: [...selected],
-        bcCount,
-        fcCount,
-        starterCount,
-        positions: [...positions],
-      };
-    }
-
-    const current = available[index];
-    let best = search(index + 1, selected, bcCount, fcCount, starterCount, positions);
-
-    const nextBcCount = bcCount + (Number(current?.position_type || 0) === 1 ? 1 : 0);
-    const nextFcCount = fcCount + (Number(current?.position_type || 0) === 2 ? 1 : 0);
-    if (nextBcCount <= 3 && nextFcCount <= 3) {
-      selected.push(current);
-      positions.push(Number(current?.lineup_position || 0));
-      const withCurrent = search(
-        index + 1,
-        selected,
-        nextBcCount,
-        nextFcCount,
-        starterCount + (Number(current?.lineup_position || 0) <= 5 ? 1 : 0),
-        positions
-      );
-      positions.pop();
-      selected.pop();
-      best = compareCandidates(withCurrent, best);
-    }
-
-    return best;
-  };
-
-  const best = search(0, [], 0, 0, 0, []) || {
-    selected: [],
-    bcCount: 0,
-    fcCount: 0,
-  };
-  for (const pick of best.selected) pick.is_effective = true;
-  const score = best.selected.reduce((sum, pick) => sum + Number(pick.final_points || 0), 0);
-  const formation = `${Number(best.bcCount || 0)}BC+${Number(best.fcCount || 0)}FC`;
-  return [Math.floor(score), best.selected, formation];
-}
-
-function buildElementsMap(bootstrap) {
-  const elements = {};
-  for (const e of bootstrap?.elements || []) {
-    const playerCode = Number(e.code || 0) || null;
-    elements[e.id] = {
-      name: e.web_name || `#${e.id}`,
-      player_code: playerCode,
-      headshot_url: playerCode ? `https://cdn.nba.com/headshots/nba/latest/520x380/${playerCode}.png` : null,
-      team: e.team,
-      position: e.element_type,
-      position_name: e.element_type === 1 ? "BC" : e.element_type === 2 ? "FC" : "UNK",
-      now_cost: Number(e.now_cost || 0),
-      form: Number(e.form || 0),
-      points_per_game: Number(e.points_per_game || 0),
-      ep_next: Number(e.ep_next || 0),
-      event_points: e.event_points || 0,
-      points_scored: e.points_scored || 0,
-      total_points: e.total_points || 0,
-      status: e.status || "",
-      news: e.news || "",
-    };
-  }
-  return elements;
-}
-
-function buildLiveElementsMap(liveRaw) {
-  const liveElements = {};
-  const rawElements = liveRaw?.elements;
-  if (Array.isArray(rawElements)) {
-    for (const item of rawElements) liveElements[item.id] = item;
-  } else if (rawElements && typeof rawElements === "object") {
-    for (const [k, v] of Object.entries(rawElements)) liveElements[Number(k)] = v;
-  }
-  return liveElements;
-}
-
-function buildTeamsMetaMap(bootstrap) {
-  const map = {};
-  for (const team of bootstrap?.teams || []) {
-    const teamId = Number(team?.id || 0);
-    if (!teamId) continue;
-    const visual = getTeamVisualMeta(team?.name || "");
-    map[teamId] = {
-      id: teamId,
-      name: team?.name || `Team #${teamId}`,
-      short_name: team?.short_name || team?.name || `#${teamId}`,
-      color: visual.color,
-      logo_url: visual.logo_url,
-    };
-  }
-  return map;
-}
-
-function buildLivePicksFromPicksData(picksData, elements, liveElements, teamsMetaById = {}) {
-  return (picksData?.picks || []).map((pick) => {
-    const elementId = Number(pick?.element || 0);
-    const elem = elements[elementId] || {};
-    const teamMeta = teamsMetaById[Number(elem.team || 0)] || {};
-    const stats = getPlayerStats(elementId, liveElements, elements);
-    const base = Number(stats?.fantasy || 0);
-    const isCaptain = !!pick?.is_captain;
-    const multiplier = Number(pick?.multiplier || 1) || 1;
-    const finalPoints = isCaptain ? base * multiplier : base;
-    return {
-      element_id: elementId,
-      name: elem.name || `#${elementId}`,
-      position_type: elem.position || 0,
-      position_name: elem.position_name || "UNK",
-      now_cost: Number(elem.now_cost || 0),
-      form: Number(elem.form || 0),
-      points_per_game: Number(elem.points_per_game || 0),
-      ep_next: Number(elem.ep_next || 0),
-      lineup_position: Number(pick?.position || 0),
-      is_captain: isCaptain,
-      is_vice: !!pick?.is_vice_captain,
-      multiplier,
-      base_points: base,
-      final_points: finalPoints,
-      stats,
-      injury: parseInjuryStatus(elem),
-      team_id: elem.team || 0,
-      team_name: teamMeta?.name || "",
-      team_short: teamMeta?.short_name || "",
-      team_logo_url: teamMeta?.logo_url || "/nba-team-logos/_.png",
-      is_effective: false,
-    };
-  });
-}
-
-function rebuildLivePicksFromCachedPlayers(players, elements, liveElements, teamsMetaById = {}) {
-  return (Array.isArray(players) ? players : []).map((player) => {
-    const elementId = Number(player?.element_id || 0);
-    const elem = elements[elementId] || {};
-    const teamId = Number(elem.team || player?.team_id || 0);
-    const teamMeta = teamsMetaById[teamId] || {};
-    const stats = getPlayerStats(elementId, liveElements, elements);
-    const base = Number(stats?.fantasy || 0);
-    const isCaptain = !!player?.is_captain;
-    const multiplier = Number(player?.multiplier || 1) || 1;
-    const finalPoints = isCaptain ? base * multiplier : base;
-    return {
-      ...player,
-      element_id: elementId,
-      name: elem.name || player?.name || `#${elementId}`,
-      position_type: elem.position || Number(player?.position_type || 0),
-      position_name: elem.position_name || player?.position_name || "UNK",
-      now_cost: Number(elem.now_cost || player?.now_cost || 0),
-      form: Number(elem.form || player?.form || 0),
-      points_per_game: Number(elem.points_per_game || player?.points_per_game || 0),
-      ep_next: Number(elem.ep_next || player?.ep_next || 0),
-      lineup_position: Number(player?.lineup_position || 0),
-      is_captain: isCaptain,
-      is_vice: !!player?.is_vice,
-      multiplier,
-      base_points: base,
-      final_points: finalPoints,
-      stats,
-      injury: parseInjuryStatus(elem) || player?.injury || null,
-      team_id: teamId,
-      team_name: teamMeta?.name || player?.team_name || "",
-      team_short: teamMeta?.short_name || player?.team_short || "",
-      team_logo_url: teamMeta?.logo_url || player?.team_logo_url || "/nba-team-logos/_.png",
-      is_effective: false,
-    };
-  });
-}
-
-function getFormationFromEffectivePlayers(picks) {
-  const effectivePlayers = (Array.isArray(picks) ? picks : []).filter((pick) => !!pick?.is_effective);
-  if (!effectivePlayers.length) return "N/A";
-  const bcCount = effectivePlayers.filter((pick) => Number(pick?.position_type || 0) === 1).length;
-  const fcCount = effectivePlayers.filter((pick) => Number(pick?.position_type || 0) === 2).length;
-  return `${bcCount}BC+${fcCount}FC`;
-}
-
-function getBeijingDateKey(value = Date.now()) {
-  const date = value instanceof Date ? value : new Date(value);
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-function getBeijingHour(value = Date.now()) {
-  const date = value instanceof Date ? value : new Date(value);
-  return Number(new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Shanghai",
-    hour: "2-digit",
-    hour12: false,
-  }).format(date));
 }
 
 function countGoodCaptainManagers(summary) {
-  return (Array.isArray(summary) ? summary : []).reduce((sum, item) => (
-    sum + (Array.isArray(item?.managers) ? item.managers.length : 0)
-  ), 0);
+  return countGoodCaptainManagersModule(summary);
 }
 
 function shouldRefreshManagerMeta(state, value = Date.now()) {
-  if (!state || typeof state !== "object") return true;
-  if (!state?.refresh_meta?.meta_updated_at) return true;
-  const currentEvent = Number(state?.current_event || 0);
-  const metaEvent = Number(state?.refresh_meta?.meta_event || 0);
-  if (!currentEvent || metaEvent !== currentEvent) return true;
-  if (!Array.isArray(state?.chips_used_summary) || state.chips_used_summary.length === 0) return true;
-  const captainChipSummary = (state.chips_used_summary || []).find((item) => String(item?.key || "") === "captain");
-  const expectedCaptainManagers = Number(captainChipSummary?.used_count || 0);
-  const actualCaptainManagers = countGoodCaptainManagers(state?.good_captain_summary);
-  if (expectedCaptainManagers !== actualCaptainManagers) return true;
-  if (!hasDetailedTrendList(state?.transfer_trends?.league?.top_in)) return true;
-  if (!Array.isArray(state?.h2h) || state.h2h.length === 0) return true;
-  if (!state?.picks_by_uid || typeof state.picks_by_uid !== "object") return true;
-  return false;
-}
-
-function buildWeekTotalSummary(historyWeek, currentEvent, gd1MissingPenalty) {
-  if (!historyWeek?.has_week_rows) return null;
-  const currentEventId = Number(currentEvent || 0);
-  const currentEventPoints = Number(historyWeek.points_by_event?.[currentEventId] || 0);
-  const settledPoints = Number(historyWeek.weekly_points || 0) - currentEventPoints;
-
-  let settledTransferCost = 0;
-  for (const [rawEventId, rawCost] of Object.entries(historyWeek.transfer_cost_by_event || {})) {
-    const eventId = Number(rawEventId || 0);
-    if (!eventId || eventId === currentEventId) continue;
-    settledTransferCost += Number(rawCost || 0);
-  }
-
-  const todayTransferCost = Number(
-    historyWeek.current_event_transfer_cost || historyWeek.transfer_cost_by_event?.[currentEventId] || 0
-  );
-  const recordedDay1Cost = Number(historyWeek.transfer_cost_by_day?.[1] || 0);
-  const manualDay1Penalty = recordedDay1Cost > 0 ? 0 : Number(gd1MissingPenalty || 0);
-
-  return {
-    settled_points: Number(settledPoints || 0),
-    settled_transfer_cost: Number(settledTransferCost || 0),
-    current_event_transfer_cost: Number(todayTransferCost || 0),
-    manual_day1_penalty: Number(manualDay1Penalty || 0),
-  };
-}
-
-function computeWeekTotalFromSummary(summary, todayScore) {
-  if (!summary) return null;
-  const total =
-    Number(summary.settled_points || 0) +
-    Number(todayScore || 0) -
-    Number(summary.settled_transfer_cost || 0) -
-    Number(summary.current_event_transfer_cost || 0) -
-    Number(summary.manual_day1_penalty || 0);
-  return Math.max(0, Math.round(total));
+  return shouldRefreshManagerMetaModule(state, value, buildManagerMetaDeps());
 }
 
 async function buildFreshHomepageState(baseState) {
+  return buildFreshHomepageStateModule(baseState, buildHomepageLiveDeps());
   const matches = Array.isArray(baseState?.h2h) ? baseState.h2h : [];
   if (!matches.length) return baseState;
 
@@ -1368,7 +814,7 @@ async function buildFreshHomepageState(baseState) {
   const currentWeek = currentMeta.gw || extractGwNumber(currentEventName) || extractGwNumber(currentEvent) || 22;
   const futureWeekEventIds = buildWeekEventIds(events, currentWeek, currentEvent);
   const elements = buildElementsMap(bootstrap);
-  const teamsMetaById = buildTeamsMetaMap(bootstrap);
+  const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
   const liveElements = buildLiveElementsMap(liveRaw);
   const currentFixtures = Array.isArray(fixturesRaw) ? fixturesRaw : [];
   const teamsPlayingToday = buildTeamsPlayingToday(currentFixtures);
@@ -1602,6 +1048,7 @@ async function buildFreshHomepageState(baseState) {
 }
 
 async function getHomepageFreshDecision(state, value = Date.now()) {
+  return getHomepageFreshDecisionModule(state, value, buildHomepageLiveDeps());
   const bootstrap = await fetchJson("/bootstrap-static/", 1);
   const events = Array.isArray(bootstrap?.events) ? bootstrap.events : [];
   const [actualCurrentEvent, actualCurrentEventName] = getCurrentEvent(events);
@@ -1623,6 +1070,7 @@ async function getHomepageFreshDecision(state, value = Date.now()) {
 }
 
 async function buildCurrentFixturePayload(baseState = null) {
+  return buildCurrentFixturePayloadModule(baseState, buildHomepageLiveDeps());
   const bootstrap = await fetchJson("/bootstrap-static/", 1);
   const events = Array.isArray(bootstrap?.events) ? bootstrap.events : [];
   const [currentEvent, currentEventName] = getCurrentEvent(events);
@@ -1721,6 +1169,7 @@ async function buildCurrentFixturePayload(baseState = null) {
 }
 
 function buildChipsUsedSummary(picksByUid) {
+  return buildChipsUsedSummaryModule(picksByUid, buildManagerMetaDeps());
   const totalManagers = UID_LIST.length;
   const chips = [
     {
@@ -1761,6 +1210,7 @@ function buildChipsUsedSummary(picksByUid) {
 }
 
 function buildGoodCaptainSummary(picksByUid) {
+  return buildGoodCaptainSummaryModule(picksByUid, buildManagerMetaDeps());
   const grouped = new Map();
 
   for (const uid of UID_LIST) {
@@ -1814,6 +1264,7 @@ function buildGoodCaptainSummary(picksByUid) {
 }
 
 async function refreshManagerMetaState(env, existingState = null, options = {}) {
+  return refreshManagerMetaStateModule(env, existingState, options, buildManagerMetaDeps());
   const lightweightCaptainDetails = options?.lightweightCaptainDetails !== false;
   const previousState = existingState || await getState(env);
   if (!previousState) {
@@ -1832,7 +1283,7 @@ async function refreshManagerMetaState(env, existingState = null, options = {}) 
     fetchJson(`/fixtures/?event=${currentEvent}`, 1),
   ]);
   const liveElements = buildLiveElementsMap(liveRaw);
-  const teamsMetaById = buildTeamsMetaMap(bootstrap);
+  const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
   const currentFixtures = Array.isArray(fixturesRaw) ? fixturesRaw : [];
   const teamsPlayingToday = buildTeamsPlayingToday(currentFixtures);
   const eventLiveCache = {
@@ -2565,7 +2016,7 @@ async function buildFreshManagerPanelPayload(baseState, uid) {
   const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(currentEventName || previous?.current_event_name || "");
   const currentWeek = currentMeta.gw || extractGwNumber(currentEventName) || extractGwNumber(currentEvent) || 22;
   const elements = buildElementsMap(bootstrap);
-  const teamsMetaById = buildTeamsMetaMap(bootstrap);
+  const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
   const eventLiveCache = {};
 
   let [picksRes, historyRes, transfersRes] = await Promise.all([
@@ -3364,7 +2815,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   const weeklyStandingsPhase = currentWeek >= 1 && currentWeek <= 25 ? currentWeek + 1 : null;
   const futureWeekEventIds = buildWeekEventIds(events, currentWeek, currentEvent);
   const previousPicksByUid = buildPreviousPicksByUid(previousState);
-  const teamsMetaById = buildTeamsMetaMap(bootstrap);
+  const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
 
   const teams = {};
   for (const t of bootstrap.teams || []) teams[t.id] = t.name;
@@ -4926,6 +4377,7 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
       label: toGwDayLabel(meta?.gw, meta?.day),
       captain_name: elements[elementId]?.name || `#${elementId}`,
       captain_points: Math.round(fantasyPoints),
+      ownership_percent: Number(elements[elementId]?.selected_by_percent || 0),
     });
   }
 
@@ -5059,6 +4511,13 @@ async function buildSeasonSummaryPayload(uidInput) {
   const favoriteCaptain = [...captainNameCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
   const bestCaptain = [...captainRecords].sort((a, b) => Number(b?.captain_points || 0) - Number(a?.captain_points || 0))[0] || null;
   const worstCaptain = [...captainRecords].sort((a, b) => Number(a?.captain_points || 0) - Number(b?.captain_points || 0))[0] || null;
+  const lowestOwnershipCaptain = [...captainRecords]
+    .filter((item) => Number(item?.ownership_percent || 0) > 0)
+    .sort((a, b) =>
+      Number(a?.ownership_percent || 0) - Number(b?.ownership_percent || 0) ||
+      Number(b?.captain_points || 0) - Number(a?.captain_points || 0) ||
+      Number(a?.event || 0) - Number(b?.event || 0)
+    )[0] || null;
 
   const bestDayRow = [...rows].sort((a, b) => Number(b?.points || 0) - Number(a?.points || 0))[0] || null;
   const bestDayMeta = eventMetaById?.[Number(bestDayRow?.event || 0)] || {};
@@ -5231,10 +4690,19 @@ async function buildSeasonSummaryPayload(uidInput) {
     },
     captain: {
       lead: "Captain 页先按整个赛季的 Captain chip 记录来排，不看今天，不看本周，而是回头看你这一季到底把赌注押在了谁身上。",
+      summary: {
+        lowest_ownership: lowestOwnershipCaptain ? {
+          label: lowestOwnershipCaptain.label || "",
+          captain_name: lowestOwnershipCaptain.captain_name || "",
+          ownership_percent: Number(lowestOwnershipCaptain.ownership_percent || 0),
+          captain_points: Number(lowestOwnershipCaptain.captain_points || 0),
+        } : null,
+      },
       cards: [
         ["Captain 次数", formatDisplayNumber(captainUseCount), "这里统计的是整个赛季开过 Captain chip 的次数"],
         ["队长总得分", formatDisplayNumber(captainTotalPoints), "已按当日 Captain 球员真实 fantasy 分回算"],
         ["最爱 Captain", favoriteCaptain ? favoriteCaptain[0] : "暂无", favoriteCaptain ? `一共选了 ${favoriteCaptain[1]} 次` : "暂时还没有 Captain 记录"],
+        ["最低持有率 Captain", lowestOwnershipCaptain ? `${lowestOwnershipCaptain.label}` : "暂无", lowestOwnershipCaptain ? `${formatDisplayNumber(lowestOwnershipCaptain.ownership_percent)}% 持有率` : "暂时还没有足够记录"],
       ],
       rows: [
         ["最高队长", bestCaptain ? `${bestCaptain.label} · ${bestCaptain.captain_name} · ${formatDisplayNumber(bestCaptain.captain_points)} 分` : "暂无 Captain 记录"],

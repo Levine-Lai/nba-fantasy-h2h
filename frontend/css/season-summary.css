@@ -1407,20 +1407,69 @@
     color: #0f172a;
 }
 
-.season-summary-transfer-player-media {
-    margin-top: 10px;
+.season-summary-transfer-player-showcase {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.42fr) minmax(0, 0.58fr);
+    align-items: center;
+    gap: 20px;
+    min-height: 0;
+    margin-top: auto;
+    padding: 18px 20px;
+    border-radius: 28px;
+    border: 1px solid rgba(191, 219, 254, 0.72);
+    background:
+        radial-gradient(circle at top left, rgba(191, 219, 254, 0.24), transparent 38%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(240, 247, 255, 0.98));
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
+}
+
+.season-summary-transfer-player-showcase-art {
     display: flex;
+    align-items: center;
     justify-content: center;
 }
 
-.season-summary-transfer-player-headshot {
-    width: 78px;
-    height: 78px;
+.season-summary-transfer-player-showcase-headshot {
+    width: min(100%, 240px);
+    aspect-ratio: 1 / 1;
     object-fit: cover;
-    border-radius: 20px;
-    border: 1px solid rgba(191, 219, 254, 0.9);
+    border-radius: 34px;
+    border: 1px solid rgba(191, 219, 254, 0.92);
     background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(226, 232, 240, 0.82));
-    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
+}
+
+.season-summary-transfer-player-showcase-copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.season-summary-transfer-player-showcase-overline {
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.season-summary-transfer-player-showcase-name {
+    font-size: clamp(30px, 4vw, 52px);
+    line-height: 0.92;
+    font-weight: 900;
+    letter-spacing: -0.06em;
+    color: #10213a;
+    word-break: break-word;
+}
+
+.season-summary-transfer-player-showcase-days {
+    font-size: clamp(22px, 2.7vw, 34px);
+    line-height: 1;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    color: #2563eb;
 }
 
 .season-summary-transfer-dashboard {
@@ -1448,12 +1497,6 @@
         min-height: 82px;
         padding: 10px 10px 9px;
         border-radius: 18px;
-    }
-
-    .season-summary-transfer-player-headshot {
-        width: 58px;
-        height: 58px;
-        border-radius: 16px;
     }
 
     .season-summary-transfer-main-full .season-summary-transfer-glance-label {
@@ -1484,6 +1527,36 @@
     .season-summary-transfer-emphasis {
         font-size: 1.06em;
     }
+
+    .season-summary-transfer-player-showcase {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 14px 14px 16px;
+        border-radius: 20px;
+    }
+
+    .season-summary-transfer-player-showcase-headshot {
+        width: min(100%, 150px);
+        border-radius: 24px;
+    }
+
+    .season-summary-transfer-player-showcase-copy {
+        align-items: center;
+        text-align: center;
+        gap: 8px;
+    }
+
+    .season-summary-transfer-player-showcase-overline {
+        font-size: 11px;
+    }
+
+    .season-summary-transfer-player-showcase-name {
+        font-size: clamp(24px, 8vw, 34px);
+    }
+
+    .season-summary-transfer-player-showcase-days {
+        font-size: clamp(18px, 5.5vw, 24px);
+    }
 }
 
 .season-summary-nav {
@@ -1504,7 +1577,7 @@
 }
 
 .season-summary-captain-glance {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .season-summary-captain-glance-card {

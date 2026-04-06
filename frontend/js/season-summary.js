@@ -1,5 +1,5 @@
 (function () {
-    const PAGE_COUNT = 5;
+    const DEFAULT_PAGE_COUNT = 4;
     const INTRO_EXIT_MS = 860;
     const state = {
         currentPage: 0,
@@ -58,17 +58,23 @@
         refs().shell?.classList.toggle("profile-entering", !!enabled);
     }
 
+    function getPageCount() {
+        return Math.max(1, document.querySelectorAll(".season-summary-page").length || DEFAULT_PAGE_COUNT);
+    }
+
     function updateIndicator() {
+        const pageCount = getPageCount();
         document.querySelectorAll(".season-summary-page").forEach((page, index) => {
             page.classList.toggle("active", index === state.currentPage);
         });
         const { prevBtn, nextBtn } = refs();
         if (prevBtn) prevBtn.disabled = state.currentPage <= 0;
-        if (nextBtn) nextBtn.disabled = state.currentPage >= PAGE_COUNT - 1;
+        if (nextBtn) nextBtn.disabled = state.currentPage >= pageCount - 1;
     }
 
     function goToPage(nextPage) {
-        state.currentPage = Math.max(0, Math.min(PAGE_COUNT - 1, Number(nextPage || 0)));
+        const pageCount = getPageCount();
+        state.currentPage = Math.max(0, Math.min(pageCount - 1, Number(nextPage || 0)));
         updateIndicator();
     }
 
@@ -600,6 +606,27 @@
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
         const timeSlotLabel = String(favoriteTimeSlot?.full_label || "--");
         const longestHoldHeadshot = String(longestHold?.headshot_url || "").trim();
+        const longestHoldShowcase = longestHold?.player_name ? `
+            <div class="season-summary-transfer-player-showcase">
+                ${longestHoldHeadshot ? `
+                    <div class="season-summary-transfer-player-showcase-art">
+                        <img
+                            class="season-summary-transfer-player-showcase-headshot"
+                            src="${escapeHtml(longestHoldHeadshot)}"
+                            alt="${escapeHtml(longestHold?.player_name || "Player headshot")}"
+                            loading="lazy"
+                            referrerpolicy="no-referrer"
+                            onerror="this.closest('.season-summary-transfer-player-showcase-art')?.remove()"
+                        />
+                    </div>
+                ` : ""}
+                <div class="season-summary-transfer-player-showcase-copy">
+                    <div class="season-summary-transfer-player-showcase-overline">鏈€闀块櫔浼翠綘鐨勪汉</div>
+                    <div class="season-summary-transfer-player-showcase-name">${escapeHtml(longestHold.player_name)}</div>
+                    <div class="season-summary-transfer-player-showcase-days">${escapeHtml(formatSummaryNumber(longestHold.days_held))} 澶?/div>
+                </div>
+            </div>
+        ` : "";
         const cards = [
             {
                 label: "总换人次数",
@@ -673,8 +700,8 @@
         return `
             <div class="season-summary-transfer-copy">
                 <div class="season-summary-transfer-glance">
-                    ${cards.map((card, index) => `
-                        <div class="season-summary-transfer-glance-card${index === 3 && longestHoldHeadshot ? " season-summary-transfer-glance-card-player" : ""}">
+                    ${cards.map((card) => `
+                        <div class="season-summary-transfer-glance-card">
                             <div class="season-summary-transfer-glance-label">${escapeHtml(card.label)}</div>
                             <div class="season-summary-transfer-glance-value">${escapeHtml(card.value)}</div>
                             <div class="season-summary-transfer-glance-note">${escapeHtml(card.note)}</div>
@@ -871,6 +898,221 @@
                     </div>
                 </aside>
             </section>
+        `;
+    }
+
+    function renderPages(profile) {
+        return `
+            ${renderCoverPage(profile)}
+
+            ${renderTransferPage(profile)}
+
+            ${renderCaptainPage(profile)}
+
+            <section class="season-summary-page">
+                <div class="season-summary-main">
+                    <div class="season-summary-page-title">高光时刻</div>
+                    ${renderStatsGrid(profile?.highlights?.cards || [])}
+                    <div class="season-summary-quote">${escapeHtml(profile?.highlights?.quote || "")}</div>
+                </div>
+                <aside class="season-summary-side">
+                    <div class="season-summary-rail">
+                        <div class="season-summary-mini-title">${escapeHtml(profile?.highlights?.sideTitle || "Highlights")}</div>
+                        ${renderBullets(profile?.highlights?.sideBullets || [])}
+                        ${renderKpis(profile?.highlights?.sideKpis || [])}
+                    </div>
+                </aside>
+            </section>
+        `;
+    }
+
+    function renderTransferStory(profile) {
+        const transfers = profile?.transfers || {};
+        const summary = transfers.summary || {};
+        const totalTransfers = Number(summary.total_transfers || 0);
+        const activeWeeks = Number(summary.active_weeks || 0);
+        const seasonWeeks = Number(summary.season_weeks || 24);
+        const penaltyPoints = Number(summary.penalty_points || 0);
+        const transferEveryWeek = !!summary.transfer_every_week;
+        const mostIn = summary.most_in || null;
+        const mostOut = summary.most_out || null;
+        const favoriteDay = summary.favorite_day || null;
+        const favoriteTimeSlot = summary.favorite_time_slot || null;
+        const longestHold = summary.longest_hold || null;
+        const longestHoldHeadshot = String(longestHold?.headshot_url || "").trim();
+        const timeSlotLabel = String(favoriteTimeSlot?.full_label || "--");
+        const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+
+        const cards = [
+            {
+                label: "总换人次数",
+                value: `${formatSummaryNumber(totalTransfers)}次`,
+                note: "不含 WC / AS",
+            },
+            {
+                label: "操作周数",
+                value: `${formatSummaryNumber(activeWeeks)}/${formatSummaryNumber(seasonWeeks)}`,
+                note: transferEveryWeek ? "每一周都坚持换人" : "有些周选择以逸待劳",
+            },
+            {
+                label: "扣分总计",
+                value: penaltyPoints > 0 ? `-${formatSummaryNumber(penaltyPoints)}` : "0",
+                note: penaltyPoints > 200 ? "这一季下手很果断" : "整体算是谨慎出手",
+            },
+            {
+                label: "偏爱换人时段",
+                value: timeSlotLabel,
+                note: favoriteTimeSlot?.count ? `${formatSummaryNumber(favoriteTimeSlot.count)} 次发生在这个时段` : "暂时没有明显固定偏好",
+            },
+        ];
+
+        let paragraphOne = `这个赛季总共转会${mark(formatSummaryNumber(totalTransfers))}次，`;
+        paragraphOne += transferEveryWeek
+            ? "并且每一周都坚持换人，相信最终的排名没有辜负你的努力~"
+            : "机智的你选择以逸待劳，并不是把 FT 用完才是最好的选择。";
+        paragraphOne += penaltyPoints > 200
+            ? `整个赛季一共扣过${mark(formatSummaryNumber(penaltyPoints))}分，大胆而奔放的操作决定了你的上限。`
+            : `整个赛季一共扣过${mark(formatSummaryNumber(penaltyPoints))}分，谨慎精确才是你的代名词。`;
+
+        let paragraphTwo = "这一季你的转会对象很分散，来来去去的人不少，但没有谁特别频繁地牵动你的手指。";
+        if (mostIn?.name && mostOut?.name) {
+            paragraphTwo = `${mark(mostIn.name)}被你换进来了${mark(formatSummaryNumber(mostIn.count))}次，是你心心念念的那个人吗？希望他的表现没有让你失望；而${mark(mostOut.name)}被你送走了${mark(formatSummaryNumber(mostOut.count))}次，想必他的表现你也看在眼里吧。`;
+        } else if (mostIn?.name) {
+            paragraphTwo = `${mark(mostIn.name)}被你换进来了${mark(formatSummaryNumber(mostIn.count))}次，看得出来你总愿意再给他一次机会。`;
+        } else if (mostOut?.name) {
+            paragraphTwo = `${mark(mostOut.name)}被你送走了${mark(formatSummaryNumber(mostOut.count))}次，能让你反复按下离队键的人，多少已经把耐心磨掉了。`;
+        }
+
+        const favoriteStartHour = Number(String(favoriteTimeSlot?.label || "").split("-")[0]);
+        let timeSentence = "你好像没有把换人习惯固定在某个特定时段，想到就动，倒也算是一种自由。";
+        if (Number.isFinite(favoriteStartHour)) {
+            if (favoriteStartHour >= 8 && favoriteStartHour < 20) {
+                timeSentence = `你好像更喜欢在${mark(timeSlotLabel)}换人，伤病报告都是小事，心情＞fantasy。`;
+            } else if (favoriteStartHour >= 20 && favoriteStartHour < 24) {
+                timeSentence = `你好像更喜欢在${mark(timeSlotLabel)}换人，谨慎而大胆的选择，等到消息更完整再操作，也不耽误睡觉时间。`;
+            } else if (favoriteStartHour >= 0 && favoriteStartHour < 6) {
+                timeSentence = `你好像更喜欢在${mark(timeSlotLabel)}换人，夜生活才是你的舞台，必须看到我的球员 available 再睡觉。`;
+            } else if (favoriteStartHour >= 6 && favoriteStartHour < 8) {
+                timeSentence = `你好像更喜欢在${mark(timeSlotLabel)}换人，全服最谨慎的玩家，早起闹钟定好，守着 ddl 落子无悔。`;
+            }
+        }
+
+        const favoriteDayNumber = Number(favoriteDay?.day || 0);
+        let daySentence = "";
+        if (favoriteDayNumber >= 1 && favoriteDayNumber <= 3) {
+            daySentence = `${mark(`Day${favoriteDayNumber}`)}也是你最常出手的日子，拿到 FT 就该趁早用。`;
+        } else if (favoriteDayNumber >= 4 && favoriteDayNumber <= 7) {
+            daySentence = `经常把转会留到${mark(`Day${favoriteDayNumber}`)}再出手，不仅规划得当，而且沉得住气。`;
+        }
+        const paragraphThree = [timeSentence, daySentence].filter(Boolean).join("");
+
+        let paragraphFour = "漫长的赛季，人来人往，你的阵容名单也像车站一样不停有人上车下车。";
+        if (longestHold?.player_name) {
+            paragraphFour = `漫长的赛季，人来人往，不知道你有没有猜到，留在你阵容中最久的人是${mark(longestHold.player_name)}呢，相信陪伴你走过了${mark(formatSummaryNumber(longestHold.days_held))}天，他已经成为你心中的第一爱酱了吧。`;
+        }
+
+        const longestHoldShowcase = longestHold?.player_name ? `
+            <div class="season-summary-transfer-player-showcase">
+                ${longestHoldHeadshot ? `
+                    <div class="season-summary-transfer-player-showcase-art">
+                        <img
+                            class="season-summary-transfer-player-showcase-headshot"
+                            src="${escapeHtml(longestHoldHeadshot)}"
+                            alt="${escapeHtml(longestHold.player_name)}"
+                            loading="lazy"
+                            referrerpolicy="no-referrer"
+                            onerror="this.closest('.season-summary-transfer-player-showcase-art')?.remove()"
+                        />
+                    </div>
+                ` : ""}
+                <div class="season-summary-transfer-player-showcase-copy">
+                    <div class="season-summary-transfer-player-showcase-overline">最长陪伴你的人</div>
+                    <div class="season-summary-transfer-player-showcase-name">${escapeHtml(longestHold.player_name)}</div>
+                    <div class="season-summary-transfer-player-showcase-days">${escapeHtml(formatSummaryNumber(longestHold.days_held))} 天</div>
+                </div>
+            </div>
+        ` : "";
+
+        return `
+            <div class="season-summary-transfer-copy">
+                <div class="season-summary-transfer-glance">
+                    ${cards.map((card) => `
+                        <div class="season-summary-transfer-glance-card">
+                            <div class="season-summary-transfer-glance-label">${escapeHtml(card.label)}</div>
+                            <div class="season-summary-transfer-glance-value">${escapeHtml(card.value)}</div>
+                            <div class="season-summary-transfer-glance-note">${escapeHtml(card.note)}</div>
+                        </div>
+                    `).join("")}
+                </div>
+                <div class="season-summary-transfer-story-list">
+                    <p class="season-summary-transfer-story-paragraph">${paragraphOne}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphTwo}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphThree}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphFour}</p>
+                </div>
+                ${longestHoldShowcase}
+            </div>
+        `;
+    }
+
+    function renderCaptainStory(profile) {
+        const captain = profile?.captain || {};
+        const cards = Array.isArray(captain.cards) ? captain.cards : [];
+        const rows = Array.isArray(captain.rows) ? captain.rows : [];
+        const summary = captain.summary || {};
+        const countCard = cards[0] || ["Captain 次数", "-", ""];
+        const totalCard = cards[1] || ["队长总得分", "-", ""];
+        const favoriteCard = cards[2] || ["最爱 Captain", "暂无", ""];
+        const ownershipCard = cards[3] || ["最低持有率 Captain", "暂无", ""];
+        const bestRow = rows[0]?.[1] || "暂无 Captain 记录";
+        const worstRow = rows[1]?.[1] || "暂无 Captain 记录";
+        const lowestOwnership = summary.lowest_ownership || null;
+        const countValue = String(countCard[1] || "-");
+        const totalValue = String(totalCard[1] || "-");
+        const favoriteValue = String(favoriteCard[1] || "暂无");
+        const favoriteNote = String(favoriteCard[2] || "");
+        const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+
+        const cardsView = [
+            { label: String(countCard[0] || "Captain 次数"), value: countValue, note: String(countCard[2] || "") },
+            { label: String(totalCard[0] || "队长总得分"), value: totalValue, note: String(totalCard[2] || "") },
+            { label: "最爱 Captain", value: favoriteValue, note: favoriteNote || "这一季还没有稳定偏爱" },
+            {
+                label: String(ownershipCard[0] || "最低持有率 Captain"),
+                value: String(ownershipCard[1] || "暂无"),
+                note: lowestOwnership ? `${formatSummaryNumber(lowestOwnership.ownership_percent)}% 持有率` : String(ownershipCard[2] || "暂时还没有足够记录"),
+            },
+        ];
+
+        const paragraphOne = `这一季你一共开了${mark(countValue)}次 Captain，累计拿到了${mark(totalValue)}分。每一次把赌注押在一个人身上，多少都带着一点“今天就看你了”的意味。`;
+        const paragraphTwo = favoriteValue && favoriteValue !== "暂无"
+            ? `${mark(favoriteValue)}是你最常按下去的那位天选之人，${favoriteNote || "看得出来你对他一直很有信心。"}`
+            : "这一季你在 Captain 的选择上并没有长期押注某一个人，更像是在不同的比赛日里顺着感觉做判断。";
+        const paragraphThree = bestRow.includes("暂无")
+            ? "这一页暂时还没有足够的 Captain 记录，等真实数据补齐之后，会更像一份属于你的队长回忆录。"
+            : `最甜的一次 Captain 来自${mark(bestRow)}；而最让人挠头的那次，则是${mark(worstRow)}。高峰和低谷都被记了下来，这才像一个完整的赛季。`;
+        const paragraphFour = lowestOwnership?.captain_name
+            ? `如果要说最有“反模板”味道的一次，大概就是${mark(lowestOwnership.label || "那一天")}的${mark(lowestOwnership.captain_name)}了。当时他的持有率只有${mark(formatSummaryNumber(lowestOwnership.ownership_percent))}% ，却依然替你拿下了${mark(formatSummaryNumber(lowestOwnership.captain_points))}分。`
+            : "这一季暂时还没有一位足够低持有率又留下强烈印象的 Captain，说明你的选择更多还是顺着稳定答案在走。";
+
+        return `
+            <div class="season-summary-transfer-copy season-summary-captain-copy">
+                <div class="season-summary-transfer-glance season-summary-captain-glance">
+                    ${cardsView.map((card) => `
+                        <div class="season-summary-transfer-glance-card season-summary-captain-glance-card">
+                            <div class="season-summary-transfer-glance-label">${escapeHtml(card.label)}</div>
+                            <div class="season-summary-transfer-glance-value">${escapeHtml(card.value)}</div>
+                            <div class="season-summary-transfer-glance-note">${escapeHtml(card.note)}</div>
+                        </div>
+                    `).join("")}
+                </div>
+                <div class="season-summary-transfer-story-list season-summary-captain-story-list">
+                    <p class="season-summary-transfer-story-paragraph">${paragraphOne}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphTwo}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphThree}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphFour}</p>
+                </div>
+            </div>
         `;
     }
 

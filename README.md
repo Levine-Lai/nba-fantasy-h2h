@@ -1,5 +1,21 @@
 # NBA Fantasy H2H
 
+## 2026-04 架构整理
+
+本轮没有修改对外 API，也没有新增 KV 路径，重点是把 Worker 内部的通用领域逻辑拆成更清晰的深模块：
+
+- `worker/src/lib/http.js`
+- `worker/src/lib/fixture-runtime.js`
+- `worker/src/lib/history-domain.js`
+- `worker/src/lib/live-score.js`
+
+当前原则：
+
+- 对外接口和页面输出保持不变
+- 首页实时、DDL 后静态、单人小窗三条链路继续分层
+- 不为了“重构更干净”增加额外 KV 读写
+- 通用领域知识优先下沉到 `lib/`，路由层只负责编排
+
 这是一个面向 NBA Fantasy 私人联赛的可视化站点，当前线上核心由两部分组成：
 
 - 前端页面：`frontend/`
