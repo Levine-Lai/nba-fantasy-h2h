@@ -1528,6 +1528,27 @@ async function buildFreshHomepageState(baseState) {
   };
 }
 
+async function getHomepageFreshDecision(state, value = Date.now()) {
+  const bootstrap = await fetchJson("/bootstrap-static/", 1);
+  const events = Array.isArray(bootstrap?.events) ? bootstrap.events : [];
+  const [actualCurrentEvent, actualCurrentEventName] = getCurrentEvent(events);
+  const refreshWindow = getFixtureRefreshWindowInfo(state?.fixtures?.games || [], value);
+  const finalizedEvent = Number(state?.refresh_meta?.live_finalized_event || 0);
+  const eventChanged = Number(actualCurrentEvent || 0) !== Number(state?.current_event || 0);
+  const shouldFresh =
+    eventChanged ||
+    refreshWindow.active ||
+    (refreshWindow.after_end && Number(actualCurrentEvent || 0) > 0 && finalizedEvent !== Number(actualCurrentEvent || 0));
+  return {
+    shouldFresh,
+    eventChanged,
+    actualCurrentEvent: Number(actualCurrentEvent || 0) || null,
+    actualCurrentEventName: actualCurrentEventName || null,
+    refreshWindow,
+    finalizedEvent,
+  };
+}
+
 async function buildCurrentFixturePayload(baseState = null) {
   const bootstrap = await fetchJson("/bootstrap-static/", 1);
   const events = Array.isArray(bootstrap?.events) ? bootstrap.events : [];
@@ -1587,8 +1608,6 @@ async function buildCurrentFixturePayload(baseState = null) {
     for (const [idText, liveData] of Object.entries(liveElements)) {
       const elementId = Number(idText);
       const elem = elements[elementId] || {};
-      const stats = liveData?.stats;
-      if (!stats) continue;
       const player = {
         id: elementId,
         name: elem.name || `#${elementId}`,
@@ -5277,6 +5296,16 @@ export default {
             console.error("[state-fresh-h2h-failed]", String(error?.message || error || "unknown"));
             responseState = state;
           }
+        } else {
+          try {
+            const freshDecision = await getHomepageFreshDecision(state);
+            if (freshDecision.shouldFresh) {
+              responseState = normalizeStateChipStatus(await buildFreshHomepageState(state));
+            }
+          } catch (error) {
+            console.error("[state-auto-fresh-failed]", String(error?.message || error || "unknown"));
+            responseState = state;
+          }
         }
         return jsonResponse(responseState);
       }
@@ -5306,8 +5335,13 @@ export default {
       if (path === "/api/classic-rankings") return jsonResponse(state.classic_rankings || []);
       if (path.startsWith("/api/fixture/")) {
         const id = Number(path.split("/").pop());
+        const currentFixtureIds = new Set((state?.fixtures?.games || []).map((game) => Number(game?.id || 0)).filter(Boolean));
+        const isCurrentFixture = currentFixtureIds.has(id);
         let payload = state.fixture_details[String(id)] || state.fixture_details[id] || {};
-        if (!payload || !payload.home_players) {
+        if (isCurrentFixture) {
+          const freshFixtures = await buildCurrentFixturePayload(state);
+          payload = freshFixtures.fixture_details[String(id)] || freshFixtures.fixture_details[id] || payload;
+        } else if (!payload || !payload.home_players) {
           const freshFixtures = await buildCurrentFixturePayload(state);
           payload = freshFixtures.fixture_details[String(id)] || freshFixtures.fixture_details[id] || {};
         }

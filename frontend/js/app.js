@@ -1737,6 +1737,9 @@ const App = {
     },
 
     async getLineupCached(uid, options = {}) {
+        if (options?.fresh === true) {
+            return API.getLineup(uid, options);
+        }
         const key = `${String(uid)}:${options?.fresh === true ? "fresh" : "cached"}:${options?.panelOnly === true ? "panel" : "full"}`;
         if (!this.lineupCache.has(key)) {
             this.lineupCache.set(key, API.getLineup(uid, options).catch((error) => {
@@ -1781,23 +1784,14 @@ const App = {
         try {
             this.lineupCache.clear();
             let state = null;
-            let shouldFetchFresh = true;
             try {
                 state = await API.getStateCached();
-                this.applyState(state);
-                const refreshWindow = getFixtureRefreshWindowInfo(state?.fixtures?.games || [], Date.now());
-                const finalizedEvent = Number(state?.refresh_meta?.live_finalized_event || 0);
-                const currentEvent = Number(state?.current_event || 0);
-                shouldFetchFresh = refreshWindow.active || (refreshWindow.after_end && currentEvent > 0 && finalizedEvent !== currentEvent);
             } catch (cachedError) {
                 console.warn("Initial cached state load failed:", cachedError);
-            }
-            if (shouldFetchFresh || !state) {
                 try {
-                    const freshState = await API.getStateFresh();
-                    state = freshState || state;
+                    state = await API.getStateFresh();
                 } catch (error) {
-                    console.warn("[API Fallback] /api/state?fresh_h2h=1 failed, keeping cached state", error);
+                    console.warn("[API Fallback] /api/state fallback failed", error);
                 }
             }
             if (state) {
@@ -1857,6 +1851,16 @@ const App = {
     async showGameDetail(fixtureId) {
         Render.modalLoading("game-modal", "game-body", "game-title");
         try {
+            const freshPayload = await API.getGameDetail(fixtureId);
+            if (
+                freshPayload &&
+                Array.isArray(freshPayload.home_players) &&
+                Array.isArray(freshPayload.away_players) &&
+                (freshPayload.home_players.length > 0 || freshPayload.away_players.length > 0)
+            ) {
+                Render.gameDetail(freshPayload);
+                return;
+            }
             const localPayload = this.latestFixtureDetails?.[String(fixtureId)] || this.latestFixtureDetails?.[Number(fixtureId)];
             if (
                 localPayload &&
@@ -1865,24 +1869,21 @@ const App = {
                 (localPayload.home_players.length > 0 || localPayload.away_players.length > 0)
             ) {
                 Render.gameDetail(localPayload);
-                try {
-                    const freshPayload = await API.getGameDetail(fixtureId);
-                    if (
-                        freshPayload &&
-                        Array.isArray(freshPayload.home_players) &&
-                        Array.isArray(freshPayload.away_players) &&
-                        (freshPayload.home_players.length > 0 || freshPayload.away_players.length > 0)
-                    ) {
-                        Render.gameDetail(freshPayload);
-                    }
-                } catch (error) {
-                    console.warn("Game detail fresh update failed:", error);
-                }
                 return;
             }
-            Render.gameDetail(await API.getGameDetail(fixtureId));
+            Render.modalError("game-body", "No data");
         } catch (error) {
             console.error(error);
+            const localPayload = this.latestFixtureDetails?.[String(fixtureId)] || this.latestFixtureDetails?.[Number(fixtureId)];
+            if (
+                localPayload &&
+                Array.isArray(localPayload.home_players) &&
+                Array.isArray(localPayload.away_players) &&
+                (localPayload.home_players.length > 0 || localPayload.away_players.length > 0)
+            ) {
+                Render.gameDetail(localPayload);
+                return;
+            }
             Render.modalError("game-body");
         }
     },
@@ -1890,11 +1891,23 @@ const App = {
     async showLineupDual(uid1, name1, uid2, name2) {
         Render.modalLoading("lineup-modal", "lineup-body", "lineup-title", `${name1} VS ${name2}`);
         try {
-            const [data1, data2] = await Promise.all([this.getLineupCached(uid1), this.getLineupCached(uid2)]);
+            const [data1, data2] = await Promise.all([
+                this.getLineupCached(uid1, { fresh: true }),
+                this.getLineupCached(uid2, { fresh: true }),
+            ]);
             Render.lineup(data1, name1, true, data2, name2);
         } catch (error) {
             console.error(error);
-            Render.modalError("lineup-body");
+            try {
+                const [cached1, cached2] = await Promise.all([
+                    this.getLineupCached(uid1),
+                    this.getLineupCached(uid2),
+                ]);
+                Render.lineup(cached1, name1, true, cached2, name2);
+            } catch (fallbackError) {
+                console.error("Lineup fallback error:", fallbackError);
+                Render.modalError("lineup-body");
+            }
         }
     },
 
