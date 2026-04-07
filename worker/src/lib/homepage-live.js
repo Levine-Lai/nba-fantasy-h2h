@@ -86,12 +86,14 @@ export async function buildFreshHomepageState(baseState, deps) {
   const freshScoresByUid = {};
   const nextPicksByUid = { ...(baseState?.picks_by_uid || {}) };
 
-  await mapLimit(targetUids, 4, async (uid) => {
+  await mapLimit(targetUids, 2, async (uid) => {
     const previous = nextPicksByUid[uid] || {};
-    const [picksRes, historyRes] = await Promise.all([
+    let [picksRes, historyRes] = await Promise.all([
       fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 2),
       fetchJsonSafe(`/entry/${uid}/history/`, 2),
     ]);
+    if (!picksRes.ok) picksRes = await fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 2);
+    if (!historyRes.ok) historyRes = await fetchJsonSafe(`/entry/${uid}/history/`, 2);
     let historyWeek = null;
     if (historyRes.ok && historyRes.data && typeof historyRes.data === "object") {
       historyWeek = calculateWeekScoresFromHistory(historyRes.data, currentWeek, currentEvent, eventMetaById);
