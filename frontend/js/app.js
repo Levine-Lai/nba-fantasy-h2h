@@ -63,34 +63,34 @@ const API = {
     },
 };
 
-// Update this snapshot when a new gameweek closes.
-const GW23_LAST_STANDINGS = [
-    { rank: 1, uid: "2", team_name: "大吉鲁", gw: 23, won: 17, draw: 1, lost: 5, scored: 28919, conceded: 26523, points: 52 },
-    { rank: 2, uid: "15", team_name: "笨笨", gw: 23, won: 17, draw: 0, lost: 6, scored: 25710, conceded: 26714, points: 51 },
-    { rank: 3, uid: "4319", team_name: "Kimi", gw: 23, won: 16, draw: 0, lost: 7, scored: 29028, conceded: 27091, points: 48 },
-    { rank: 4, uid: "5095", team_name: "AI", gw: 23, won: 16, draw: 0, lost: 7, scored: 26188, conceded: 27733, points: 48 },
-    { rank: 5, uid: "3455", team_name: "Paul", gw: 23, won: 15, draw: 0, lost: 8, scored: 29323, conceded: 27748, points: 45 },
-    { rank: 6, uid: "10", team_name: "弗老大", gw: 23, won: 15, draw: 0, lost: 8, scored: 28692, conceded: 27800, points: 45 },
-    { rank: 7, uid: "17", team_name: "堡", gw: 23, won: 14, draw: 1, lost: 8, scored: 29055, conceded: 26287, points: 43 },
-    { rank: 8, uid: "6", team_name: "紫葱酱", gw: 23, won: 14, draw: 0, lost: 9, scored: 28438, conceded: 27412, points: 42 },
-    { rank: 9, uid: "14", team_name: "酸男", gw: 23, won: 14, draw: 0, lost: 9, scored: 28686, conceded: 28301, points: 42 },
-    { rank: 10, uid: "5410", team_name: "kusuri", gw: 23, won: 13, draw: 0, lost: 10, scored: 29212, conceded: 27763, points: 39 },
-    { rank: 11, uid: "9", team_name: "雕哥", gw: 23, won: 13, draw: 0, lost: 10, scored: 28049, conceded: 27245, points: 39 },
-    { rank: 12, uid: "4224", team_name: "班班", gw: 23, won: 12, draw: 0, lost: 11, scored: 28216, conceded: 27955, points: 36 },
-    { rank: 13, uid: "189", team_name: "凯文", gw: 23, won: 12, draw: 0, lost: 11, scored: 27804, conceded: 27883, points: 36 },
-    { rank: 14, uid: "5101", team_name: "鬼嗨", gw: 23, won: 12, draw: 0, lost: 11, scored: 27036, conceded: 27324, points: 36 },
-    { rank: 15, uid: "32", team_name: "伍家辉", gw: 23, won: 11, draw: 0, lost: 12, scored: 29301, conceded: 27110, points: 33 },
-    { rank: 16, uid: "16447", team_name: "文史哲", gw: 23, won: 11, draw: 0, lost: 12, scored: 27842, conceded: 28036, points: 33 },
-    { rank: 17, uid: "6441", team_name: "马哥", gw: 23, won: 10, draw: 0, lost: 13, scored: 26428, conceded: 26957, points: 30 },
-    { rank: 18, uid: "23", team_name: "橘队", gw: 23, won: 9, draw: 0, lost: 14, scored: 27425, conceded: 27816, points: 27 },
-    { rank: 19, uid: "4", team_name: "尼弟", gw: 23, won: 9, draw: 0, lost: 14, scored: 27642, conceded: 28320, points: 27 },
-    { rank: 20, uid: "11", team_name: "船哥", gw: 23, won: 9, draw: 0, lost: 14, scored: 27494, conceded: 28599, points: 27 },
-    { rank: 21, uid: "6412", team_name: "阿甘", gw: 23, won: 8, draw: 0, lost: 15, scored: 25416, conceded: 27094, points: 24 },
-    { rank: 22, uid: "22761", team_name: "纪导", gw: 23, won: 7, draw: 0, lost: 16, scored: 27950, conceded: 28277, points: 21 },
-    { rank: 23, uid: "42", team_name: "桑迪", gw: 23, won: 7, draw: 0, lost: 16, scored: 25139, conceded: 27583, points: 21 },
-    { rank: 24, uid: "5467", team_name: "老姜", gw: 23, won: 7, draw: 0, lost: 16, scored: 25937, conceded: 28454, points: 21 },
-    { rank: 25, uid: "6562", team_name: "柯南", gw: 23, won: 5, draw: 0, lost: 18, scored: 27662, conceded: 27795, points: 15 },
-    { rank: 26, uid: "8580", team_name: "小火龙", gw: 23, won: 5, draw: 0, lost: 18, scored: 25146, conceded: 27918, points: 15 },
+// Update this snapshot when a gameweek closes.
+const GW24_LAST_STANDINGS = [
+    { rank: 1, uid: "2", team_name: "大吉鲁", gw: 24, won: 17, draw: 1, lost: 6, diff: 2289, points: 52 },
+    { rank: 2, uid: "4319", team_name: "Kimi", gw: 24, won: 17, draw: 0, lost: 7, diff: 1979, points: 51 },
+    { rank: 3, uid: "15", team_name: "笨笨", gw: 24, won: 17, draw: 0, lost: 7, diff: -1170, points: 51 },
+    { rank: 4, uid: "5095", team_name: "AI", gw: 24, won: 17, draw: 0, lost: 7, diff: -1438, points: 51 },
+    { rank: 5, uid: "3455", team_name: "Paul", gw: 24, won: 16, draw: 0, lost: 8, diff: 1817, points: 48 },
+    { rank: 6, uid: "10", team_name: "弗老大", gw: 24, won: 16, draw: 0, lost: 8, diff: 978, points: 48 },
+    { rank: 7, uid: "17", team_name: "堡", gw: 24, won: 15, draw: 1, lost: 8, diff: 2942, points: 46 },
+    { rank: 8, uid: "14", team_name: "酸男", gw: 24, won: 15, draw: 0, lost: 9, diff: 474, points: 45 },
+    { rank: 9, uid: "5410", team_name: "kusuri", gw: 24, won: 14, draw: 0, lost: 10, diff: 1615, points: 42 },
+    { rank: 10, uid: "6", team_name: "紫葱酱", gw: 24, won: 14, draw: 0, lost: 10, diff: 984, points: 42 },
+    { rank: 11, uid: "9", team_name: "雕哥", gw: 24, won: 13, draw: 0, lost: 11, diff: 630, points: 39 },
+    { rank: 12, uid: "4224", team_name: "班班", gw: 24, won: 13, draw: 0, lost: 11, diff: 448, points: 39 },
+    { rank: 13, uid: "189", team_name: "凯文", gw: 24, won: 13, draw: 0, lost: 11, diff: 68, points: 39 },
+    { rank: 14, uid: "32", team_name: "伍家辉", gw: 24, won: 12, draw: 0, lost: 12, diff: 2309, points: 36 },
+    { rank: 15, uid: "16447", team_name: "文史哲", gw: 24, won: 12, draw: 0, lost: 12, diff: -123, points: 36 },
+    { rank: 16, uid: "5101", team_name: "鬼嗨", gw: 24, won: 12, draw: 0, lost: 12, diff: -627, points: 36 },
+    { rank: 17, uid: "4", team_name: "尼弟", gw: 24, won: 10, draw: 0, lost: 14, diff: -406, points: 30 },
+    { rank: 18, uid: "6441", team_name: "马哥", gw: 24, won: 10, draw: 0, lost: 14, diff: -716, points: 30 },
+    { rank: 19, uid: "23", team_name: "橘队", gw: 24, won: 9, draw: 0, lost: 15, diff: -633, points: 27 },
+    { rank: 20, uid: "11", team_name: "船哥", gw: 24, won: 9, draw: 0, lost: 15, diff: -1223, points: 27 },
+    { rank: 21, uid: "22761", team_name: "纪导", gw: 24, won: 8, draw: 0, lost: 16, diff: 12, points: 24 },
+    { rank: 22, uid: "6412", team_name: "阿甘", gw: 24, won: 8, draw: 0, lost: 16, diff: -1764, points: 24 },
+    { rank: 23, uid: "42", team_name: "桑迪", gw: 24, won: 7, draw: 0, lost: 17, diff: -2515, points: 21 },
+    { rank: 24, uid: "5467", team_name: "老姜", gw: 24, won: 7, draw: 0, lost: 17, diff: -2664, points: 21 },
+    { rank: 25, uid: "6562", team_name: "柯南", gw: 24, won: 5, draw: 0, lost: 19, diff: -222, points: 15 },
+    { rank: 26, uid: "8580", team_name: "小火龙", gw: 24, won: 5, draw: 0, lost: 19, diff: -3044, points: 15 },
 ];
 
 const MAX_TITLE_POINTS_REMAINING = 6;
@@ -357,28 +357,25 @@ function getStandingsDisplayName(uid, state, fallback = "-") {
 }
 
 function buildStaticStandingsRows(state) {
-    const currentGw = Number(state?.display_week || 0) || extractGameweekNumber(state?.current_event_name) || 24;
-    const lastCompletedGw = Number(state?.last_completed_week || 0) || Math.max(22, currentGw - 1);
-    const sourceRows = Array.isArray(state?.h2h_last_standings) && state.h2h_last_standings.length
-        ? state.h2h_last_standings
-        : GW23_LAST_STANDINGS;
+    const lastCompletedGw = 24;
+    const sourceRows = GW24_LAST_STANDINGS;
     const remainingTitlePoints = Math.max(0, (FINAL_H2H_GW - lastCompletedGw) * 3);
     const leaderPoints = sourceRows.reduce((max, row) => Math.max(max, Number(row?.points || 0)), 0);
     return sourceRows.map((row) => ({
         ...row,
         gw: lastCompletedGw,
         team_name: getStandingsDisplayName(row.uid, state, row.team_name),
-        diff: Number(row?.diff ?? (Number(row?.scored || 0) - Number(row?.conceded || 0) || 0)),
+        scored: Number(row?.scored || 0),
+        conceded: Number(row?.conceded || 0),
+        diff: Number(row?.diff || 0),
         contender: Number(row?.points || 0) + remainingTitlePoints >= leaderPoints,
     }));
 }
 
 function buildLiveStandingsRows(state) {
-    const currentGw = Number(state?.display_week || 0) || extractGameweekNumber(state?.current_event_name) || 24;
+    const currentGw = 25;
     const remainingTitlePoints = Math.max(0, (FINAL_H2H_GW - currentGw) * 3);
-    const baselineRows = Array.isArray(state?.h2h_last_standings) && state.h2h_last_standings.length
-        ? state.h2h_last_standings
-        : buildStaticStandingsRows(state);
+    const baselineRows = buildStaticStandingsRows(state);
     const byUid = {};
 
     baselineRows.forEach((row) => {
@@ -1093,9 +1090,8 @@ const Render = {
 
         const staticRows = buildStaticStandingsRows(state);
         const liveRows = buildLiveStandingsRows(state);
-        const currentGw = extractGameweekNumber(state?.current_event_name) || 24;
-        const displayGw = Number(state?.display_week || 0) || currentGw;
-        const lastCompletedGw = Number(state?.last_completed_week || 0) || Math.max(22, displayGw - 1);
+        const displayGw = 25;
+        const lastCompletedGw = 24;
 
         lastBadge.textContent = `GW${lastCompletedGw} Final`;
         liveBadge.textContent = `GW${displayGw} Live`;

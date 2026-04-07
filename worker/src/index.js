@@ -731,6 +731,9 @@ function buildHomepageLiveDeps() {
     buildWinProbabilitySummary,
     formatKickoffBj,
     getFixtureRefreshWindowInfo,
+    ALL_FIXTURES,
+    UID_MAP,
+    uidToNumber,
   };
 }
 
@@ -3406,7 +3409,20 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   if (!availableWeeks.includes(fixtureWeek)) {
     fixtureWeek = availableWeeks.filter((w) => w <= displayWeek).pop() || availableWeeks[0] || displayWeek;
   }
-  const weeklyFixtures = ALL_FIXTURES.filter(([gw]) => gw === fixtureWeek);
+  const preferredTopOrder = fixtureWeek === 25
+    ? ["4319-4224", "2-5101", "5095-14", "15-189"]
+    : [];
+  const preferredOrderMap = new Map(preferredTopOrder.map((key, index) => [key, index]));
+  const weeklyFixtures = ALL_FIXTURES
+    .filter(([gw]) => gw === fixtureWeek)
+    .sort((left, right) => {
+      const leftKey = `${normalizeUid(left?.[1])}-${normalizeUid(left?.[2])}`;
+      const rightKey = `${normalizeUid(right?.[1])}-${normalizeUid(right?.[2])}`;
+      const leftRank = preferredOrderMap.has(leftKey) ? preferredOrderMap.get(leftKey) : Number.MAX_SAFE_INTEGER;
+      const rightRank = preferredOrderMap.has(rightKey) ? preferredOrderMap.get(rightKey) : Number.MAX_SAFE_INTEGER;
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      return 0;
+    });
 
   let h2h = weeklyFixtures.map(([gw, rawUid1, rawUid2]) => {
     const uid1 = normalizeUid(rawUid1);

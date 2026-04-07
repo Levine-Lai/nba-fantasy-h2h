@@ -31,15 +31,10 @@ export async function buildFreshHomepageState(baseState, deps) {
     buildResolvedWinProbabilitySummary,
     buildWinProbabilitySummary,
     formatKickoffBj,
+    ALL_FIXTURES,
+    UID_MAP,
+    uidToNumber,
   } = deps;
-
-  const matches = Array.isArray(baseState?.h2h) ? baseState.h2h : [];
-  if (!matches.length) return baseState;
-
-  const targetUids = [...new Set(
-    matches.flatMap((match) => [normalizeUid(match?.uid1), normalizeUid(match?.uid2)]).filter(Boolean)
-  )];
-  if (!targetUids.length) return baseState;
 
   const bootstrap = await fetchJson("/bootstrap-static/", 1);
   const events = bootstrap.events || [];
@@ -63,6 +58,31 @@ export async function buildFreshHomepageState(baseState, deps) {
     currentFixtures.length > 0 &&
     currentFixtures.every((fixture) => resolveFixtureStatus(fixture).code === "finished");
   const isWeekResolved = futureWeekEventIds.length === 0 && allCurrentFixturesFinished;
+  const maxFixtureWeek = [...new Set((ALL_FIXTURES || []).map(([gw]) => Number(gw || 0)))].sort((a, b) => a - b).pop() || currentWeek;
+  const displayWeek = isWeekResolved ? Math.min(maxFixtureWeek, Number(currentWeek || 0) + 1) : Number(currentWeek || 0);
+  const availableWeeks = [...new Set((ALL_FIXTURES || []).map(([gw]) => Number(gw || 0)))].sort((a, b) => a - b);
+  let fixtureWeek = displayWeek;
+  if (!availableWeeks.includes(fixtureWeek)) {
+    fixtureWeek = availableWeeks.filter((w) => w <= displayWeek).pop() || availableWeeks[0] || displayWeek;
+  }
+  const preferredTopOrder = fixtureWeek === 25
+    ? ["4319-4224", "2-5101", "5095-14", "15-189"]
+    : [];
+  const preferredOrderMap = new Map(preferredTopOrder.map((key, index) => [key, index]));
+  const weeklyFixtures = (ALL_FIXTURES || [])
+    .filter(([gw]) => Number(gw || 0) === Number(fixtureWeek || 0))
+    .sort((left, right) => {
+      const leftKey = `${normalizeUid(left?.[1])}-${normalizeUid(left?.[2])}`;
+      const rightKey = `${normalizeUid(right?.[1])}-${normalizeUid(right?.[2])}`;
+      const leftRank = preferredOrderMap.has(leftKey) ? preferredOrderMap.get(leftKey) : Number.MAX_SAFE_INTEGER;
+      const rightRank = preferredOrderMap.has(rightKey) ? preferredOrderMap.get(rightKey) : Number.MAX_SAFE_INTEGER;
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      return 0;
+    });
+  const targetUids = [...new Set(
+    weeklyFixtures.flatMap((match) => [normalizeUid(match?.[1]), normalizeUid(match?.[2])]).filter(Boolean)
+  )];
+  if (!targetUids.length) return baseState;
   const freshScoresByUid = {};
   const nextPicksByUid = { ...(baseState?.picks_by_uid || {}) };
 
@@ -231,9 +251,12 @@ export async function buildFreshHomepageState(baseState, deps) {
     };
   }
 
-  const nextMatches = syncMatchesWithPicksByUid(matches, nextPicksByUid).map((match) => {
-    const uid1 = normalizeUid(match?.uid1);
-    const uid2 = normalizeUid(match?.uid2);
+  const nextMatches = weeklyFixtures.map(([, rawUid1, rawUid2]) => {
+    const uid1 = normalizeUid(rawUid1);
+    const uid2 = normalizeUid(rawUid2);
+    const match = (baseState?.h2h || []).find((item) =>
+      normalizeUid(item?.uid1) === uid1 && normalizeUid(item?.uid2) === uid2
+    ) || {};
     const fresh1 = freshScoresByUid[uid1];
     const fresh2 = freshScoresByUid[uid2];
     const total1 = Number(fresh1?.event_total ?? match?.total1 ?? 0);
@@ -253,6 +276,11 @@ export async function buildFreshHomepageState(baseState, deps) {
 
     return {
       ...match,
+      gameweek: fixtureWeek,
+      uid1: uidToNumber(uid1),
+      uid2: uidToNumber(uid2),
+      team1: nextPicksByUid?.[uid1]?.team_name || UID_MAP?.[uidToNumber(uid1)] || uid1,
+      team2: nextPicksByUid?.[uid2]?.team_name || UID_MAP?.[uidToNumber(uid2)] || uid2,
       total1,
       total2,
       today1,
@@ -275,6 +303,8 @@ export async function buildFreshHomepageState(baseState, deps) {
     ...baseState,
     current_event: currentEvent,
     current_event_name: currentEventName || baseState?.current_event_name,
+    display_week: fixtureWeek,
+    last_completed_week: Math.max(22, fixtureWeek - 1),
     h2h: nextMatches,
     picks_by_uid: nextPicksByUid,
     fixtures: {
