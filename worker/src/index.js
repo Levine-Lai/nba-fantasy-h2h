@@ -1480,6 +1480,7 @@ async function refreshManagerMetaState(env, existingState = null, options = {}) 
       raw_transfers: transfersData,
       captain_used: captainUsed,
       chip_status: chipStatus,
+      historical_h2h_week_totals: historicalH2hWeekTotals,
       week_total_summary: weekTotalSummary,
       fetch_status: {
         ...(previous.fetch_status || {}),
@@ -2517,6 +2518,38 @@ function computeWeekTotalFromHistory(historyWeek, currentEvent, todayScore, gd1M
   return Math.max(0, Math.round(total));
 }
 
+function computeCompletedWeekTotalForGw(historyData, transfersData, targetWeek, eventMetaById, elements) {
+  const week = Number(targetWeek || 0);
+  if (!week) return null;
+
+  const weekEventIds = Object.entries(eventMetaById || {})
+    .filter(([, meta]) => Number(meta?.gw || 0) === week)
+    .map(([eventId]) => Number(eventId || 0))
+    .filter((eventId) => eventId > 0)
+    .sort((a, b) => a - b);
+  const finalEventId = weekEventIds[weekEventIds.length - 1];
+  if (!finalEventId) return null;
+
+  const historyWeek = calculateWeekScoresFromHistory(historyData, week, finalEventId, eventMetaById);
+  if (!historyWeek?.has_week_rows) return null;
+
+  const chipDayMap = getChipDayMapFromHistory(historyData, week, 0, eventMetaById);
+  const transferSummary = buildWeeklyTransferSummary(
+    Array.isArray(transfersData) ? transfersData : [],
+    week,
+    eventMetaById,
+    elements,
+    chipDayMap
+  );
+  const finalDayScore = Number(historyWeek.points_by_event?.[finalEventId] || historyWeek.today_points || 0);
+  return computeWeekTotalFromHistory(
+    historyWeek,
+    finalEventId,
+    finalDayScore,
+    Number(transferSummary.gd1_missing_penalty || 0)
+  );
+}
+
 function calculateProjectedFutureScore(players, futureTeamsByEvent) {
   let total = 0;
   let bestCaptainCandidate = 0;
@@ -2723,7 +2756,7 @@ function buildClassicRankingsPayload(overallRows, weeklyRows, currentWeek, weekl
   });
 }
 
-function buildLiveH2HStandings(baseStatsByUid, liveMatches) {
+function buildSeededH2HTable(baseStatsByUid) {
   const table = {};
   for (const uid of UID_LIST) {
     const base = baseStatsByUid[uid] || { points: 0, played: 0, won: 0, draw: 0, lost: 0, scored: 0, conceded: 0 };
@@ -2740,37 +2773,60 @@ function buildLiveH2HStandings(baseStatsByUid, liveMatches) {
       live_applied: false,
     };
   }
+  return table;
+}
 
-  for (const match of liveMatches || []) {
-    const left = table[normalizeUid(match.uid1)];
-    const right = table[normalizeUid(match.uid2)];
-    if (!left || !right) continue;
+function applyH2HMatchToTable(table, uid1, uid2, total1, total2, options = {}) {
+  const left = table[normalizeUid(uid1)];
+  const right = table[normalizeUid(uid2)];
+  if (!left || !right) return;
 
-    left.played += 1;
-    right.played += 1;
-    left.scored += Number(match.total1 || 0);
-    left.conceded += Number(match.total2 || 0);
-    right.scored += Number(match.total2 || 0);
-    right.conceded += Number(match.total1 || 0);
+  left.played += 1;
+  right.played += 1;
+  left.scored += Number(total1 || 0);
+  left.conceded += Number(total2 || 0);
+  right.scored += Number(total2 || 0);
+  right.conceded += Number(total1 || 0);
+  if (options.liveApplied) {
     left.live_applied = true;
     right.live_applied = true;
-
-    if (Number(match.total1 || 0) > Number(match.total2 || 0)) {
-      left.won += 1;
-      right.lost += 1;
-      left.points += 3;
-    } else if (Number(match.total2 || 0) > Number(match.total1 || 0)) {
-      right.won += 1;
-      left.lost += 1;
-      right.points += 3;
-    } else {
-      left.draw += 1;
-      right.draw += 1;
-      left.points += 1;
-      right.points += 1;
-    }
   }
 
+  if (Number(total1 || 0) > Number(total2 || 0)) {
+    left.won += 1;
+    right.lost += 1;
+    left.points += 3;
+  } else if (Number(total2 || 0) > Number(total1 || 0)) {
+    right.won += 1;
+    left.lost += 1;
+    right.points += 3;
+  } else {
+    left.draw += 1;
+    right.draw += 1;
+    left.points += 1;
+    right.points += 1;
+  }
+}
+
+function applyCompletedH2HWeeksToTable(table, weeklyTotalsByUid = {}, upToWeek = null) {
+  const targetWeek = Number(upToWeek || 0);
+  if (!targetWeek) return;
+
+  const completedWeeks = [...new Set(ALL_FIXTURES.map(([gw]) => Number(gw || 0)))]
+    .filter((gw) => gw > 22 && gw <= targetWeek)
+    .sort((a, b) => a - b);
+
+  for (const week of completedWeeks) {
+    const weekFixtures = ALL_FIXTURES.filter(([gw]) => Number(gw || 0) === week);
+    for (const [, uid1, uid2] of weekFixtures) {
+      const total1 = Number(weeklyTotalsByUid?.[normalizeUid(uid1)]?.[String(week)] ?? weeklyTotalsByUid?.[normalizeUid(uid1)]?.[week] ?? 0);
+      const total2 = Number(weeklyTotalsByUid?.[normalizeUid(uid2)]?.[String(week)] ?? weeklyTotalsByUid?.[normalizeUid(uid2)]?.[week] ?? 0);
+      applyH2HMatchToTable(table, uid1, uid2, total1, total2, { liveApplied: false });
+    }
+  }
+}
+
+function finalizeH2HTable(table) {
   return Object.values(table)
     .map((row) => ({
       ...row,
@@ -2788,6 +2844,23 @@ function buildLiveH2HStandings(baseStatsByUid, liveMatches) {
       ...row,
       rank: index + 1,
     }));
+}
+
+function buildCompletedH2HStandings(baseStatsByUid, weeklyTotalsByUid = {}, lastCompletedWeek = null) {
+  const table = buildSeededH2HTable(baseStatsByUid);
+  applyCompletedH2HWeeksToTable(table, weeklyTotalsByUid, lastCompletedWeek);
+  return finalizeH2HTable(table);
+}
+
+function buildLiveH2HStandings(baseStatsByUid, liveMatches, weeklyTotalsByUid = {}, lastCompletedWeek = null) {
+  const table = buildSeededH2HTable(baseStatsByUid);
+  applyCompletedH2HWeeksToTable(table, weeklyTotalsByUid, lastCompletedWeek);
+
+  for (const match of liveMatches || []) {
+    applyH2HMatchToTable(table, match?.uid1, match?.uid2, match?.total1, match?.total2, { liveApplied: true });
+  }
+
+  return finalizeH2HTable(table);
 }
 
 async function mapLimit(list, limit, fn) {
@@ -2812,6 +2885,10 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(currentEventName);
   const currentWeek = currentMeta.gw || extractGwNumber(currentEventName) || extractGwNumber(currentEvent) || 22;
   const currentDay = Number(currentMeta.day || 0) || 1;
+  const lastCompletedH2hWeek = Math.max(22, Number(currentWeek || 0) - 1);
+  const completedH2hWeeks = [...new Set(ALL_FIXTURES.map(([gw]) => Number(gw || 0)))]
+    .filter((gw) => gw > 22 && gw <= lastCompletedH2hWeek)
+    .sort((a, b) => a - b);
   const weeklyStandingsPhase = currentWeek >= 1 && currentWeek <= 25 ? currentWeek + 1 : null;
   const futureWeekEventIds = buildWeekEventIds(events, currentWeek, currentEvent);
   const previousPicksByUid = buildPreviousPicksByUid(previousState);
@@ -2980,6 +3057,10 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       rich_day: Number(previous.rich_day || 0) || null,
       captain_week: Number(previous.captain_week || 0) || null,
       transfer_records: Array.isArray(previous.transfer_records) ? previous.transfer_records : [],
+      historical_h2h_week_totals:
+        previous.historical_h2h_week_totals && typeof previous.historical_h2h_week_totals === "object"
+          ? { ...previous.historical_h2h_week_totals }
+          : {},
       week_total_summary: previous.week_total_summary || null,
       lineup_economy: previous.lineup_economy || null,
       picks: Array.isArray(previous.players) ? previous.players : [],
@@ -3070,6 +3151,25 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     const wildcardActive = wildcardDay !== null;
     const penaltyScore = Number(transferSummary.penalty_score || 0);
     const historyWeek = calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById);
+    const historicalH2hWeekTotals = (
+      previous.historical_h2h_week_totals && typeof previous.historical_h2h_week_totals === "object"
+        ? { ...previous.historical_h2h_week_totals }
+        : {}
+    );
+    if (hasHistoryData && completedH2hWeeks.length) {
+      for (const week of completedH2hWeeks) {
+        const completedWeekTotal = computeCompletedWeekTotalForGw(
+          historyData,
+          transfersData,
+          week,
+          eventMetaById,
+          elements
+        );
+        if (Number.isFinite(Number(completedWeekTotal))) {
+          historicalH2hWeekTotals[String(week)] = Number(completedWeekTotal || 0);
+        }
+      }
+    }
     const captainChipEvent = hasHistoryData
       ? getCaptainChipEvent(historyData, currentWeek, currentEvent, eventMetaById)
       : null;
@@ -3128,6 +3228,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     standingsByUid[uid].transfer_records = transferSummary.records;
     standingsByUid[uid].captain_used = captainUsed;
     standingsByUid[uid].chip_status = chipStatus;
+    standingsByUid[uid].historical_h2h_week_totals = historicalH2hWeekTotals;
     standingsByUid[uid].week_total_summary = buildWeekTotalSummary(historyWeek, currentEvent, gd1MissingPenalty);
     if (historyWeek.has_week_rows) {
       const previewTodayScore = historyWeek.today_points !== null
@@ -3355,6 +3456,10 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
       wildcard_post_gw17_event: s.wildcard_post_gw17_event || null,
       rich_day: s.rich_day || null,
       captain_week: s.captain_week || null,
+      historical_h2h_week_totals:
+        s.historical_h2h_week_totals && typeof s.historical_h2h_week_totals === "object"
+          ? { ...s.historical_h2h_week_totals }
+          : {},
       fetch_status: s.fetch_status || { picks_ok: true, history_ok: true, transfers_ok: true },
       event_total: s.week_total || 0,
       overall_total: s.overall_total || s.week_total || 0,
@@ -3459,7 +3564,21 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     currentWeek,
   });
   fdr.daily_averages = league_daily_averages;
-  const h2hStandings = buildLiveH2HStandings(H2H_BASE_STATS_BY_UID, h2h);
+  const historicalH2hTotalsByUid = {};
+  for (const uid of UID_LIST) {
+    historicalH2hTotalsByUid[uid] = standingsByUid[uid]?.historical_h2h_week_totals || {};
+  }
+  const h2hLastStandings = buildCompletedH2HStandings(
+    H2H_BASE_STATS_BY_UID,
+    historicalH2hTotalsByUid,
+    lastCompletedH2hWeek
+  );
+  const h2hStandings = buildLiveH2HStandings(
+    H2H_BASE_STATS_BY_UID,
+    h2h,
+    historicalH2hTotalsByUid,
+    lastCompletedH2hWeek
+  );
   const classicRankings = buildClassicRankingsPayload(
     overallStandingsRows,
     weeklyStandingsRows,
@@ -3485,6 +3604,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     },
     fixture_details: fixtureDetails,
     h2h,
+    h2h_last_standings: h2hLastStandings,
     h2h_standings: h2hStandings,
     classic_rankings: classicRankings,
     picks_by_uid: picksByUid,

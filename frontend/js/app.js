@@ -357,26 +357,36 @@ function getStandingsDisplayName(uid, state, fallback = "-") {
 }
 
 function buildStaticStandingsRows(state) {
-    const leaderPoints = GW23_LAST_STANDINGS.reduce((max, row) => Math.max(max, Number(row?.points || 0)), 0);
-    return GW23_LAST_STANDINGS.map((row) => ({
+    const currentGw = extractGameweekNumber(state?.current_event_name) || 24;
+    const lastCompletedGw = Math.max(22, currentGw - 1);
+    const sourceRows = Array.isArray(state?.h2h_last_standings) && state.h2h_last_standings.length
+        ? state.h2h_last_standings
+        : GW23_LAST_STANDINGS;
+    const remainingTitlePoints = Math.max(0, (FINAL_H2H_GW - lastCompletedGw) * 3);
+    const leaderPoints = sourceRows.reduce((max, row) => Math.max(max, Number(row?.points || 0)), 0);
+    return sourceRows.map((row) => ({
         ...row,
+        gw: lastCompletedGw,
         team_name: getStandingsDisplayName(row.uid, state, row.team_name),
-        contender: Number(row.points || 0) + MAX_TITLE_POINTS_REMAINING >= leaderPoints,
+        diff: Number(row?.diff ?? (Number(row?.scored || 0) - Number(row?.conceded || 0) || 0)),
+        contender: Number(row?.points || 0) + remainingTitlePoints >= leaderPoints,
     }));
 }
 
 function buildLiveStandingsRows(state) {
     const currentGw = extractGameweekNumber(state?.current_event_name) || 24;
     const remainingTitlePoints = Math.max(0, (FINAL_H2H_GW - currentGw) * 3);
+    const baselineRows = Array.isArray(state?.h2h_last_standings) && state.h2h_last_standings.length
+        ? state.h2h_last_standings
+        : buildStaticStandingsRows(state);
     const byUid = {};
 
-    GW23_LAST_STANDINGS.forEach((row) => {
+    baselineRows.forEach((row) => {
         byUid[String(row.uid)] = {
             ...row,
             gw: currentGw,
             team_name: getStandingsDisplayName(row.uid, state, row.team_name),
             base_rank: Number(row.rank || 0),
-            contender: false,
         };
     });
 
@@ -389,33 +399,33 @@ function buildLiveStandingsRows(state) {
 
         const total1 = Number(match?.total1 || 0);
         const total2 = Number(match?.total2 || 0);
-        left.gw = currentGw;
-        right.gw = currentGw;
-        left.scored += total1;
-        left.conceded += total2;
-        right.scored += total2;
-        right.conceded += total1;
+        left.scored = Number(left.scored || 0) + total1;
+        left.conceded = Number(left.conceded || 0) + total2;
+        right.scored = Number(right.scored || 0) + total2;
+        right.conceded = Number(right.conceded || 0) + total1;
+        left.played = Number(left.played || 0) + 1;
+        right.played = Number(right.played || 0) + 1;
 
         if (total1 > total2) {
-            left.won += 1;
-            left.points += 3;
-            right.lost += 1;
+            left.won = Number(left.won || 0) + 1;
+            left.points = Number(left.points || 0) + 3;
+            right.lost = Number(right.lost || 0) + 1;
         } else if (total2 > total1) {
-            right.won += 1;
-            right.points += 3;
-            left.lost += 1;
+            right.won = Number(right.won || 0) + 1;
+            right.points = Number(right.points || 0) + 3;
+            left.lost = Number(left.lost || 0) + 1;
         } else {
-            left.draw += 1;
-            right.draw += 1;
-            left.points += 1;
-            right.points += 1;
+            left.draw = Number(left.draw || 0) + 1;
+            right.draw = Number(right.draw || 0) + 1;
+            left.points = Number(left.points || 0) + 1;
+            right.points = Number(right.points || 0) + 1;
         }
     });
 
-    return Object.values(byUid)
+    const rows = Object.values(byUid)
         .map((row) => ({
             ...row,
-            diff: Number(row.scored || 0) - Number(row.conceded || 0),
+            diff: Number(row?.scored || 0) - Number(row?.conceded || 0),
         }))
         .sort((a, b) =>
             Number(b.points || 0) - Number(a.points || 0) ||
@@ -428,14 +438,13 @@ function buildLiveStandingsRows(state) {
         .map((row, index) => ({
             ...row,
             rank: index + 1,
-        }))
-        .map((row, _, rows) => {
-            const leaderPoints = rows.reduce((max, item) => Math.max(max, Number(item?.points || 0)), 0);
-            return {
-                ...row,
-                contender: Number(row?.points || 0) + remainingTitlePoints >= leaderPoints,
-            };
-        });
+        }));
+
+    const leaderPoints = rows.reduce((max, row) => Math.max(max, Number(row?.points || 0)), 0);
+    return rows.map((row) => ({
+        ...row,
+        contender: Number(row?.points || 0) + remainingTitlePoints >= leaderPoints,
+    }));
 }
 
 function renderStandingsTable(rows, options = {}) {
@@ -1085,8 +1094,9 @@ const Render = {
         const staticRows = buildStaticStandingsRows(state);
         const liveRows = buildLiveStandingsRows(state);
         const currentGw = extractGameweekNumber(state?.current_event_name) || 24;
+        const lastCompletedGw = Math.max(22, currentGw - 1);
 
-        lastBadge.textContent = "GW23 Final";
+        lastBadge.textContent = `GW${lastCompletedGw} Final`;
         liveBadge.textContent = `GW${currentGw} Live`;
         lastWrap.innerHTML = renderStandingsTable(staticRows, { highlightContenders: true });
         liveWrap.innerHTML = renderStandingsTable(liveRows, { highlightContenders: true });
