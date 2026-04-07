@@ -4466,7 +4466,7 @@ async function buildLongestHeldPlayerSummary(uidNumber, latestEventId, rowEventI
         player_name: elements[elementId]?.name || `#${elementId}`,
         headshot_url: elements[elementId]?.headshot_url || null,
         ownership_percent: Number(elements[elementId]?.selected_by_percent || 0),
-        points_per_game: Number(elements[elementId]?.points_per_game || 0),
+        points_per_game: Number(elements[elementId]?.points_per_game || 0) / 10,
         days_held: 0,
         first_event: eventId,
         last_event: eventId,
@@ -4521,7 +4521,7 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
       element_id: elementId,
       captain_name: elements[elementId]?.name || `#${elementId}`,
       headshot_url: elements[elementId]?.headshot_url || null,
-      season_average_points: Number(elements[elementId]?.points_per_game || 0),
+      season_average_points: Number(elements[elementId]?.points_per_game || 0) / 10,
       captain_points: Math.round(fantasyPoints),
       ownership_percent: Number(elements[elementId]?.selected_by_percent || 0),
     });
@@ -4658,20 +4658,24 @@ async function buildSeasonSummaryPayload(uidInput) {
   const transferPenaltyEvents = rows.filter((row) => Number(row?.event_transfers_cost || 0) > 0).length;
   const transferEveryWeek = seasonWeeksTracked > 0 && transferWeeksActive >= seasonWeeksTracked;
 
-  const captainEvents = extractChipHistoryRecords(historyData)
-    .map((item) => {
-      const eventId = Number(item?.event || 0);
-      const rawName = String(item?.name || "").toLowerCase();
-      const meta = eventMetaById?.[eventId] || {};
-      return {
-        event: eventId,
-        name: rawName,
-        gw: Number(item?.gw || item?.gameweek || meta?.gw || 0) || null,
-        day: Number(item?.day || meta?.day || 0) || null,
-      };
-    })
-    .filter((item) => item.event && item.name === "phcapt")
-    .sort((a, b) => Number(a?.event || 0) - Number(b?.event || 0));
+  const captainEvents = [...new Map(
+    (Array.isArray(historyData?.chips) ? historyData.chips : [])
+      .map((item) => {
+        const eventId = Number(item?.event || 0);
+        const rawName = String(item?.name || "").toLowerCase();
+        const meta = eventMetaById?.[eventId] || {};
+        return [
+          eventId,
+          {
+            event: eventId,
+            name: rawName,
+            gw: Number(item?.gw || item?.gameweek || meta?.gw || 0) || null,
+            day: Number(item?.day || meta?.day || 0) || null,
+          },
+        ];
+      })
+      .filter(([eventId, item]) => eventId && item.name === "phcapt")
+  ).values()].sort((a, b) => Number(a?.event || 0) - Number(b?.event || 0));
 
   const captainRecords = await buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eventMetaById);
   const captainUseCount = captainRecords.length;

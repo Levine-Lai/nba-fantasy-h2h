@@ -1856,3 +1856,115 @@
         border-radius: 18px;
     }
 }
+
+.season-summary-page-title {
+    margin: 0 0 6px;
+    font-size: clamp(36px, 3.8vw, 52px);
+    line-height: 0.92;
+}
+
+.season-summary-cover-stat-label,
+.season-summary-story-card-label {
+    font-size: 13px;
+    letter-spacing: 0.04em;
+}
+
+.season-summary-cover-stat-value {
+    font-size: clamp(32px, 4.4vw, 58px);
+}
+
+.season-summary-story-card-value {
+    font-size: clamp(36px, 4vw, 50px);
+}
+
+.season-summary-transfer-main-full .season-summary-transfer-story-paragraph {
+    line-height: 1.95;
+}
+
+.season-summary-inline-player {
+    width: 3em;
+    height: 3em;
+    margin: 0 0.18em;
+    vertical-align: -0.82em;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+}
+
+.season-summary-inline-player-image {
+    object-fit: contain;
+    filter: drop-shadow(0 10px 16px rgba(15, 23, 42, 0.2));
+}
+
+.season-summary-page-highlights .season-summary-transfer-main {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.season-summary-page-highlights .season-summary-transfer-copy {
+    margin-inline: auto;
+}
+
+.season-summary-page-player-details .season-summary-page-title,
+.season-summary-page-transfer .season-summary-page-title,
+.season-summary-page-captain .season-summary-page-title,
+.season-summary-page-highlights .season-summary-page-title {
+    min-height: 1.05em;
+}
+
+@media (max-width: 768px) {
+    .season-summary-layout {
+        padding: 0 8px 8px;
+    }
+
+    .season-summary-page {
+        gap: 8px;
+        padding: 4px 10px 10px;
+        align-content: start;
+    }
+
+    .season-summary-page-cover {
+        gap: 8px;
+    }
+
+    .season-summary-cover-main {
+        gap: 10px;
+        padding: 0 2px 0;
+    }
+
+    .season-summary-page-title {
+        margin: 0 0 4px;
+        font-size: 36px;
+    }
+
+    .season-summary-cover-stat-label,
+    .season-summary-story-card-label {
+        font-size: 12px;
+    }
+
+    .season-summary-cover-stat-value {
+        font-size: clamp(30px, 8vw, 42px);
+    }
+
+    .season-summary-story-card-value {
+        font-size: clamp(27px, 7vw, 36px);
+    }
+
+    .season-summary-transfer-main-full .season-summary-transfer-story-paragraph {
+        line-height: 1.9;
+    }
+
+    .season-summary-story-shell {
+        gap: 10px;
+    }
+
+    .season-summary-inline-player {
+        width: 2.35em;
+        height: 2.35em;
+        margin: 0 0.14em;
+        vertical-align: -0.62em;
+    }
+}
