@@ -464,6 +464,30 @@
         return `<div class="season-summary-story-avatar-strip${className ? ` ${className}` : ""}">${avatars.join("")}</div>`;
     }
 
+    function getStoryPlayerName(item) {
+        return String(item?.player_name || item?.captain_name || item?.name || "Player");
+    }
+
+    function renderInlinePlayerMention(item, className = "") {
+        const safeUrl = String(item?.headshot_url || "").trim();
+        const safeName = getStoryPlayerName(item);
+        if (!safeUrl) {
+            return `<strong class="season-summary-transfer-emphasis">${escapeHtml(safeName)}</strong>`;
+        }
+        return `
+            <span class="season-summary-inline-player${className ? ` ${className}` : ""}" title="${escapeHtml(safeName)}" aria-label="${escapeHtml(safeName)}">
+                <img
+                    class="season-summary-inline-player-image"
+                    src="${escapeHtml(safeUrl)}"
+                    alt="${escapeHtml(safeName)}"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                    onerror="this.parentElement?.remove()"
+                />
+            </span>
+        `;
+    }
+
     function getTransferTimeMood(fullLabel) {
         const label = String(fullLabel || "");
         if (label === "00:00-08:00") {
@@ -1431,12 +1455,209 @@
         `;
     }
 
+    function renderPlayerDetailsStoryV2(profile) {
+        const details = profile?.player_details?.summary || {};
+        const totalUniquePlayers = Number(details.total_unique_players || 0);
+        const averagePlayerScore = Number(details.average_player_score || 0);
+        const averageHoldDays = Number(details.average_hold_days || 0);
+        const seasonDays = Number(details.season_days || 0);
+        const leaguePercentile = Number(details.league_percentile || 0);
+        const lowestOwnershipPlayer = details.lowest_ownership_player || null;
+        const longestHold = details.longest_hold || null;
+        const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+
+        const cards = [
+            {
+                label: "持有球员总人数",
+                value: `${formatSummaryNumber(totalUniquePlayers)}人`,
+                note: "整个赛季进入过阵容的不同球员",
+            },
+            {
+                label: "平均持有球员分数",
+                value: `${formatSummaryDecimal(averagePlayerScore)}分`,
+                note: leaguePercentile ? `超过这个联盟${formatSummaryNumber(leaguePercentile)}%的玩家` : "按本联盟玩家口径估算",
+            },
+            {
+                label: "平均持有球员天数",
+                value: `${formatSummaryDecimal(averageHoldDays)}天`,
+                note: `${formatSummaryNumber(seasonDays)}个比赛日里的平均陪伴`,
+            },
+        ];
+
+        const paragraphOne = `整个赛季你一共选过${mark(formatSummaryNumber(totalUniquePlayers))}名不同的球员，即使可能你并不是他们的球迷，却也见证了他们为你上分的努力；这${mark(formatSummaryNumber(totalUniquePlayers))}名球员平均每一个人能在每个比赛日给你拿下${mark(formatSummaryDecimal(averagePlayerScore))}分，超过这个联盟${mark(formatSummaryNumber(leaguePercentile))}%的玩家，似乎你的每一个选择都充满着智慧。`;
+        const paragraphTwo = lowestOwnershipPlayer?.player_name
+            ? `${renderInlinePlayerMention(lowestOwnershipPlayer)}是你选择过持有率最低的球员，全服持有率仅有${mark(`${formatSummaryDecimal(lowestOwnershipPlayer.ownership_percent)}%`)}，这位宝藏球员也没有辜负你的信任，在你持有他的${mark(formatSummaryNumber(lowestOwnershipPlayer.days_held))}天里平均每场砍下${mark(formatSummaryDecimal(lowestOwnershipPlayer.average_points))}分，群友们都夸你是 DIFF 大师！`
+            : "这个赛季你也曾把目光投向一些不那么热门的名字，正是这些看起来离谱的决定，慢慢拼出了只属于你的阵容性格。";
+        const paragraphThree = longestHold?.player_name
+            ? `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，平均每一位球员在你阵容中能停留${mark(formatSummaryDecimal(averageHoldDays))}天，相遇短暂，希望他们也在你的 fantasy 故事中留下了美好的一页；不过，不知道你有没有猜到，留在你阵容中最久的人是${renderInlinePlayerMention(longestHold)}呢，相信陪伴你走过了${mark(formatSummaryNumber(longestHold.days_held))}天，他已经成为你心中的第一爱酱了吧！`
+            : `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，你的阵容不断迎来送往，平均每一位球员在你这里停留${mark(formatSummaryDecimal(averageHoldDays))}天，这本身就已经是一种只属于 fantasy 的陪伴。`;
+
+        return `
+            <div class="season-summary-transfer-copy season-summary-story-shell">
+                <div class="season-summary-page-title">球员详情</div>
+                ${renderStoryCards(cards, "season-summary-story-cards-player")}
+                <div class="season-summary-transfer-story-list season-summary-story-copy">
+                    <p class="season-summary-transfer-story-paragraph">${paragraphOne}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphTwo}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphThree}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderPlayerDetailsPageV2(profile) {
+        return `
+            <section class="season-summary-page season-summary-page-transfer season-summary-page-player-details">
+                <div class="season-summary-main season-summary-transfer-main season-summary-transfer-main-full">
+                    ${renderPlayerDetailsStoryV2(profile)}
+                </div>
+            </section>
+        `;
+    }
+
+    function renderTransferStoryV2(profile) {
+        const transfers = profile?.transfers || {};
+        const summary = transfers.summary || {};
+        const totalTransfers = Number(summary.total_transfers || 0);
+        const activeWeeks = Number(summary.active_weeks || 0);
+        const seasonWeeks = Number(summary.season_weeks || 24);
+        const penaltyPoints = Number(summary.penalty_points || 0);
+        const transferEveryWeek = !!summary.transfer_every_week;
+        const mostIn = summary.most_in || null;
+        const mostOut = summary.most_out || null;
+        const favoriteDay = summary.favorite_day || null;
+        const favoriteTimeSlot = summary.favorite_time_slot || null;
+        const timeSlotLabel = String(favoriteTimeSlot?.full_label || "--");
+        const startHour = Number(String(favoriteTimeSlot?.label || favoriteTimeSlot?.full_label || "").split(":")[0]);
+        const favoriteDayNumber = Number(favoriteDay?.day || 0);
+        const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+
+        const cards = [
+            { label: "总换人次数", value: `${formatSummaryNumber(totalTransfers)}次`, note: "不含 WC / AS" },
+            { label: "操作周数", value: `${formatSummaryNumber(activeWeeks)}/${formatSummaryNumber(seasonWeeks)}`, note: transferEveryWeek ? "每一周都坚持换人" : "并不是每周都要把 FT 用完" },
+            { label: "扣分总计", value: penaltyPoints > 0 ? `-${formatSummaryNumber(penaltyPoints)}` : "0", note: penaltyPoints > 200 ? "大胆而奔放的操作" : "谨慎精确的节奏" },
+            { label: "偏爱换人时段", value: timeSlotLabel, note: favoriteTimeSlot?.count ? `${formatSummaryNumber(favoriteTimeSlot.count)}次发生在这里` : "这季还没有固定生物钟" },
+        ];
+
+        const paragraphOne = `这个赛季总共转会${mark(formatSummaryNumber(totalTransfers))}次，${transferEveryWeek ? "并且每一周都坚持换人，相信最终的排名没有辜负你的努力~" : "机智的你选择以逸待劳，并不是把 FT 用完才是最好的选择。"}${penaltyPoints > 200 ? `整个赛季一共扣过${mark(`-${formatSummaryNumber(penaltyPoints)}`)}分，大胆而奔放的操作决定了你的上限。` : `整个赛季一共扣过${mark(`-${formatSummaryNumber(penaltyPoints)}`)}分，谨慎精确才是你的代名词。`}`;
+        const paragraphTwo = mostIn?.name && mostOut?.name
+            ? `${renderInlinePlayerMention(mostIn)}被你换进来了${mark(formatSummaryNumber(mostIn.count))}次，是你心心念念的那个人吗？希望他的表现没有让你失望；而${renderInlinePlayerMention(mostOut)}被你送走了${mark(formatSummaryNumber(mostOut.count))}次，想必他的表现你也看在眼里吧。`
+            : "这个赛季你换人的节奏很有个人风格，人来人往之间，喜爱和犹豫都写在每一笔转会里。";
+
+        let timeSentence = "你的换人时机并不完全固定，很多决定像是顺着比赛的节奏自然发生。";
+        if (Number.isFinite(startHour)) {
+            if (startHour >= 8 && startHour < 20) timeSentence = `你好像更喜欢在${mark(timeSlotLabel)}换人，伤病报告都是小事，心情＞fantasy。`;
+            if (startHour >= 20 && startHour < 24) timeSentence = `你好像更喜欢在${mark(timeSlotLabel)}换人，谨慎而大胆的选择，等到消息更完整再操作，也不耽误睡觉时间。`;
+            if (startHour >= 0 && startHour < 6) timeSentence = `你好像更喜欢在${mark(timeSlotLabel)}换人，夜生活才是你的舞台，必须看到我的球员 available 再睡觉。`;
+            if (startHour >= 6 && startHour < 8) timeSentence = `你好像更喜欢在${mark(timeSlotLabel)}换人，全服最谨慎的玩家，早起闹钟定好，守着 ddl 落子无悔。`;
+        }
+
+        let daySentence = "";
+        if (favoriteDayNumber >= 1 && favoriteDayNumber <= 3) daySentence = `${mark(`Day${favoriteDayNumber}`)}也是你最常出手的日子，拿到 FT 就该趁早用。`;
+        if (favoriteDayNumber >= 4 && favoriteDayNumber <= 7) daySentence = `经常把转会留到${mark(`Day${favoriteDayNumber}`)}再出手，不仅规划得当，而且沉得住气。`;
+        const paragraphThree = [timeSentence, daySentence].filter(Boolean).join("");
+
+        return `
+            <div class="season-summary-transfer-copy season-summary-story-shell">
+                <div class="season-summary-page-title">转会详情</div>
+                ${renderStoryCards(cards, "season-summary-story-cards-transfer")}
+                <div class="season-summary-transfer-story-list season-summary-story-copy">
+                    <p class="season-summary-transfer-story-paragraph">${paragraphOne}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphTwo}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphThree}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderTransferPageV2(profile) {
+        return `
+            <section class="season-summary-page season-summary-page-transfer">
+                <div class="season-summary-main season-summary-transfer-main season-summary-transfer-main-full">
+                    ${renderTransferStoryV2(profile)}
+                </div>
+            </section>
+        `;
+    }
+
+    function renderCaptainStoryV2(profile) {
+        const captain = profile?.captain || {};
+        const summary = captain.summary || {};
+        const totalWeeks = Number(summary.total_weeks || 25);
+        const useCount = Number(summary.use_count || 0);
+        const totalPoints = Number(summary.total_points || 0);
+        const averagePoints = Number(summary.average_points || 0);
+        const leaguePercentile = Number(summary.league_percentile || 0);
+        const favoriteCaptain = summary.favorite_captain || null;
+        const bestCaptain = summary.best || null;
+        const worstCaptain = summary.worst || null;
+        const lowestOwnership = summary.lowest_ownership || null;
+        const zeroCount = Number(summary.zero_count || 0);
+        const favoriteName = String(favoriteCaptain?.captain_name || "暂无");
+        const favoriteAvg = Number(favoriteCaptain?.average_points || 0);
+        const favoriteSeasonAvg = Number(favoriteCaptain?.season_average_points || 0);
+        const averageDelta = Number((favoriteAvg - favoriteSeasonAvg).toFixed(1));
+        const favoriteIsJokic = favoriteName === "N.Jokic";
+        const countNote = useCount >= totalWeeks ? "一次都没忘，太能操作了！" : "咦，你还留了一手";
+        const lowestLabel = lowestOwnership ? `GW${formatSummaryNumber(lowestOwnership.gw)} Day${formatSummaryNumber(lowestOwnership.day)}` : "暂无记录";
+        const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+
+        const cards = [
+            { label: "Captain 次数", value: `${formatSummaryNumber(useCount)}/${formatSummaryNumber(totalWeeks)}`, note: countNote },
+            { label: "队长平均得分", value: `${formatSummaryDecimal(averagePoints)}分`, note: `超过${formatSummaryNumber(leaguePercentile)}%的玩家` },
+            { label: "最常选择的队长", value: favoriteName, note: favoriteCaptain ? `${formatSummaryNumber(favoriteCaptain.count)}次` : "还没形成固定偏爱" },
+            { label: "最低持有率 Captain", value: lowestOwnership?.captain_name || "暂无", note: lowestLabel },
+        ];
+
+        const paragraphOne = `在这个没有 vc 的游戏中队长的选择就显得尤为关键，这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，累计拿到了${mark(formatSummaryNumber(totalPoints))}分，平均每个队长都能拿到${mark(formatSummaryDecimal(averagePoints))}分，超过了这个联盟${mark(formatSummaryNumber(leaguePercentile))}%的玩家！`;
+
+        let paragraphTwo = "这个赛季你的 Captain 选择并没有只跟着模板走，而是慢慢形成了自己熟悉的偏好。";
+        if (favoriteCaptain?.captain_name) {
+            if (favoriteIsJokic) {
+                paragraphTwo = `${renderInlinePlayerMention(favoriteCaptain)}是你经常选择的队长，他也是很多人青睐的队长人选，跟着主流走永远不会错。你每次选他当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvg))}分，比他这个赛季的平均分数${averageDelta >= 0 ? "高" : "低"}${mark(formatSummaryDecimal(Math.abs(averageDelta)))}分，${averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这个塞尔维亚大胖子。" : "看来你选队长的时机还可以再打磨一下。"}`;
+            } else {
+                paragraphTwo = `什么？！你最常选的队长居然不是约基奇？看来你的品味非常之独特，保持特立独行永远是范特西游戏中最酷的精神，继续保持！你每次选${renderInlinePlayerMention(favoriteCaptain)}当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvg))}分，比他这个赛季的平均分数${averageDelta >= 0 ? "高" : "低"}${mark(formatSummaryDecimal(Math.abs(averageDelta)))}分，${averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这名球员。" : "看来你选队长的时机还可以再打磨一下。"}`;
+            }
+        }
+
+        const paragraphThree = bestCaptain?.captain_name && worstCaptain?.captain_name
+            ? `最高分的一次队长来自${mark(bestCaptain.label || "")} · ${renderInlinePlayerMention(bestCaptain)} · ${mark(`${formatSummaryNumber(bestCaptain.captain_points)}分`)}；而最让人难过的那次，则是${mark(worstCaptain.label || "")} · ${renderInlinePlayerMention(worstCaptain)} · ${mark(`${formatSummaryNumber(worstCaptain.captain_points)}分`)}。整个赛季你一共 c 到过${mark(formatSummaryNumber(zeroCount))}次 0 分，${zeroCount > 0 ? "哎，运气也是这个游戏的一部分，希望你不要灰心，一个赛季总有起起伏伏。" : "不得不承认你真的太会选队长了。" }`
+            : "等 Captain 记录再丰富一点，这一页会更像属于你自己的队长回忆录。";
+
+        const paragraphFour = lowestOwnership?.captain_name
+            ? `如果要说最 diff 的那一次，大概就是${mark(`GW${formatSummaryNumber(lowestOwnership.gw)} Day${formatSummaryNumber(lowestOwnership.day)}`)}的${renderInlinePlayerMention(lowestOwnership)}了。当时他的持有率只有${mark(`${formatSummaryDecimal(lowestOwnership.ownership_percent)}%`)}，却依然替你拿下了${mark(`${formatSummaryNumber(lowestOwnership.captain_points)}分`)}，勇气可嘉，值得陈赞！`
+            : "这个赛季你最像 DIFF 大师的那一次，还在等下一版数据把它完整抓出来。";
+
+        return `
+            <div class="season-summary-transfer-copy season-summary-story-shell season-summary-captain-copy">
+                <div class="season-summary-page-title">队长选择</div>
+                ${renderStoryCards(cards, "season-summary-story-cards-captain")}
+                <div class="season-summary-transfer-story-list season-summary-story-copy">
+                    <p class="season-summary-transfer-story-paragraph">${paragraphOne}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphTwo}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphThree}</p>
+                    <p class="season-summary-transfer-story-paragraph">${paragraphFour}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderCaptainPageV2(profile) {
+        return `
+            <section class="season-summary-page season-summary-page-captain">
+                <div class="season-summary-main season-summary-transfer-main season-summary-transfer-main-full">
+                    ${renderCaptainStoryV2(profile)}
+                </div>
+            </section>
+        `;
+    }
+
     function renderPages(profile) {
         return `
             ${renderCoverPage(profile)}
-            ${renderPlayerDetailsPage(profile)}
-            ${renderTransferPage(profile)}
-            ${renderCaptainPage(profile)}
+            ${renderPlayerDetailsPageV2(profile)}
+            ${renderTransferPageV2(profile)}
+            ${renderCaptainPageV2(profile)}
             ${renderHighlightsPage(profile)}
         `;
     }
