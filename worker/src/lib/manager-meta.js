@@ -88,7 +88,7 @@ export function buildGoodCaptainSummary(picksByUid, deps) {
     ).trim();
     const day = Number(captainUsed.day || 0) || null;
     const captainPoints = Number(captainUsed.captain_points || 0);
-    const key = `${day || 0}__${captainName}__${captainPoints}`;
+    const key = `${day || 0}__${captainName}`;
     const current = grouped.get(key) || {
       captain_name: captainName,
       captain_points: captainPoints,

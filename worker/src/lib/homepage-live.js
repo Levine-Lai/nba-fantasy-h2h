@@ -277,6 +277,8 @@ export async function buildFreshHomepageState(baseState, deps) {
     return {
       ...match,
       gameweek: fixtureWeek,
+      t1: nextPicksByUid?.[uid1]?.team_name || UID_MAP?.[uidToNumber(uid1)] || uid1,
+      t2: nextPicksByUid?.[uid2]?.team_name || UID_MAP?.[uidToNumber(uid2)] || uid2,
       uid1: uidToNumber(uid1),
       uid2: uidToNumber(uid2),
       team1: nextPicksByUid?.[uid1]?.team_name || UID_MAP?.[uidToNumber(uid1)] || uid1,

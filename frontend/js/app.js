@@ -365,8 +365,7 @@ function buildStaticStandingsRows(state) {
         ...row,
         gw: lastCompletedGw,
         team_name: getStandingsDisplayName(row.uid, state, row.team_name),
-        scored: Number(row?.scored || 0),
-        conceded: Number(row?.conceded || 0),
+        base_diff: Number(row?.diff || 0),
         diff: Number(row?.diff || 0),
         contender: Number(row?.points || 0) + remainingTitlePoints >= leaderPoints,
     }));
@@ -396,10 +395,8 @@ function buildLiveStandingsRows(state) {
 
         const total1 = Number(match?.total1 || 0);
         const total2 = Number(match?.total2 || 0);
-        left.scored = Number(left.scored || 0) + total1;
-        left.conceded = Number(left.conceded || 0) + total2;
-        right.scored = Number(right.scored || 0) + total2;
-        right.conceded = Number(right.conceded || 0) + total1;
+        left.diff = Number(left.base_diff || left.diff || 0) + (total1 - total2);
+        right.diff = Number(right.base_diff || right.diff || 0) + (total2 - total1);
         left.played = Number(left.played || 0) + 1;
         right.played = Number(right.played || 0) + 1;
 
@@ -422,13 +419,12 @@ function buildLiveStandingsRows(state) {
     const rows = Object.values(byUid)
         .map((row) => ({
             ...row,
-            diff: Number(row?.scored || 0) - Number(row?.conceded || 0),
+            diff: Number(row?.diff || 0),
         }))
         .sort((a, b) =>
             Number(b.points || 0) - Number(a.points || 0) ||
             Number(b.won || 0) - Number(a.won || 0) ||
             Number(b.diff || 0) - Number(a.diff || 0) ||
-            Number(b.scored || 0) - Number(a.scored || 0) ||
             Number(a.base_rank || a.rank || 0) - Number(b.base_rank || b.rank || 0) ||
             String(a.team_name || "").localeCompare(String(b.team_name || ""))
         )
@@ -473,7 +469,7 @@ function renderStandingsTable(rows, options = {}) {
                             <td>${Number(row?.won || 0)}</td>
                             <td>${Number(row?.draw || 0)}</td>
                             <td>${Number(row?.lost || 0)}</td>
-                            <td>${Number(row?.diff || (Number(row?.scored || 0) - Number(row?.conceded || 0)) || 0)}</td>
+                            <td>${Number(row?.diff || 0)}</td>
                             <td class="points-cell">${Number(row?.points || 0)}</td>
                         </tr>
                     `).join("")}
@@ -993,8 +989,8 @@ const Render = {
                                     <img
                                         class="good-captain-avatar"
                                         src="${escapeHtml(getManagerLogoUrl(manager.team_name || manager.uid || ""))}"
-                                        alt="${escapeHtml(manager.team_name)} logo"
-                                        title="${escapeHtml(manager.team_name)}"
+                                        alt="${escapeHtml(manager.team_name || manager.uid || "-")} logo"
+                                        title="${escapeHtml(manager.team_name || manager.uid || "-")}"
                                         width="36"
                                         height="36"
                                         loading="lazy"
@@ -1096,7 +1092,7 @@ const Render = {
         lastBadge.textContent = `GW${lastCompletedGw} Final`;
         liveBadge.textContent = `GW${displayGw} Live`;
         lastWrap.innerHTML = renderStandingsTable(staticRows, { highlightContenders: true });
-        liveWrap.innerHTML = renderStandingsTable(liveRows, { highlightContenders: true });
+        liveWrap.innerHTML = renderStandingsTable(liveRows, { highlightContenders: false });
         renderFdrTableInto("rankings-fdr-header-row", "rankings-fdr-week-badge", "rankings-fdr-body", state?.fdr || {});
     },
 
@@ -1270,6 +1266,8 @@ const Render = {
         }, 0);
 
         container.innerHTML = (matches || []).map((match) => {
+            const leftName = match.t1 || match.team1 || "-";
+            const rightName = match.t2 || match.team2 || "-";
             const leftScore = Number(match.total1 || 0);
             const rightScore = Number(match.total2 || 0);
             const isLeftWin = leftScore > rightScore;
@@ -1292,30 +1290,30 @@ const Render = {
             return `
                 <div class="match-block">
                     <div class="match-card">
-                        <div class="team-side ${leftClass} ${leftMuted} js-transfer-toggle" data-panel-id="${leftPanelId}" data-uid="${match.uid1}" data-team="${escapeHtml(match.t1)}" data-side="left">
+                        <div class="team-side ${leftClass} ${leftMuted} js-transfer-toggle" data-panel-id="${leftPanelId}" data-uid="${match.uid1}" data-team="${escapeHtml(leftName)}" data-side="left">
                             <div class="team-head">
                                 <div class="manager-logo-wrap">
                                     ${leftHasCrown ? '<span class="manager-crown" aria-hidden="true">👑</span>' : ''}
-                                    <img class="manager-logo" src="${escapeHtml(getManagerLogoUrl(match.t1))}" alt="${escapeHtml(match.t1)} logo" decoding="async" width="40" height="40" loading="lazy" onerror="this.onerror=null;this.src='/LOGO.png';">
+                                    <img class="manager-logo" src="${escapeHtml(getManagerLogoUrl(leftName))}" alt="${escapeHtml(leftName)} logo" decoding="async" width="40" height="40" loading="lazy" onerror="this.onerror=null;this.src='/LOGO.png';">
                                 </div>
-                                <div class="team-name">${escapeHtml(match.t1)}</div>
+                                <div class="team-name">${escapeHtml(leftName)}</div>
                             </div>
                             <div class="score-main ${leftClass}">${leftScore}</div>
                             <div class="score-sub">Today ${match.today1}</div>
                             <div class="score-prob">Win ${leftWinProb}% <span class="score-mood">${leftMood}</span></div>
                             ${renderChipStatusCards(leftChipStatus)}
                         </div>
-                        <div class="vs-divider js-open-lineup" data-uid1="${match.uid1}" data-name1="${escapeHtml(match.t1)}" data-uid2="${match.uid2}" data-name2="${escapeHtml(match.t2)}">
+                        <div class="vs-divider js-open-lineup" data-uid1="${match.uid1}" data-name1="${escapeHtml(leftName)}" data-uid2="${match.uid2}" data-name2="${escapeHtml(rightName)}">
                             <div class="vs-text">VS</div>
                             <div class="match-diff">Diff: ${Math.abs(Number(match.diff || 0))}</div>
                         </div>
-                        <div class="team-side ${rightClass} ${rightMuted} js-transfer-toggle" data-panel-id="${rightPanelId}" data-uid="${match.uid2}" data-team="${escapeHtml(match.t2)}" data-side="right">
+                        <div class="team-side ${rightClass} ${rightMuted} js-transfer-toggle" data-panel-id="${rightPanelId}" data-uid="${match.uid2}" data-team="${escapeHtml(rightName)}" data-side="right">
                             <div class="team-head">
                                 <div class="manager-logo-wrap">
                                     ${rightHasCrown ? '<span class="manager-crown" aria-hidden="true">👑</span>' : ''}
-                                    <img class="manager-logo" src="${escapeHtml(getManagerLogoUrl(match.t2))}" alt="${escapeHtml(match.t2)} logo" decoding="async" width="40" height="40" loading="lazy" onerror="this.onerror=null;this.src='/LOGO.png';">
+                                    <img class="manager-logo" src="${escapeHtml(getManagerLogoUrl(rightName))}" alt="${escapeHtml(rightName)} logo" decoding="async" width="40" height="40" loading="lazy" onerror="this.onerror=null;this.src='/LOGO.png';">
                                 </div>
-                                <div class="team-name">${escapeHtml(match.t2)}</div>
+                                <div class="team-name">${escapeHtml(rightName)}</div>
                             </div>
                             <div class="score-main ${rightClass}">${rightScore}</div>
                             <div class="score-sub">Today ${match.today2}</div>
