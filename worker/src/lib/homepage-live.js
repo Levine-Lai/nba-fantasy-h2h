@@ -92,6 +92,10 @@ export async function buildFreshHomepageState(baseState, deps) {
       fetchJsonSafe(`/entry/${uid}/event/${currentEvent}/picks/`, 2),
       fetchJsonSafe(`/entry/${uid}/history/`, 2),
     ]);
+    let historyWeek = null;
+    if (historyRes.ok && historyRes.data && typeof historyRes.data === "object") {
+      historyWeek = calculateWeekScoresFromHistory(historyRes.data, currentWeek, currentEvent, eventMetaById);
+    }
     if (!picksRes.ok || !Array.isArray(picksRes.data?.picks)) {
       const sameEvent = Number(previous?.current_event || 0) === Number(currentEvent);
       const previousPlayers = Array.isArray(previous?.players) ? previous.players : [];
@@ -99,11 +103,8 @@ export async function buildFreshHomepageState(baseState, deps) {
         const rebuiltPlayers = rebuildLivePicksFromCachedPlayers(previousPlayers, elements, liveElements, teamsMetaById);
         const [freshToday] = calculateEffectiveScore(rebuiltPlayers, teamsPlayingToday);
         let summary = previous?.week_total_summary || null;
-        if (historyRes.ok && historyRes.data && typeof historyRes.data === "object") {
-          const historyWeek = calculateWeekScoresFromHistory(historyRes.data, currentWeek, currentEvent, eventMetaById);
-          if (historyWeek?.has_week_rows) {
-            summary = buildWeekTotalSummary(historyWeek, currentEvent, Number(previous?.gd1_missing_penalty || 0));
-          }
+        if (historyWeek?.has_week_rows) {
+          summary = buildWeekTotalSummary(historyWeek, currentEvent, Number(previous?.gd1_missing_penalty || 0));
         }
         const fallbackWeek = Math.max(
           0,
@@ -127,9 +128,30 @@ export async function buildFreshHomepageState(baseState, deps) {
           },
         };
       } else {
+        let summary = previous?.week_total_summary || null;
+        if (historyWeek?.has_week_rows) {
+          summary = buildWeekTotalSummary(historyWeek, currentEvent, Number(previous?.gd1_missing_penalty || 0));
+        }
+        const historyToday = Number(historyWeek?.today_points ?? NaN);
+        const fallbackToday = Number.isFinite(historyToday)
+          ? historyToday
+          : Number(previous?.total_live || 0);
+        const fallbackWeek = computeWeekTotalFromSummary(summary, fallbackToday)
+          ?? Number(previous?.event_total || 0);
         freshScoresByUid[uid] = {
-          total_live: Number(previous?.total_live || 0),
-          event_total: Number(previous?.event_total || 0),
+          total_live: Math.max(0, Number(fallbackToday || 0)),
+          event_total: Math.max(0, Number(fallbackWeek || 0)),
+        };
+        nextPicksByUid[uid] = {
+          ...previous,
+          current_event: currentEvent,
+          current_event_name: currentEventName,
+          week_total_summary: summary,
+          fetch_status: {
+            ...(previous?.fetch_status || {}),
+            picks_ok: false,
+            history_ok: historyRes.ok || previous?.fetch_status?.history_ok === true,
+          },
         };
       }
       return;
@@ -138,11 +160,8 @@ export async function buildFreshHomepageState(baseState, deps) {
     const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
     const [freshToday] = calculateEffectiveScore(picks, teamsPlayingToday);
     let summary = previous?.week_total_summary || null;
-    if (historyRes.ok && historyRes.data && typeof historyRes.data === "object") {
-      const historyWeek = calculateWeekScoresFromHistory(historyRes.data, currentWeek, currentEvent, eventMetaById);
-      if (historyWeek?.has_week_rows) {
-        summary = buildWeekTotalSummary(historyWeek, currentEvent, Number(previous?.gd1_missing_penalty || 0));
-      }
+    if (historyWeek?.has_week_rows) {
+      summary = buildWeekTotalSummary(historyWeek, currentEvent, Number(previous?.gd1_missing_penalty || 0));
     }
     const sameEvent = Number(previous?.current_event || 0) === Number(currentEvent);
     const fallbackWeek = sameEvent
