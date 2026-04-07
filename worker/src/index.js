@@ -4413,6 +4413,7 @@ function buildTransferPreferenceSummary(transfers) {
       label: `Day${Number(favoriteDayEntry[0] || 0)}`,
     } : null,
     favorite_time_slot: favoriteSlotEntry ? {
+      start_hour: Number(favoriteSlotEntry[0] || 0),
       label: favoriteSlotMeta?.label || "",
       full_label: favoriteSlotMeta?.full_label || "",
       count: Number(favoriteSlotEntry[1] || 0),
@@ -4678,9 +4679,9 @@ async function buildSeasonSummaryPayload(uidInput) {
   ).values()].sort((a, b) => Number(a?.event || 0) - Number(b?.event || 0));
 
   const captainRecords = await buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eventMetaById);
-  const captainUseCount = captainRecords.length;
+  const captainUseCount = captainEvents.length;
   const captainTotalPoints = captainRecords.reduce((sum, item) => sum + Number(item?.captain_points || 0), 0);
-  const captainAveragePoints = captainUseCount > 0 ? captainTotalPoints / captainUseCount : 0;
+  const captainAveragePoints = captainRecords.length > 0 ? captainTotalPoints / captainRecords.length : 0;
   const captainNameCounts = new Map();
   for (const record of captainRecords) {
     const name = String(record?.captain_name || "").trim();
@@ -4868,6 +4869,7 @@ async function buildSeasonSummaryPayload(uidInput) {
           label: transferPreferences.favorite_day.label || "",
         } : null,
         favorite_time_slot: transferPreferences.favorite_time_slot ? {
+          start_hour: Number(transferPreferences.favorite_time_slot.start_hour || 0),
           label: transferPreferences.favorite_time_slot.label || "",
           full_label: transferPreferences.favorite_time_slot.full_label || "",
           count: Number(transferPreferences.favorite_time_slot.count || 0),
@@ -4937,7 +4939,7 @@ async function buildSeasonSummaryPayload(uidInput) {
         } : null,
       },
       cards: [
-        ["Captain 次数", formatDisplayNumber(captainUseCount), "这里统计的是整个赛季开过 Captain chip 的次数"],
+        ["Captain 次数", formatDisplayNumber(captainUseCount), "严格按 /entry/{id}/history/ 里的 phcapt 次数统计"],
         ["队长总得分", formatDisplayNumber(captainTotalPoints), "已按当日 Captain 球员真实 fantasy 分回算"],
         ["最爱 Captain", favoriteCaptain ? favoriteCaptain[0] : "暂无", favoriteCaptain ? `一共选了 ${favoriteCaptain[1]} 次` : "暂时还没有 Captain 记录"],
         ["最低持有率 Captain", lowestOwnershipCaptain ? `${lowestOwnershipCaptain.label}` : "暂无", lowestOwnershipCaptain ? `${formatDisplayNumber(lowestOwnershipCaptain.ownership_percent)}% 持有率` : "暂时还没有足够记录"],
