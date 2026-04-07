@@ -357,8 +357,8 @@ function getStandingsDisplayName(uid, state, fallback = "-") {
 }
 
 function buildStaticStandingsRows(state) {
-    const currentGw = extractGameweekNumber(state?.current_event_name) || 24;
-    const lastCompletedGw = Math.max(22, currentGw - 1);
+    const currentGw = Number(state?.display_week || 0) || extractGameweekNumber(state?.current_event_name) || 24;
+    const lastCompletedGw = Number(state?.last_completed_week || 0) || Math.max(22, currentGw - 1);
     const sourceRows = Array.isArray(state?.h2h_last_standings) && state.h2h_last_standings.length
         ? state.h2h_last_standings
         : GW23_LAST_STANDINGS;
@@ -374,7 +374,7 @@ function buildStaticStandingsRows(state) {
 }
 
 function buildLiveStandingsRows(state) {
-    const currentGw = extractGameweekNumber(state?.current_event_name) || 24;
+    const currentGw = Number(state?.display_week || 0) || extractGameweekNumber(state?.current_event_name) || 24;
     const remainingTitlePoints = Math.max(0, (FINAL_H2H_GW - currentGw) * 3);
     const baselineRows = Array.isArray(state?.h2h_last_standings) && state.h2h_last_standings.length
         ? state.h2h_last_standings
@@ -1094,10 +1094,11 @@ const Render = {
         const staticRows = buildStaticStandingsRows(state);
         const liveRows = buildLiveStandingsRows(state);
         const currentGw = extractGameweekNumber(state?.current_event_name) || 24;
-        const lastCompletedGw = Math.max(22, currentGw - 1);
+        const displayGw = Number(state?.display_week || 0) || currentGw;
+        const lastCompletedGw = Number(state?.last_completed_week || 0) || Math.max(22, displayGw - 1);
 
         lastBadge.textContent = `GW${lastCompletedGw} Final`;
-        liveBadge.textContent = `GW${currentGw} Live`;
+        liveBadge.textContent = `GW${displayGw} Live`;
         lastWrap.innerHTML = renderStandingsTable(staticRows, { highlightContenders: true });
         liveWrap.innerHTML = renderStandingsTable(liveRows, { highlightContenders: true });
         renderFdrTableInto("rankings-fdr-header-row", "rankings-fdr-week-badge", "rankings-fdr-body", state?.fdr || {});

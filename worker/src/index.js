@@ -2885,10 +2885,6 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   const currentMeta = eventMetaById[currentEvent] || parseEventMetaFromName(currentEventName);
   const currentWeek = currentMeta.gw || extractGwNumber(currentEventName) || extractGwNumber(currentEvent) || 22;
   const currentDay = Number(currentMeta.day || 0) || 1;
-  const lastCompletedH2hWeek = Math.max(22, Number(currentWeek || 0) - 1);
-  const completedH2hWeeks = [...new Set(ALL_FIXTURES.map(([gw]) => Number(gw || 0)))]
-    .filter((gw) => gw > 22 && gw <= lastCompletedH2hWeek)
-    .sort((a, b) => a - b);
   const weeklyStandingsPhase = currentWeek >= 1 && currentWeek <= 25 ? currentWeek + 1 : null;
   const futureWeekEventIds = buildWeekEventIds(events, currentWeek, currentEvent);
   const previousPicksByUid = buildPreviousPicksByUid(previousState);
@@ -2973,6 +2969,12 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   });
   const allCurrentFixturesFinished = games.length > 0 && games.every((game) => !!game.finished);
   const isWeekResolved = futureWeekEventIds.length === 0 && allCurrentFixturesFinished;
+  const maxFixtureWeek = [...new Set(ALL_FIXTURES.map(([gw]) => Number(gw || 0)))].sort((a, b) => a - b).pop() || currentWeek;
+  const displayWeek = isWeekResolved ? Math.min(maxFixtureWeek, Number(currentWeek || 0) + 1) : Number(currentWeek || 0);
+  const lastCompletedH2hWeek = Math.max(22, Math.min(maxFixtureWeek, displayWeek - 1));
+  const completedH2hWeeks = [...new Set(ALL_FIXTURES.map(([gw]) => Number(gw || 0)))]
+    .filter((gw) => gw > 22 && gw <= lastCompletedH2hWeek)
+    .sort((a, b) => a - b);
   const teamsPlayingToday = buildTeamsPlayingToday(games);
   const futureTeamsByEvent = futureWeekEventIds.map((eventId) => buildTeamsPlayingToday(futureFixturesByEvent[eventId] || []));
   const upcomingDayContexts = buildUpcomingDayContexts(upcomingEventIds, eventMetaById, fixturesByEvent);
@@ -3400,9 +3402,9 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   });
 
   const availableWeeks = [...new Set(ALL_FIXTURES.map(([gw]) => gw))].sort((a, b) => a - b);
-  let fixtureWeek = currentWeek;
+  let fixtureWeek = displayWeek;
   if (!availableWeeks.includes(fixtureWeek)) {
-    fixtureWeek = availableWeeks.filter((w) => w <= currentWeek).pop() || availableWeeks[0] || currentWeek;
+    fixtureWeek = availableWeeks.filter((w) => w <= displayWeek).pop() || availableWeeks[0] || displayWeek;
   }
   const weeklyFixtures = ALL_FIXTURES.filter(([gw]) => gw === fixtureWeek);
 
@@ -3561,7 +3563,7 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
   transferTrends.today_value_top = buildTodayValueLeaders(picksByUid, teamsPlayingToday);
   const fdr = buildFdrPayload({
     standingsByUid,
-    currentWeek,
+    currentWeek: displayWeek,
   });
   fdr.daily_averages = league_daily_averages;
   const historicalH2hTotalsByUid = {};
@@ -3596,6 +3598,9 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     generated_at: new Date().toISOString(),
     current_event: currentEvent,
     current_event_name: currentEventName,
+    current_week: currentWeek,
+    display_week: displayWeek,
+    last_completed_week: lastCompletedH2hWeek,
     fixtures: {
       event: currentEvent,
       event_name: currentEventName,
