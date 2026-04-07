@@ -1603,3 +1603,227 @@
         min-height: 76px;
     }
 }
+
+.season-summary-story-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    height: 100%;
+    min-height: 0;
+}
+
+.season-summary-story-cards {
+    display: grid;
+    gap: 12px;
+}
+
+.season-summary-story-cards-player {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.season-summary-story-cards-transfer,
+.season-summary-story-cards-captain {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.season-summary-story-cards-highlights {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.season-summary-story-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 102px;
+    padding: 14px 16px 12px;
+    border-radius: 22px;
+    border: 1px solid #e3ebf4;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(246, 249, 253, 0.98));
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.05);
+}
+
+.season-summary-story-card-label {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.season-summary-story-card-value {
+    margin-top: 8px;
+    font-size: clamp(24px, 2.7vw, 34px);
+    line-height: 0.94;
+    font-weight: 900;
+    letter-spacing: -0.05em;
+    color: #10213a;
+}
+
+.season-summary-story-card-note {
+    margin-top: 7px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
+    color: #64748b;
+}
+
+.season-summary-story-copy {
+    gap: 12px;
+}
+
+.season-summary-story-stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 160px;
+    margin-top: auto;
+    overflow: hidden;
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at top left, rgba(191, 219, 254, 0.2), transparent 38%),
+        radial-gradient(circle at top right, rgba(251, 207, 232, 0.18), transparent 40%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.98));
+    border: 1px solid rgba(191, 219, 254, 0.72);
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
+}
+
+.season-summary-story-stage-player {
+    min-height: 220px;
+}
+
+.season-summary-story-avatar {
+    display: block;
+    object-fit: cover;
+}
+
+.season-summary-story-avatar-player {
+    position: absolute;
+    bottom: 0;
+    width: min(41%, 240px);
+    max-height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 18px 30px rgba(15, 23, 42, 0.18));
+}
+
+.season-summary-story-avatar-player-left {
+    left: 5%;
+}
+
+.season-summary-story-avatar-player-right {
+    right: 5%;
+}
+
+.season-summary-story-avatar-strip {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 14px;
+    padding-top: 2px;
+}
+
+.season-summary-story-avatar-strip .season-summary-story-avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: 28px;
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(226, 232, 240, 0.82));
+    box-shadow: 0 16px 30px rgba(15, 23, 42, 0.12);
+}
+
+.season-summary-story-avatar-strip-captain {
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.season-summary-story-avatar-strip-captain .season-summary-story-avatar {
+    width: 84px;
+    height: 84px;
+    border-radius: 24px;
+}
+
+.season-summary-page-player-details .season-summary-page-title,
+.season-summary-page-transfer .season-summary-page-title,
+.season-summary-page-captain .season-summary-page-title,
+.season-summary-page-highlights .season-summary-page-title {
+    margin-bottom: 2px;
+}
+
+@media (max-width: 768px) {
+    .season-summary-story-cards-player {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .season-summary-story-cards-transfer,
+    .season-summary-story-cards-captain {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .season-summary-story-cards-highlights {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .season-summary-story-card {
+        min-height: 76px;
+        padding: 10px 10px 9px;
+        border-radius: 18px;
+    }
+
+    .season-summary-story-card-label {
+        font-size: 10px;
+    }
+
+    .season-summary-story-card-value {
+        margin-top: 6px;
+        font-size: clamp(18px, 5.2vw, 24px);
+    }
+
+    .season-summary-story-card-note {
+        margin-top: 5px;
+        font-size: 10px;
+        line-height: 1.32;
+    }
+
+    .season-summary-story-copy {
+        gap: 10px;
+    }
+
+    .season-summary-story-stage {
+        min-height: 150px;
+        border-radius: 20px;
+    }
+
+    .season-summary-story-stage-player {
+        min-height: 180px;
+    }
+
+    .season-summary-story-avatar-player {
+        width: min(44%, 160px);
+    }
+
+    .season-summary-story-avatar-player-left {
+        left: 2%;
+    }
+
+    .season-summary-story-avatar-player-right {
+        right: 2%;
+    }
+
+    .season-summary-story-avatar-strip {
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .season-summary-story-avatar-strip .season-summary-story-avatar {
+        width: 70px;
+        height: 70px;
+        border-radius: 20px;
+    }
+
+    .season-summary-story-avatar-strip-captain .season-summary-story-avatar {
+        width: 62px;
+        height: 62px;
+        border-radius: 18px;
+    }
+}

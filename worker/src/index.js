@@ -4465,6 +4465,8 @@ async function buildLongestHeldPlayerSummary(uidNumber, latestEventId, rowEventI
         element_id: elementId,
         player_name: elements[elementId]?.name || `#${elementId}`,
         headshot_url: elements[elementId]?.headshot_url || null,
+        ownership_percent: Number(elements[elementId]?.selected_by_percent || 0),
+        points_per_game: Number(elements[elementId]?.points_per_game || 0),
         days_held: 0,
         first_event: eventId,
         last_event: eventId,
@@ -4516,7 +4518,10 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
       gw: Number(meta?.gw || 0) || null,
       day: Number(meta?.day || 0) || null,
       label: toGwDayLabel(meta?.gw, meta?.day),
+      element_id: elementId,
       captain_name: elements[elementId]?.name || `#${elementId}`,
+      headshot_url: elements[elementId]?.headshot_url || null,
+      season_average_points: Number(elements[elementId]?.points_per_game || 0),
       captain_points: Math.round(fantasyPoints),
       ownership_percent: Number(elements[elementId]?.selected_by_percent || 0),
     });
@@ -4525,6 +4530,14 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
   return records.sort((a, b) =>
     Number(a?.event || 0) - Number(b?.event || 0)
   );
+}
+
+function computeLeaguePercentileByRank(rank, managerCount) {
+  const safeRank = Number(rank || 0);
+  const safeCount = Number(managerCount || 0);
+  if (!safeRank || !safeCount || safeCount <= 1) return null;
+  const percentile = ((safeCount - safeRank) / (safeCount - 1)) * 100;
+  return Math.max(0, Math.min(100, Math.round(percentile)));
 }
 
 async function buildSeasonSummaryPayload(uidInput) {
@@ -4572,6 +4585,11 @@ async function buildSeasonSummaryPayload(uidInput) {
   const previousSeasonPoints = previousSeason ? formatFantasyScore(previousSeason?.total_points || previousSeason?.points || previousSeason?.total || 0) : null;
   const previousSeasonRank = previousSeason ? Number(previousSeason?.rank || 0) || null : null;
   const pointsDelta = previousSeasonPoints !== null ? totalSeasonPoints - previousSeasonPoints : null;
+  const leagueStandingsRows = await fetchAllStandings(1);
+  const leagueManagerCount = Math.max(1, Number(leagueStandingsRows.length || UID_LIST.length));
+  const leagueStandingRow = leagueStandingsRows.find((row) => Number(row?.entry || 0) === Number(uidNumber || 0)) || null;
+  const leagueRank = Number(leagueStandingRow?.rank || 0) || null;
+  const leaguePercentile = computeLeaguePercentileByRank(leagueRank, leagueManagerCount);
 
   const chipEventNameByEvent = buildSeasonChipEventNameMap(historyData);
   const rawTransfers = Array.isArray(transfersRes.data) ? transfersRes.data : [];
@@ -4617,6 +4635,21 @@ async function buildSeasonSummaryPayload(uidInput) {
   const latestEventId = Number(latestRow?.event || rowEventIds[rowEventIds.length - 1] || 0);
   const holdRanking = await buildLongestHeldPlayerSummary(uidNumber, latestEventId, rowEventIds, rawTransfers, elements);
   const longestHold = holdRanking?.[0] || null;
+  const totalUniquePlayers = Number(holdRanking?.length || 0);
+  const totalHeldDays = (holdRanking || []).reduce((sum, item) => sum + Number(item?.days_held || 0), 0);
+  const averageHoldDays = totalUniquePlayers > 0 ? totalHeldDays / totalUniquePlayers : 0;
+  const weightedHeldScoreTotal = (holdRanking || []).reduce(
+    (sum, item) => sum + (Number(item?.points_per_game || 0) * Number(item?.days_held || 0)),
+    0
+  );
+  const averageHeldPlayerScore = totalHeldDays > 0 ? weightedHeldScoreTotal / totalHeldDays : 0;
+  const lowestOwnershipHeldPlayer = [...(holdRanking || [])]
+    .filter((item) => Number.isFinite(Number(item?.ownership_percent || 0)))
+    .sort((a, b) =>
+      Number(a?.ownership_percent || 0) - Number(b?.ownership_percent || 0) ||
+      Number(b?.days_held || 0) - Number(a?.days_held || 0) ||
+      String(a?.player_name || "").localeCompare(String(b?.player_name || ""))
+    )[0] || null;
   const transferPreferences = buildTransferPreferenceSummary(qualifiedTransfers);
   const seasonWeeksTracked = Math.max(
     0,
@@ -4643,6 +4676,7 @@ async function buildSeasonSummaryPayload(uidInput) {
   const captainRecords = await buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eventMetaById);
   const captainUseCount = captainRecords.length;
   const captainTotalPoints = captainRecords.reduce((sum, item) => sum + Number(item?.captain_points || 0), 0);
+  const captainAveragePoints = captainUseCount > 0 ? captainTotalPoints / captainUseCount : 0;
   const captainNameCounts = new Map();
   for (const record of captainRecords) {
     const name = String(record?.captain_name || "").trim();
@@ -4650,8 +4684,17 @@ async function buildSeasonSummaryPayload(uidInput) {
     captainNameCounts.set(name, Number(captainNameCounts.get(name) || 0) + 1);
   }
   const favoriteCaptain = [...captainNameCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
+  const favoriteCaptainRecords = favoriteCaptain
+    ? captainRecords.filter((record) => String(record?.captain_name || "") === String(favoriteCaptain[0] || ""))
+    : [];
+  const favoriteCaptainRecord = favoriteCaptainRecords[0] || null;
+  const favoriteCaptainAverage = favoriteCaptainRecords.length
+    ? favoriteCaptainRecords.reduce((sum, item) => sum + Number(item?.captain_points || 0), 0) / favoriteCaptainRecords.length
+    : 0;
+  const favoriteCaptainSeasonAverage = Number(favoriteCaptainRecord?.season_average_points || 0);
   const bestCaptain = [...captainRecords].sort((a, b) => Number(b?.captain_points || 0) - Number(a?.captain_points || 0))[0] || null;
   const worstCaptain = [...captainRecords].sort((a, b) => Number(a?.captain_points || 0) - Number(b?.captain_points || 0))[0] || null;
+  const zeroCaptainCount = captainRecords.filter((item) => Number(item?.captain_points || 0) <= 0).length;
   const lowestOwnershipCaptain = [...captainRecords]
     .filter((item) => Number(item?.ownership_percent || 0) > 0)
     .sort((a, b) =>
@@ -4766,6 +4809,32 @@ async function buildSeasonSummaryPayload(uidInput) {
         ["Curve", `${seasonCurve.length} 周`],
       ],
     },
+    player_details: {
+      lead: "这一页更像是你整季阵容选择的回头看：你到底见过多少人，又和谁相处得最久。",
+      summary: {
+        total_unique_players: totalUniquePlayers,
+        average_player_score: Number(averageHeldPlayerScore.toFixed(1)),
+        average_hold_days: Number(averageHoldDays.toFixed(1)),
+        season_days: Number(rowEventIds.length || 0),
+        league_percentile: leaguePercentile,
+        lowest_ownership_player: lowestOwnershipHeldPlayer ? {
+          element_id: Number(lowestOwnershipHeldPlayer.element_id || 0) || null,
+          player_name: lowestOwnershipHeldPlayer.player_name || "",
+          headshot_url: lowestOwnershipHeldPlayer.headshot_url || null,
+          ownership_percent: Number(lowestOwnershipHeldPlayer.ownership_percent || 0),
+          average_points: Number(lowestOwnershipHeldPlayer.points_per_game || 0),
+          days_held: Number(lowestOwnershipHeldPlayer.days_held || 0),
+        } : null,
+        longest_hold: longestHold ? {
+          element_id: Number(longestHold.element_id || 0) || null,
+          player_name: longestHold.player_name || "",
+          headshot_url: longestHold.headshot_url || null,
+          ownership_percent: Number(longestHold.ownership_percent || 0),
+          average_points: Number(longestHold.points_per_game || 0),
+          days_held: Number(longestHold.days_held || 0),
+        } : null,
+      },
+    },
     transfers: {
       lead: "这页先不把你写成冷冰冰的转会计数器，而是先看你这一季到底多爱动手、愿不愿意为节奏付费，以及有没有自己偏爱的回头草。",
       summary: {
@@ -4778,10 +4847,12 @@ async function buildSeasonSummaryPayload(uidInput) {
         most_in: favoriteIncoming ? {
           name: favoriteIncoming[0],
           count: Number(favoriteIncoming[1] || 0),
+          headshot_url: Object.values(elements).find((item) => String(item?.name || "") === String(favoriteIncoming[0] || ""))?.headshot_url || null,
         } : null,
         most_out: favoriteOutgoing ? {
           name: favoriteOutgoing[0],
           count: Number(favoriteOutgoing[1] || 0),
+          headshot_url: Object.values(elements).find((item) => String(item?.name || "") === String(favoriteOutgoing[0] || ""))?.headshot_url || null,
         } : null,
         favorite_returner: favoriteReturner ? {
           name: favoriteReturner[0],
@@ -4796,12 +4867,6 @@ async function buildSeasonSummaryPayload(uidInput) {
           label: transferPreferences.favorite_time_slot.label || "",
           full_label: transferPreferences.favorite_time_slot.full_label || "",
           count: Number(transferPreferences.favorite_time_slot.count || 0),
-        } : null,
-        longest_hold: longestHold ? {
-          element_id: Number(longestHold.element_id || 0) || null,
-          player_name: longestHold.player_name || "",
-          headshot_url: longestHold.headshot_url || null,
-          days_held: Number(longestHold.days_held || 0),
         } : null,
       },
       day_distribution: transferPreferences.day_distribution || [],
@@ -4832,11 +4897,39 @@ async function buildSeasonSummaryPayload(uidInput) {
     captain: {
       lead: "Captain 页先按整个赛季的 Captain chip 记录来排，不看今天，不看本周，而是回头看你这一季到底把赌注押在了谁身上。",
       summary: {
+        total_weeks: Number(seasonWeeksTracked || 25) || 25,
+        use_count: captainUseCount,
+        total_points: captainTotalPoints,
+        average_points: Number(captainAveragePoints.toFixed(1)),
+        league_percentile: leaguePercentile,
+        favorite_captain: favoriteCaptain ? {
+          captain_name: String(favoriteCaptain[0] || ""),
+          count: Number(favoriteCaptain[1] || 0),
+          average_points: Number(favoriteCaptainAverage.toFixed(1)),
+          season_average_points: Number(favoriteCaptainSeasonAverage || 0),
+          headshot_url: favoriteCaptainRecord?.headshot_url || null,
+        } : null,
+        best: bestCaptain ? {
+          label: bestCaptain.label || "",
+          captain_name: bestCaptain.captain_name || "",
+          captain_points: Number(bestCaptain.captain_points || 0),
+          headshot_url: bestCaptain.headshot_url || null,
+        } : null,
+        worst: worstCaptain ? {
+          label: worstCaptain.label || "",
+          captain_name: worstCaptain.captain_name || "",
+          captain_points: Number(worstCaptain.captain_points || 0),
+          headshot_url: worstCaptain.headshot_url || null,
+        } : null,
+        zero_count: zeroCaptainCount,
         lowest_ownership: lowestOwnershipCaptain ? {
           label: lowestOwnershipCaptain.label || "",
           captain_name: lowestOwnershipCaptain.captain_name || "",
           ownership_percent: Number(lowestOwnershipCaptain.ownership_percent || 0),
           captain_points: Number(lowestOwnershipCaptain.captain_points || 0),
+          gw: Number(lowestOwnershipCaptain.gw || 0) || null,
+          day: Number(lowestOwnershipCaptain.day || 0) || null,
+          headshot_url: lowestOwnershipCaptain.headshot_url || null,
         } : null,
       },
       cards: [
