@@ -4531,8 +4531,12 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
     if (!eventId || !captainPick) continue;
 
     const elementId = Number(captainPick?.element || 0);
-    const stats = getPlayerStats(elementId, liveCache[eventId] || {}, elements);
-    const fantasyPoints = Number(stats?.fantasy || 0) * Number(captainPick?.multiplier || 1);
+    const liveElements = liveCache[eventId] || {};
+    const rawLiveFantasy = Number(liveElements?.[elementId]?.stats?.total_points);
+    const baseFantasyPoints = Number.isFinite(rawLiveFantasy)
+      ? Number((rawLiveFantasy / 10).toFixed(1))
+      : Number(getPlayerStats(elementId, liveElements, elements)?.fantasy || 0);
+    const fantasyPoints = Number(baseFantasyPoints || 0) * Number(captainPick?.multiplier || 1);
     const meta = eventMetaById?.[eventId] || {};
     records.push({
       event: eventId,
@@ -4551,6 +4555,58 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
   return records.sort((a, b) =>
     Number(a?.event || 0) - Number(b?.event || 0)
   );
+}
+
+async function buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap, elements, eventMetaById) {
+  const safeEventId = Number(eventId || 0);
+  if (!safeEventId) return null;
+
+  const [picksRes, liveRes, fixturesRes] = await Promise.all([
+    fetchJsonSafe(`/entry/${uidNumber}/event/${safeEventId}/picks/`, 2),
+    fetchJsonSafe(`/event/${safeEventId}/live/`, 2),
+    fetchJsonSafe(`/fixtures/?event=${safeEventId}`, 1),
+  ]);
+
+  if (!picksRes.ok || !liveRes.ok) return null;
+
+  const liveElements = buildLiveElementsMap(liveRes.data);
+  const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
+  const fixtures = Array.isArray(fixturesRes.data) ? fixturesRes.data : [];
+  const teamsPlayingToday = fixtures.length
+    ? buildTeamsPlayingToday(fixtures)
+    : new Set((Array.isArray(picksRes.data?.picks) ? picksRes.data.picks : [])
+      .map((pick) => Number(elements[Number(pick?.element || 0)]?.team || 0))
+      .filter(Boolean));
+  const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
+  const [, effectivePlayers, formation] = calculateEffectiveScore(picks, teamsPlayingToday);
+  const lineupPlayers = (effectivePlayers.length ? effectivePlayers : picks.filter((item) => Number(item?.multiplier || 0) > 0))
+    .sort((a, b) => Number(a?.lineup_position || 0) - Number(b?.lineup_position || 0))
+    .slice(0, 5)
+    .map((player) => {
+      const rawLiveFantasy = Number(liveElements?.[Number(player?.element_id || 0)]?.stats?.total_points);
+      const points = Number.isFinite(rawLiveFantasy)
+        ? Math.round((rawLiveFantasy / 10) * (Number(player?.multiplier || 1) || 1))
+        : Number(player?.final_points || 0);
+      return {
+        element_id: Number(player?.element_id || 0) || null,
+        player_name: String(player?.name || `#${player?.element_id || ""}`).trim(),
+        headshot_url: player?.headshot_url || null,
+        team_short: String(player?.team_short || "").trim(),
+        team_logo_url: player?.team_logo_url || "/nba-team-logos/_.png",
+        position_type: Number(player?.position_type || 0) || null,
+        points,
+      };
+    });
+
+  const meta = eventMetaById?.[safeEventId] || {};
+  return {
+    event: safeEventId,
+    gw: Number(meta?.gw || 0) || null,
+    day: Number(meta?.day || 0) || null,
+    label: toGwDayLabel(meta?.gw, meta?.day),
+    formation: formation || null,
+    players: lineupPlayers,
+  };
 }
 
 function computeLeaguePercentileByRank(rank, managerCount) {
@@ -4737,6 +4793,13 @@ async function buildSeasonSummaryPayload(uidInput) {
     .filter((row) => Number(row?.overall_rank || 0) > 0)
     .sort((a, b) => Number(a?.overall_rank || 0) - Number(b?.overall_rank || 0))[0] || null;
   const bestRankMeta = eventMetaById?.[Number(bestRankRow?.event || 0)] || {};
+  const highlightEventIds = [...new Set(
+    [Number(bestDayRow?.event || 0), Number(bestRankRow?.event || 0)].filter((value) => value > 0)
+  )];
+  const highlightLineupEntries = await Promise.all(
+    highlightEventIds.map(async (eventId) => [eventId, await buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap, elements, eventMetaById)])
+  );
+  const highlightLineupsByEvent = Object.fromEntries(highlightLineupEntries);
 
   const managerName = getManagerDisplayName(uidNumber, historyData, entryData);
   const teamName = getTeamDisplayName(uidNumber, historyData, entryData);
@@ -4939,6 +5002,7 @@ async function buildSeasonSummaryPayload(uidInput) {
           season_average_points: Number(favoriteCaptainSeasonAverage || 0),
           season_average_captain_points: Number((favoriteCaptainSeasonAverage * 2).toFixed(1)),
           headshot_url: favoriteCaptainRecord?.headshot_url || null,
+          is_jokic: /Jokic$/i.test(String(favoriteCaptain[0] || "")),
         } : null,
         best: bestCaptain ? {
           label: bestCaptain.label || "",
@@ -5002,8 +5066,26 @@ async function buildSeasonSummaryPayload(uidInput) {
       cards: [
         ["赛季最高单日", bestDayRow ? formatDisplayNumber(bestDayPoints) : "-", bestDayRow ? `${toGwDayLabel(bestDayMeta?.gw, bestDayMeta?.day)} 打出来的最高单日` : "还没有足够的历史数据"],
         ["最高全球排名", bestRankRow ? formatDisplayRank(bestRankRow.overall_rank) : "-", bestRankRow ? `${toGwDayLabel(bestRankMeta?.gw, bestRankMeta?.day)} 达到的最好位置` : "官方若缺 rank 字段，这里会留空"],
-        ["赛季标签", qualifiedTransfers.length >= 40 ? "敢赌" : (captainUseCount >= 6 ? "会挑时机" : "偏稳"), "后面很适合继续加一句更像你的收尾文案"],
       ],
+      summary: {
+        best_day: bestDayRow ? {
+          label: toGwDayLabel(bestDayMeta?.gw, bestDayMeta?.day),
+          gw: Number(bestDayMeta?.gw || 0) || null,
+          day: Number(bestDayMeta?.day || 0) || null,
+          event: Number(bestDayRow?.event || 0) || null,
+          points: Number(bestDayPoints || 0),
+          lineup: highlightLineupsByEvent[Number(bestDayRow?.event || 0)] || null,
+        } : null,
+        best_rank: bestRankRow ? {
+          label: toGwDayLabel(bestRankMeta?.gw, bestRankMeta?.day),
+          gw: Number(bestRankMeta?.gw || 0) || null,
+          day: Number(bestRankMeta?.day || 0) || null,
+          event: Number(bestRankRow?.event || 0) || null,
+          points: formatFantasyScore(bestRankRow?.points || 0),
+          overall_rank: Number(bestRankRow?.overall_rank || 0) || null,
+          lineup: highlightLineupsByEvent[Number(bestRankRow?.event || 0)] || null,
+        } : null,
+      },
       quote: bestDayRow
         ? `${toGwDayLabel(bestDayMeta?.gw, bestDayMeta?.day)} 的 ${formatDisplayNumber(bestDayPoints)} 分，会是这版赛季总结里最适合被单独打亮的一页。`
         : "等真实数据补齐后，这一页会成为整份总结最适合做动效收尾的位置。",

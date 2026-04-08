@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NBA Fantasy Player Cards</title>
+  <style>
+    :root {
+      --page-bg: #f7f7f7;
+      --card-width: 176px;
+      --card-height: 268px;
+      --card-radius: 7px;
+      --card-shadow: 0 8px 20px rgba(26, 34, 56, 0.16);
+      --body-font: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --condensed-font: "Arial Narrow", "Bahnschrift SemiCondensed", "Franklin Gothic Medium Cond", Impact, sans-serif;
+      --debug-bg: rgba(20, 26, 43, 0.78);
+      --debug-text: rgba(255, 255, 255, 0.84);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 36px 20px;
+      background:
+        radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.9), transparent 38%),
+        linear-gradient(180deg, #fbfbfb 0%, #f3f3f3 100%);
+      color: #10131a;
+      font-family: var(--body-font);
+    }
+
+    .stage {
+      width: min(100%, 980px);
+    }
+
+    .board {
+      display: flex;
+      flex-direction: column;
+      gap: 58px;
+      align-items: center;
+      justify-content: center;
+      min-height: 560px;
+    }
+
+    .row {
+      width: 100%;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .row--front {
+      gap: 158px;
+    }
+
+    .row--back {
+      gap: 112px;
+    }
+
+    .card-shell {
+      position: relative;
+      width: var(--card-width);
+      padding-top: 6px;
+    }
+
+    .player-card {
+      position: relative;
+      width: var(--card-width);
+      height: var(--card-height);
+      border-radius: var(--card-radius);
+      background: #ffffff;
+      box-shadow: var(--card-shadow);
+      overflow: hidden;
+      user-select: none;
+      isolation: isolate;
+    }
+
+    .player-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 20%);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .team-logo-wrap {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      z-index: 1;
+    }
+
+    .team-logo {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .team-logo-fallback {
+      display: none;
+      width: 100%;
+      height: 100%;
+      border-radius: 12px;
+      background: rgba(15, 21, 35, 0.08);
+      color: #0f1523;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--condensed-font);
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .team-short {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      color: var(--team-color);
+      font-family: var(--condensed-font);
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.06em;
+      line-height: 1;
+      z-index: 1;
+    }
+
+    .player-visual {
+      position: absolute;
+      inset: 52px 0 100px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 1;
+    }
+
+    .player-headshot-shell {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .player-headshot {
+      max-width: 130px;
+      max-height: 146px;
+      object-fit: contain;
+      display: block;
+      filter: drop-shadow(0 5px 10px rgba(14, 23, 38, 0.12));
+    }
+
+    .player-headshot-fallback {
+      display: none;
+      width: 108px;
+      height: 108px;
+      border-radius: 999px;
+      align-items: center;
+      justify-content: center;
+      background: var(--fallback-gradient);
+      color: #ffffff;
+      font-family: var(--condensed-font);
+      font-size: 42px;
+      font-weight: 700;
+      box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.3);
+    }
+
+    .player-card.is-logo-fallback .team-logo {
+      display: none;
+    }
+
+    .player-card.is-logo-fallback .team-logo-fallback {
+      display: flex;
+    }
+
+    .player-card.is-headshot-fallback .player-headshot {
+      display: none;
+    }
+
+    .player-card.is-headshot-fallback .player-headshot-fallback {
+      display: flex;
+    }
+
+    .position-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 96px;
+      height: 5px;
+      background: var(--accent-solid);
+      z-index: 1;
+    }
+
+    .player-name {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 56px;
+      height: 40px;
+      padding: 0 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #0d111a;
+      text-transform: uppercase;
+      font-family: var(--condensed-font);
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.065em;
+      line-height: 1;
+      z-index: 1;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .score-panel {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-gradient);
+      color: #ffffff;
+      font-family: var(--condensed-font);
+      font-size: 46px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      z-index: 1;
+    }
+
+    .score-panel.score--wide {
+      font-size: 36px;
+    }
+
+    .debug-dock {
+      margin-top: 24px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: var(--debug-bg);
+      color: var(--debug-text);
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    @media (max-width: 860px) {
+      body {
+        padding: 22px 12px 28px;
+      }
+
+      .board {
+        gap: 26px;
+        min-height: 0;
+      }
+
+      .row--front,
+      .row--back {
+        gap: 18px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      :root {
+        --card-width: 148px;
+        --card-height: 234px;
+      }
+
+      .team-logo-wrap {
+        top: 10px;
+        left: 10px;
+        width: 38px;
+        height: 38px;
+      }
+
+      .team-short {
+        top: 10px;
+        right: 10px;
+        font-size: 24px;
+      }
+
+      .player-visual {
+        inset: 46px 0 87px;
+      }
+
+      .player-headshot {
+        max-width: 114px;
+        max-height: 128px;
+      }
+
+      .position-bar {
+        bottom: 83px;
+      }
+
+      .player-name {
+        bottom: 49px;
+        height: 34px;
+        font-size: 18px;
+      }
+
+      .score-panel {
+        height: 48px;
+        font-size: 38px;
+      }
+
+      .score-panel.score--wide {
+        font-size: 30px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <div id="board" class="board" aria-live="polite"></div>
+    <div id="debugDock" class="debug-dock" hidden></div>
+  </main>
+
+  <script>
+    const TEAM_LABEL_COLORS = {
+      SAC: "#5a2d81",
+      LAL: "#552583",
+      CHI: "#ce1141",
+      CHA: "#008ca8",
+      PHX: "#1d428a",
+      default: "#17408b"
+    };
+
+    const ROLE_THEMES = {
+      1: {
+        accentSolid: "#2c58bf",
+        accentGradient: "linear-gradient(90deg, #2b4f9b 0%, #3565c9 100%)",
+        fallbackGradient: "linear-gradient(135deg, #1f3f86 0%, #4a79d8 100%)"
+      },
+      2: {
+        accentSolid: "#ec2e6b",
+        accentGradient: "linear-gradient(90deg, #cf0c2b 0%, #f02f8f 100%)",
+        fallbackGradient: "linear-gradient(135deg, #c40f2e 0%, #f13f93 100%)"
+      }
+    };
+
+    const DEMO_CARDS = [
+      { element: 527, code: 1642875, teamCode: 1610612758, teamShort: "SAC", displayName: "M.RAYNAUD", points: 26, elementType: 2, status: "a" },
+      { element: 264, code: 2544, teamCode: 1610612747, teamShort: "LAL", displayName: "L.JAMES", points: 0, elementType: 2, status: "i" },
+      { element: 94, code: 1630200, teamCode: 1610612741, teamShort: "CHI", displayName: "T.JONES", points: 43, elementType: 1, status: "a" },
+      { element: 73, code: 1642851, teamCode: 1610612766, teamShort: "CHA", displayName: "K.KNUEPPEL", points: 28, elementType: 1, status: "a" },
+      { element: 474, code: 1631221, teamCode: 1610612756, teamShort: "PHX", displayName: "C.GILLESPIE", points: 7, elementType: 1, status: "a" }
+    ];
+
+    const params = new URLSearchParams(window.location.search);
+    const config = {
+      entryId: params.get("entryId") || "",
+      eventId: params.get("eventId") || "159",
+      apiBase: params.get("apiBase") || "",
+      debug: params.get("debug") === "1"
+    };
+
+    const board = document.getElementById("board");
+    const debugDock = document.getElementById("debugDock");
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function normalizeBase(url) {
+      return url.replace(/\/+$/, "");
+    }
+
+    function getHeadshotId(player) {
+      if (!player) {
+        return "";
+      }
+
+      if (player.photo) {
+        return String(player.photo).replace(".jpg", "");
+      }
+
+      if (player.code) {
+        return String(player.code);
+      }
+
+      return "";
+    }
+
+    function headshotUrl(code) {
+      return "https://cdn.nba.com/headshots/nba/latest/520x380/" + code + ".png";
+    }
+
+    function logoUrl(teamCode) {
+      return "https://cdn.nba.com/logos/nba/" + teamCode + "/global/L/logo.svg";
+    }
+
+    function getRoleTheme(elementType) {
+      return ROLE_THEMES[elementType] || ROLE_THEMES[1];
+    }
+
+    function getTeamColor(teamShort) {
+      return TEAM_LABEL_COLORS[teamShort] || TEAM_LABEL_COLORS.default;
+    }
+
+    function formatDisplayName(player) {
+      if (player.web_name) {
+        return String(player.web_name).toUpperCase();
+      }
+
+      const first = player.first_name ? String(player.first_name).trim().charAt(0) : "";
+      const last = player.second_name ? String(player.second_name).trim() : "";
+      return (first && last ? first + "." + last : first + last).toUpperCase();
+    }
+
+    function getScoreClass(points) {
+      return String(points).length >= 3 ? "score--wide" : "";
+    }
+
+    function getMonogram(name) {
+      const letters = String(name).replace(/[^A-Z]/g, "");
+      return (letters.slice(0, 2) || "NBA").toUpperCase();
+    }
+
+    function computeFantasyPoints(rawTotalPoints, multiplier) {
+      const basePoints = Math.round((Number(rawTotalPoints) || 0) / 10);
+      return basePoints * (Number(multiplier) || 1);
+    }
+
+    async function fetchJson(url) {
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "omit",
+        cache: "no-store"
+      });
+
+      if (!response.ok) {
+        throw new Error(response.status + " " + response.statusText + " at " + url);
+      }
+
+      return response.json();
+    }
+
+    async function loadRemoteCards() {
+      const base = normalizeBase(config.apiBase);
+
+      if (!base || !config.entryId) {
+        throw new Error("Missing apiBase or entryId");
+      }
+
+      const [bootstrap, picksPayload, livePayload] = await Promise.all([
+        fetchJson(base + "/api/bootstrap-static/"),
+        fetchJson(base + "/api/entry/" + encodeURIComponent(config.entryId) + "/event/" + encodeURIComponent(config.eventId) + "/picks/"),
+        fetchJson(base + "/api/event/" + encodeURIComponent(config.eventId) + "/live/")
+      ]);
+
+      const playersById = new Map((bootstrap.elements || []).map((player) => [player.id, player]));
+      const teamsById = new Map((bootstrap.teams || []).map((team) => [team.id, team]));
+      const liveById = new Map((livePayload.elements || []).map((entry) => [entry.id, entry]));
+
+      return (picksPayload.picks || [])
+        .filter((pick) => Number(pick.multiplier) > 0)
+        .map((pick) => {
+          const player = playersById.get(pick.element);
+
+          if (!player) {
+            return null;
+          }
+
+          const team = teamsById.get(player.team) || {};
+          const live = liveById.get(player.id) || {};
+
+          return {
+            element: player.id,
+            code: getHeadshotId(player),
+            teamCode: player.team_code || team.code || "",
+            teamShort: team.short_name || "NBA",
+            displayName: formatDisplayName(player),
+            points: computeFantasyPoints(live.stats && live.stats.total_points, pick.multiplier),
+            elementType: player.element_type,
+            status: player.status,
+            position: pick.position
+          };
+        })
+        .filter(Boolean)
+        .sort((left, right) => Number(left.position) - Number(right.position));
+    }
+
+    function buildCardMarkup(card) {
+      const roleTheme = getRoleTheme(card.elementType);
+      const teamColor = getTeamColor(card.teamShort);
+      const scoreClass = getScoreClass(card.points);
+      const style = [
+        "--team-color:" + teamColor,
+        "--accent-solid:" + roleTheme.accentSolid,
+        "--accent-gradient:" + roleTheme.accentGradient,
+        "--fallback-gradient:" + roleTheme.fallbackGradient
+      ].join(";");
+
+      return `
+        <div class="card-shell">
+          <article class="player-card" style="${escapeHtml(style)}">
+            <div class="team-logo-wrap" aria-hidden="true">
+              <img class="team-logo" src="${escapeHtml(logoUrl(card.teamCode))}" alt="" />
+              <div class="team-logo-fallback">${escapeHtml(card.teamShort)}</div>
+            </div>
+            <div class="team-short">${escapeHtml(card.teamShort)}</div>
+            <div class="player-visual">
+              <div class="player-headshot-shell">
+                <img class="player-headshot" src="${escapeHtml(headshotUrl(card.code))}" alt="${escapeHtml(card.displayName)}" />
+                <div class="player-headshot-fallback">${escapeHtml(getMonogram(card.displayName))}</div>
+              </div>
+            </div>
+            <div class="position-bar"></div>
+            <div class="player-name">${escapeHtml(card.displayName)}</div>
+            <div class="score-panel ${scoreClass}">${escapeHtml(card.points)}</div>
+          </article>
+        </div>
+      `;
+    }
+
+    function renderBoard(cards) {
+      const frontCourt = cards.filter((card) => Number(card.elementType) === 2);
+      const backCourt = cards.filter((card) => Number(card.elementType) === 1);
+      const extras = cards.filter((card) => Number(card.elementType) !== 1 && Number(card.elementType) !== 2);
+
+      const rows = [];
+
+      if (frontCourt.length) {
+        rows.push('<section class="row row--front">' + frontCourt.map(buildCardMarkup).join("") + "</section>");
+      }
+
+      if (backCourt.length) {
+        rows.push('<section class="row row--back">' + backCourt.map(buildCardMarkup).join("") + "</section>");
+      }
+
+      if (extras.length) {
+        rows.push('<section class="row row--back">' + extras.map(buildCardMarkup).join("") + "</section>");
+      }
+
+      board.innerHTML = rows.join("");
+      installImageFallbacks();
+    }
+
+    function installImageFallbacks() {
+      board.querySelectorAll(".team-logo").forEach((image) => {
+        image.addEventListener("error", () => {
+          image.closest(".player-card").classList.add("is-logo-fallback");
+        }, { once: true });
+      });
+
+      board.querySelectorAll(".player-headshot").forEach((image) => {
+        image.addEventListener("error", () => {
+          image.closest(".player-card").classList.add("is-headshot-fallback");
+        }, { once: true });
+      });
+    }
+
+    function renderDebug(info) {
+      if (!config.debug) {
+        return;
+      }
+
+      debugDock.hidden = false;
+      debugDock.textContent = info;
+    }
+
+    async function start() {
+      let cards = DEMO_CARDS;
+      let debugInfo = [
+        "mode: demo",
+        "eventId: " + config.eventId,
+        "entryId: " + (config.entryId || "(none)"),
+        "apiBase: " + (config.apiBase || "(none)")
+      ];
+
+      // Public NBA Fantasy JSON endpoints do not expose permissive CORS headers
+      // for local file usage, so the page defaults to demo data unless a proxy
+      // or CORS-enabled base URL is passed in via ?apiBase=...
+      if (config.apiBase && config.entryId) {
+        try {
+          cards = await loadRemoteCards();
+          debugInfo = [
+            "mode: remote",
+            "eventId: " + config.eventId,
+            "entryId: " + config.entryId,
+            "apiBase: " + config.apiBase,
+            "cards: " + cards.length
+          ];
+        } catch (error) {
+          console.warn("Remote NBA Fantasy fetch failed, fell back to demo data.", error);
+          debugInfo = [
+            "mode: demo-fallback",
+            "eventId: " + config.eventId,
+            "entryId: " + config.entryId,
+            "apiBase: " + config.apiBase,
+            "reason: " + (error && error.message ? error.message : String(error))
+          ];
+        }
+      }
+
+      renderBoard(cards);
+      renderDebug(debugInfo.join("\n"));
+    }
+
+    start();
+  </script>
+</body>
+</html>

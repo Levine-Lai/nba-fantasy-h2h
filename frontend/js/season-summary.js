@@ -6,22 +6,22 @@
         {
             key: "daytime",
             match: (startHour) => startHour >= 8 && startHour < 20,
-            text: "你好像更喜欢在{slot}换人，伤病报告都是小事，心情＞fantasy",
+            text: "你好像更喜欢在{slot}换人，伤病报告都是小事，心情＞fantasy。",
         },
         {
             key: "late-night",
             match: (startHour) => startHour >= 20 && startHour < 24,
-            text: "你好像更喜欢在{slot}换人，谨慎而大胆的选择，等到消息更完整再操作，也不耽误睡觉时间",
+            text: "你好像更喜欢在{slot}换人，谨慎而大胆的选择，等到消息更完整再操作，也不耽误睡觉时间。",
         },
         {
             key: "overnight",
             match: (startHour) => startHour >= 0 && startHour < 6,
-            text: "你好像更喜欢在{slot}换人，夜生活才是你的舞台，必须看到要换的球员available再睡觉",
+            text: "你好像更喜欢在{slot}换人，夜生活才是你的舞台，必须看到想换的球员 available 才放心换人睡觉。",
         },
         {
             key: "early-morning",
             match: (startHour) => startHour >= 6 && startHour < 8,
-            text: "你好像更喜欢在{slot}换人，定闹钟早起卡ddl，伍哥别装了，我知道是你!",
+            text: "你好像更喜欢在{slot}换人，定闹钟早起刷消息，伍哥别装了，我知道是你~",
         },
     ];
 
@@ -29,16 +29,17 @@
         {
             key: "early-day",
             match: (day) => day >= 1 && day <= 3,
-            text: "{day}也是你最常出手的日子，拿到 FT 就该赶紧用,早早填满一周挂机才是王道",
+            text: "{day}也是你最常出手的日子，拿到 FT 就该趁早用。",
         },
         {
             key: "late-day",
             match: (day) => day >= 4 && day <= 7,
-            text: "经常把转会留到{day}再出手，规划好再出手，沉着冷静，临危不乱",
+            text: "经常把转会留到{day}再出手，不仅规划得当，而且沉得住气。",
         },
     ];
 
     const TRANSFER_TIMING_FALLBACK = "至于换人的钟点，你更像是顺着消息和感觉走，不会被单一节奏彻底绑住。";
+    const TRANSFER_DAY_FALLBACK = "至于哪一天最爱出手，你更像是根据局势和伤病灵活应变，不会轻易把自己绑在固定脚本里。";
 
     const state = {
         currentPage: 0,
@@ -323,6 +324,7 @@
                     <div class="${buildStoryCardClasses(card)}">
                         <div class="season-summary-story-card-label">${escapeHtml(card?.label || "")}</div>
                         <div class="${buildStoryCardValueClasses(card)}">${card?.valueHtml || escapeHtml(card?.value || "")}</div>
+                        ${card?.note ? `<div class="season-summary-story-card-note">${escapeHtml(card.note)}</div>` : ""}
                     </div>
                 `).join("")}
             </div>
@@ -408,6 +410,41 @@
         `;
     }
 
+    function renderHighlightPlayerCards(snapshot) {
+        const players = Array.isArray(snapshot?.players) ? snapshot.players : [];
+        if (!players.length) return "";
+
+        return `
+            <div class="season-summary-highlight-cards">
+                ${players.map((player) => {
+                    const roleClass = Number(player?.position_type || 0) === 2
+                        ? "season-summary-highlight-card-fc"
+                        : "season-summary-highlight-card-bc";
+                    const safeName = getStoryPlayerName(player).toUpperCase();
+                    const safePoints = formatSummaryNumber(player?.points || 0);
+                    const safeHeadshot = String(player?.headshot_url || "").trim();
+                    const safeLogo = String(player?.team_logo_url || "").trim();
+                    return `
+                        <article class="season-summary-highlight-card ${roleClass}">
+                            <div class="season-summary-highlight-card-top">
+                                ${safeLogo ? `<img class="season-summary-highlight-card-logo" src="${escapeHtml(safeLogo)}" alt="${escapeHtml(player?.team_short || "")}" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'season-summary-highlight-card-logo-fallback',textContent:this.alt||''}))">` : `<span class="season-summary-highlight-card-logo-fallback">${escapeHtml(player?.team_short || "")}</span>`}
+                                <span class="season-summary-highlight-card-team">${escapeHtml(player?.team_short || "")}</span>
+                            </div>
+                            <div class="season-summary-highlight-card-visual">
+                                ${safeHeadshot
+                                    ? `<img class="season-summary-highlight-card-headshot" src="${escapeHtml(safeHeadshot)}" alt="${escapeHtml(safeName)}" loading="lazy" decoding="async" onerror="this.style.display='none';this.parentElement.classList.add('is-fallback');this.parentElement.innerHTML='<span class=&quot;season-summary-highlight-card-headshot-fallback&quot;>${escapeHtml(safeName.slice(0, 2) || "P")}</span>';">`
+                                    : `<span class="season-summary-highlight-card-headshot-fallback">${escapeHtml(safeName.slice(0, 2) || "P")}</span>`}
+                            </div>
+                            <div class="season-summary-highlight-card-bar"></div>
+                            <div class="season-summary-highlight-card-name">${escapeHtml(safeName)}</div>
+                            <div class="season-summary-highlight-card-score">${escapeHtml(safePoints)}</div>
+                        </article>
+                    `;
+                }).join("")}
+            </div>
+        `;
+    }
+
     function getTransferTimeSentence(favoriteTimeSlot) {
         const slotLabel = String(favoriteTimeSlot?.full_label || "").trim();
         const startHour = Number(favoriteTimeSlot?.start_hour);
@@ -464,16 +501,9 @@
                 value: `${formatSummaryDecimal(averageHoldDays)}天`,
                 note: `${formatSummaryNumber(seasonDays)}个比赛日里的平均陪伴`,
             },
-            {
-                label: "持有最长时间球员",
-                value: longestHold?.player_name || "暂无",
-                valueHtml: renderCardHeadshot(longestHold?.headshot_url, longestHold?.player_name || "暂无"),
-                valueClass: "season-summary-story-card-value-avatar",
-                cardClass: "season-summary-story-card-avatar",
-            },
         ];
 
-        const paragraphOne = `整个赛季你一共选过${mark(formatSummaryNumber(totalUniquePlayers))}名不同的球员，即使可能你并不是他们的球迷，却也见证了他们为你上分的努力；这${mark(formatSummaryNumber(totalUniquePlayers))}名球员平均每一个人都能在每个比赛日给你拿下${mark(formatSummaryDecimal(averagePlayerScore))}分，超过这个联盟${mark(formatSummaryNumber(leaguePercentile))}%的玩家，似乎你的每一个选择都充满着智慧。`;
+        const paragraphOne = `整个赛季你一共选过${mark(formatSummaryNumber(totalUniquePlayers))}名不同的球员，即使可能你并不是他们的球迷，却也见证了他们为你上分的努力；这${mark(formatSummaryNumber(totalUniquePlayers))}名球员平均每一个人都能在每个比赛日给你拿下${mark(formatSummaryDecimal(averagePlayerScore))}分，${leaguePercentile ? `超过这个联盟${mark(formatSummaryNumber(leaguePercentile))}%的玩家，` : ""}似乎你的每一个选择都充满着智慧。`;
         const paragraphTwo = lowestOwnershipPlayer?.player_name
             ? `${renderInlinePlayerMention(lowestOwnershipPlayer)}是你选择过持有率最低的球员，全服持有率仅有${mark(`${formatSummaryDecimal(lowestOwnershipPlayer.ownership_percent)}%`)}，这位宝藏球员也没有辜负你的信任，在你持有他的${mark(formatSummaryNumber(lowestOwnershipPlayer.days_held))}天里平均每场砍下${mark(formatSummaryDecimal(lowestOwnershipPlayer.average_points))}分，群友们都夸你是 DIFF 大师！`
             : "这个赛季你也曾把目光投向一些不那么热门的名字，正是这些看起来离谱的决定，慢慢拼出了只属于你的阵容性格。";
@@ -528,14 +558,15 @@
         const paragraphTwo = mostIn?.name && mostOut?.name
             ? `${renderInlinePlayerMention(mostIn)}被你换进来了${mark(formatSummaryNumber(mostIn.count))}次，是你心心念念的那个人吗？希望他的表现没有让你失望；而${renderInlinePlayerMention(mostOut)}被你送走了${mark(formatSummaryNumber(mostOut.count))}次，想必他的表现你也看在眼里吧。`
             : "这个赛季你换人的节奏很有个人风格，人来人往之间，喜爱和犹豫都写在每一笔转会里。";
-        const paragraphThree = buildTransferTimingParagraph(favoriteDay, favoriteTimeSlot);
+        const paragraphThree = getTransferDaySentence(favoriteDay) || TRANSFER_DAY_FALLBACK;
+        const paragraphFour = getTransferTimeSentence(favoriteTimeSlot) || TRANSFER_TIMING_FALLBACK;
 
         return renderStoryPage({
             pageClass: "season-summary-page-transfer",
             title: "转会详情",
             cards,
             cardGridClass: "season-summary-story-cards-transfer",
-            paragraphs: [paragraphOne, paragraphTwo, paragraphThree],
+            paragraphs: [paragraphOne, paragraphTwo, paragraphThree, paragraphFour],
         });
     }
 
@@ -560,18 +591,31 @@
         const favoriteAvg = Number(favoriteCaptain?.average_points || 0);
         const favoriteSeasonCaptainAvg = Number(favoriteCaptain?.season_average_captain_points || 0);
         const averageDelta = Number((favoriteAvg - favoriteSeasonCaptainAvg).toFixed(1));
-        const favoriteIsJokic = /Jokic$/i.test(favoriteName);
+        const favoriteIsJokic = !!favoriteCaptain?.is_jokic;
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+        const countNote = useCount >= totalWeeks
+            ? "一次都没忘，太能操作了！"
+            : (useCount >= Math.max(0, totalWeeks - 2) ? "咦，你还留了一手" : "有时候留白也是策略的一部分");
+        const lowestOwnershipNote = lowestOwnership?.label
+            ? `${lowestOwnership.label} · ${formatSummaryDecimal(lowestOwnership?.ownership_percent || 0)}%`
+            : "暂时还没有足够记录";
 
         const cards = [
-            { label: "Captain 次数", value: `${formatSummaryNumber(useCount)}/${formatSummaryNumber(totalWeeks)}` },
-            { label: "队长平均得分", value: hasCaptainDetails ? `${formatSummaryDecimal(averagePoints)}分` : "--" },
-            { label: "最常选择的队长", value: favoriteName },
+            { label: "Captain 次数", value: `${formatSummaryNumber(useCount)}/${formatSummaryNumber(totalWeeks)}`, note: countNote },
+            {
+                label: "队长平均得分",
+                value: hasCaptainDetails ? `${formatSummaryDecimal(averagePoints)}分` : "--",
+                note: hasCaptainDetails
+                    ? (leaguePercentile ? `超过这个联盟${formatSummaryNumber(leaguePercentile)}%的玩家` : `累计 ${formatSummaryNumber(totalPoints)} 分`)
+                    : "Captain 详情待补全",
+            },
+            { label: "最常选择的队长", value: favoriteName, note: favoriteCaptain?.count ? `一共选了 ${formatSummaryNumber(favoriteCaptain.count)} 次` : "还没有固定答案" },
+            { label: "最低持有率 Captain", value: lowestOwnership?.captain_name || "暂无", note: lowestOwnership?.label || lowestOwnershipNote },
         ];
 
-        let paragraphOne = `这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，累计拿到了${mark(formatSummaryNumber(totalPoints))}分，平均每个队长都能拿到${mark(formatSummaryDecimal(averagePoints))}分，超过了这个联盟${mark(formatSummaryNumber(leaguePercentile))}%的玩家！`;
+        let paragraphOne = `在这个没有 VC 的游戏中队长的选择就显得尤为关键，这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，累计拿到了${mark(formatSummaryNumber(totalPoints))}分，平均每个队长都能拿到${mark(formatSummaryDecimal(averagePoints))}分，${leaguePercentile ? `超过了这个联盟${mark(formatSummaryNumber(leaguePercentile))}%的玩家！` : "每一次落子都决定着这一周的上限。"}`;
         if (useCount > 0 && !hasCaptainDetails) {
-            paragraphOne = `这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，次数已经按 official history 的 phcapt 记录对齐；不过这次生成时，官方 Captain 详情接口只成功解析了${mark(formatSummaryNumber(resolvedCount))}次，所以具体得分我先不乱写。`;
+            paragraphOne = `这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，次数已经按 /entry/{entry_id}/history/ 里的 phcapt 记录对齐了；不过这次生成时，官方 Captain 详情接口只成功解析了${mark(formatSummaryNumber(resolvedCount))}次，所以具体得分我先不乱写。`;
         }
 
         let paragraphTwo = "这个赛季你的 Captain 选择并没有只跟着模板走，而是慢慢形成了自己熟悉的偏好。";
@@ -617,32 +661,50 @@
 
     function renderHighlightsPage(profile) {
         const highlights = profile?.highlights || {};
-        const cards = (Array.isArray(highlights.cards) ? highlights.cards : []).map((item) => ({
-            label: item?.[0] || "",
-            value: item?.[1] || "-",
-            note: item?.[2] || "",
-        }));
-        const bestDay = cards[0] || { label: "赛季最高单日", value: "-", note: "" };
-        const bestRank = cards[1] || { label: "最高全球排名", value: "-", note: "" };
-        const seasonTag = cards[2] || { label: "赛季标签", value: "-", note: "" };
+        const summary = highlights.summary || {};
+        const bestDay = summary.best_day || null;
+        const bestRank = summary.best_rank || null;
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+        const cards = [
+            {
+                label: "赛季最高单日",
+                value: bestDay ? `${formatSummaryNumber(bestDay.points)}分` : "-",
+                note: bestDay?.label || "还没有足够的历史数据",
+            },
+            {
+                label: "最高全球排名",
+                value: bestRank?.overall_rank ? formatSummaryNumber(bestRank.overall_rank) : "-",
+                note: bestRank?.label || "还没有足够的历史数据",
+            },
+        ];
 
-        const paragraphOne = bestDay.note
-            ? `${mark(bestDay.note)}大概会是你这个赛季最容易被重新想起的一天，那天你一口气拿到了${mark(bestDay.value)}，整支队伍像是一起把运气和手感都推到了高点。`
+        const paragraphOne = bestDay
+            ? `${mark(bestDay.label)}大概会是你这个赛季最容易被重新想起的一天，那天你一口气拿到了${mark(`${formatSummaryNumber(bestDay.points)}分`)}，也是你这个赛季得过的最高分，你还记得都是哪些爱酱替你冲锋陷阵吗？`
             : "总会有那么一天，你的阵容像突然一起开花，那种成就感会让人忍不住反复回看。";
-        const paragraphTwo = bestRank.note
-            ? `${mark(bestRank.note)}你把自己的全球排名推到了${mark(bestRank.value)}，比起一场比赛的输赢，这种站上更高位置的瞬间更像赛季里真正的高光。`
+        const paragraphTwo = bestRank
+            ? `${mark(bestRank.label)}也是一个特殊的日子，你拿到了${mark(`${formatSummaryNumber(bestRank.points)}分`)}，最关键的是单日 OR 为${mark(formatSummaryNumber(bestRank.overall_rank || 0))}，比起一场比赛的输赢，这种站上更高位置的瞬间更像赛季里真正的高光。`
             : "有些高光不只是分数本身，而是你终于看到自己在更大榜单里往上爬的那一刻。";
-        const paragraphThree = `至于这个赛季最终像哪一种故事，${mark(seasonTag.value)}大概最接近你的气质。${escapeHtml(highlights.quote || "高光从来不只是某一天的数据，而是整整一个赛季里你留下的手感与判断。")}`;
 
-        return renderStoryPage({
-            pageClass: "season-summary-page-highlights",
-            copyClass: " season-summary-highlights-copy",
-            title: "高光时刻",
-            cards,
-            cardGridClass: "season-summary-story-cards-highlights",
-            paragraphs: [paragraphOne, paragraphTwo, paragraphThree],
-        });
+        return `
+            <section class="season-summary-page season-summary-page-story season-summary-page-highlights">
+                <div class="season-summary-story-main">
+                    <div class="season-summary-story-shell season-summary-highlights-copy">
+                        <div class="season-summary-page-title">高光时刻</div>
+                        ${renderStoryCards(cards, "season-summary-story-cards-highlights")}
+                        <div class="season-summary-highlight-stories">
+                            <div class="season-summary-highlight-story">
+                                <p class="season-summary-story-paragraph">${paragraphOne}</p>
+                                ${renderHighlightPlayerCards(bestDay?.lineup)}
+                            </div>
+                            <div class="season-summary-highlight-story">
+                                <p class="season-summary-story-paragraph">${paragraphTwo}</p>
+                                ${renderHighlightPlayerCards(bestRank?.lineup)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        `;
     }
 
     function renderPages(profile) {
