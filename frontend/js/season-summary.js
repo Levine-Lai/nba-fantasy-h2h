@@ -542,6 +542,7 @@
     function renderCaptainPage(profile) {
         const summary = profile?.captain?.summary || {};
         const useCount = Number(summary.use_count || 0);
+        const totalWeeks = Number(summary.total_weeks || 25) || 25;
         const resolvedCount = Number(summary.resolved_count || 0);
         const detailComplete = !!summary.detail_complete;
         const hasCaptainDetails = detailComplete && resolvedCount > 0;
@@ -563,7 +564,7 @@
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
 
         const cards = [
-            { label: "Captain 次数", value: `${formatSummaryNumber(useCount)}次` },
+            { label: "Captain 次数", value: `${formatSummaryNumber(useCount)}/${formatSummaryNumber(totalWeeks)}` },
             { label: "队长平均得分", value: hasCaptainDetails ? `${formatSummaryDecimal(averagePoints)}分` : "--" },
             { label: "最常选择的队长", value: favoriteName },
         ];

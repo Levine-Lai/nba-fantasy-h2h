@@ -4925,7 +4925,7 @@ async function buildSeasonSummaryPayload(uidInput) {
     captain: {
       lead: "Captain 页先按整个赛季的 Captain chip 记录来排，不看今天，不看本周，而是回头看你这一季到底把赌注押在了谁身上。",
       summary: {
-        total_weeks: Number(seasonWeeksTracked || 25) || 25,
+        total_weeks: 25,
         use_count: captainUseCount,
         resolved_count: captainResolvedCount,
         detail_complete: captainDetailComplete,

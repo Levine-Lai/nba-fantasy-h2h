@@ -1,4 +1,14 @@
+import { HEADSHOT_FILE_BY_CODE } from "./headshot-manifest.js";
+
 // Live scoring helpers are the single source of truth for effective-five scoring.
+function buildLocalHeadshotUrl(playerCode) {
+  const normalizedCode = String(Number(playerCode || 0) || "");
+  if (!normalizedCode) return null;
+  const filename = HEADSHOT_FILE_BY_CODE[normalizedCode];
+  if (!filename) return null;
+  return `/nba-headshots-520x380/${encodeURIComponent(filename)}`;
+}
+
 export function calculateWeekScoresFromHistory(historyData, currentWeek, currentEvent, eventMetaById) {
   const rows = Array.isArray(historyData?.current) ? historyData.current : [];
   let weeklyPoints = 0;
@@ -215,7 +225,7 @@ export function buildElementsMap(bootstrap) {
     elements[e.id] = {
       name: e.web_name || `#${e.id}`,
       player_code: playerCode,
-      headshot_url: playerCode ? `https://cdn.nba.com/headshots/nba/latest/520x380/${playerCode}.png` : null,
+      headshot_url: buildLocalHeadshotUrl(playerCode),
       team: e.team,
       position: e.element_type,
       position_name: e.element_type === 1 ? "BC" : e.element_type === 2 ? "FC" : "UNK",
