@@ -322,7 +322,7 @@
                 ${(Array.isArray(cards) ? cards : []).map((card) => `
                     <div class="${buildStoryCardClasses(card)}">
                         <div class="season-summary-story-card-label">${escapeHtml(card?.label || "")}</div>
-                        <div class="${buildStoryCardValueClasses(card)}">${escapeHtml(card?.value || "")}</div>
+                        <div class="${buildStoryCardValueClasses(card)}">${card?.valueHtml || escapeHtml(card?.value || "")}</div>
                     </div>
                 `).join("")}
             </div>
@@ -351,10 +351,28 @@
                     src="${escapeHtml(safeUrl)}"
                     alt="${escapeHtml(safeName)}"
                     loading="lazy"
-                    referrerpolicy="no-referrer"
-                    onerror="const parent=this.parentElement;if(parent){parent.replaceWith(parent.dataset.fallback||'');}"
+                    onerror="const parent=this.parentElement;if(parent){const fallback=document.createElement('strong');fallback.className='season-summary-transfer-emphasis';fallback.textContent=parent.dataset.fallback||'';parent.replaceWith(fallback);}"
                 />
             </span>
+        `;
+    }
+
+    function renderCardHeadshot(url, alt) {
+        const safeUrl = String(url || "").trim();
+        const safeAlt = String(alt || "").trim();
+        if (!safeUrl) {
+            return `<span class="season-summary-story-card-avatar-fallback">${escapeHtml(safeAlt || "暂无")}</span>`;
+        }
+        return `
+            <img
+                class="season-summary-story-card-headshot"
+                src="${escapeHtml(safeUrl)}"
+                alt="${escapeHtml(safeAlt)}"
+                data-fallback="${escapeHtml(safeAlt || "暂无")}"
+                loading="lazy"
+                decoding="async"
+                onerror="const fallback=document.createElement('span');fallback.className='season-summary-story-card-avatar-fallback';fallback.textContent=this.getAttribute('data-fallback')||'暂无';this.replaceWith(fallback);"
+            />
         `;
     }
 
@@ -446,20 +464,19 @@
                 value: `${formatSummaryDecimal(averageHoldDays)}天`,
                 note: `${formatSummaryNumber(seasonDays)}个比赛日里的平均陪伴`,
             },
+            {
+                label: "持有最长时间球员",
+                value: longestHold?.player_name || "暂无",
+                valueHtml: renderCardHeadshot(longestHold?.headshot_url, longestHold?.player_name || "暂无"),
+                valueClass: "season-summary-story-card-value-avatar",
+                cardClass: "season-summary-story-card-avatar",
+            },
         ];
 
         const paragraphOne = `整个赛季你一共选过${mark(formatSummaryNumber(totalUniquePlayers))}名不同的球员，即使可能你并不是他们的球迷，却也见证了他们为你上分的努力；这${mark(formatSummaryNumber(totalUniquePlayers))}名球员平均每一个人都能在每个比赛日给你拿下${mark(formatSummaryDecimal(averagePlayerScore))}分，超过这个联盟${mark(formatSummaryNumber(leaguePercentile))}%的玩家，似乎你的每一个选择都充满着智慧。`;
-        let paragraphTwo = "这个赛季你也曾把目光投向一些不那么热门的名字，正是这些看起来离谱的决定，慢慢拼出了只属于你的阵容性格。";
-        if (lowestOwnershipPlayer?.player_name) {
-            const heldAveragePoints = Number(lowestOwnershipPlayer.held_average_points || 0);
-            const seasonAveragePoints = Number(lowestOwnershipPlayer.season_average_points || 0);
-            const averageDelta = Number((heldAveragePoints - seasonAveragePoints).toFixed(1));
-            const deltaLabel = formatSummaryDecimal(Math.abs(averageDelta));
-            const performanceSentence = averageDelta >= 0
-                ? `这位宝藏球员也没有辜负你的信任，在你持有他的${mark(formatSummaryNumber(lowestOwnershipPlayer.days_held))}天里平均每场砍下${mark(formatSummaryDecimal(heldAveragePoints))}分，比他的赛季平均分高${mark(deltaLabel)}分，群友们都夸你是 DIFF 大师！`
-                : `可惜他没有对得起你的信任，在你持有他的${mark(formatSummaryNumber(lowestOwnershipPlayer.days_held))}天里平均每场砍下${mark(formatSummaryDecimal(heldAveragePoints))}分，比他的赛季平均分低${mark(deltaLabel)}分，想必你已经痛骂了他一顿。`;
-            paragraphTwo = `${renderInlinePlayerMention(lowestOwnershipPlayer)}是你选择过持有率最低的球员，全服持有率仅有${mark(`${formatSummaryDecimal(lowestOwnershipPlayer.ownership_percent)}%`)}，${performanceSentence}`;
-        }
+        const paragraphTwo = lowestOwnershipPlayer?.player_name
+            ? `${renderInlinePlayerMention(lowestOwnershipPlayer)}是你选择过持有率最低的球员，全服持有率仅有${mark(`${formatSummaryDecimal(lowestOwnershipPlayer.ownership_percent)}%`)}，这位宝藏球员也没有辜负你的信任，在你持有他的${mark(formatSummaryNumber(lowestOwnershipPlayer.days_held))}天里平均每场砍下${mark(formatSummaryDecimal(lowestOwnershipPlayer.average_points))}分，群友们都夸你是 DIFF 大师！`
+            : "这个赛季你也曾把目光投向一些不那么热门的名字，正是这些看起来离谱的决定，慢慢拼出了只属于你的阵容性格。";
         const paragraphThree = longestHold?.player_name
             ? `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，平均每一位球员在你阵容中能停留${mark(formatSummaryDecimal(averageHoldDays))}天，相遇短暂，希望他们也在你的 fantasy 故事中留下了美好的一页；不过，不知道你有没有猜到，留在你阵容中最久的人是${renderInlinePlayerMention(longestHold)}呢，相信陪伴你走过了${mark(formatSummaryNumber(longestHold.days_held))}天，他已经成为你心中的第一爱酱了吧！`
             : `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，你的阵容不断迎来送往，平均每一位球员在你这里停留${mark(formatSummaryDecimal(averageHoldDays))}天，这本身就已经是一种只属于 fantasy 的陪伴。`;
@@ -524,8 +541,10 @@
 
     function renderCaptainPage(profile) {
         const summary = profile?.captain?.summary || {};
-        const totalWeeks = Number(summary.total_weeks || 0);
         const useCount = Number(summary.use_count || 0);
+        const resolvedCount = Number(summary.resolved_count || 0);
+        const detailComplete = !!summary.detail_complete;
+        const hasCaptainDetails = detailComplete && resolvedCount > 0;
         const totalPoints = Number(summary.total_points || 0);
         const averagePoints = Number(summary.average_points || 0);
         const leaguePercentile = Number(summary.league_percentile || 0);
@@ -534,28 +553,30 @@
         const worstCaptain = summary.worst || null;
         const lowestOwnership = summary.lowest_ownership || null;
         const zeroCount = Number(summary.zero_count || 0);
-        const favoriteName = String(favoriteCaptain?.captain_name || "暂无");
+        const favoriteName = hasCaptainDetails
+            ? String(favoriteCaptain?.captain_name || "暂无")
+            : (useCount > 0 ? "待补全" : "暂无");
         const favoriteAvg = Number(favoriteCaptain?.average_points || 0);
         const favoriteSeasonCaptainAvg = Number(favoriteCaptain?.season_average_captain_points || 0);
         const averageDelta = Number((favoriteAvg - favoriteSeasonCaptainAvg).toFixed(1));
         const favoriteIsJokic = /Jokic$/i.test(favoriteName);
-        const lowestLabel = lowestOwnership ? `GW${formatSummaryNumber(lowestOwnership.gw)} Day${formatSummaryNumber(lowestOwnership.day)}` : "暂无记录";
-        const countNote = totalWeeks > 0
-            ? `严格按 official history 的 phcapt 统计，本季共 ${formatSummaryNumber(useCount)} 次`
-            : "严格按 official history 的 phcapt 统计";
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
 
         const cards = [
-            { label: "Captain 次数", value: `${formatSummaryNumber(useCount)}次`, note: countNote },
-            { label: "队长平均得分", value: `${formatSummaryDecimal(averagePoints)}分`, note: `超过${formatSummaryNumber(leaguePercentile)}%的玩家` },
-            { label: "最常选择的队长", value: favoriteName, note: favoriteCaptain ? `${formatSummaryNumber(favoriteCaptain.count)}次` : "还没形成固定偏爱" },
-            { label: "最低持有率 Captain", value: lowestOwnership?.captain_name || "暂无", note: lowestLabel },
+            { label: "Captain 次数", value: `${formatSummaryNumber(useCount)}次` },
+            { label: "队长平均得分", value: hasCaptainDetails ? `${formatSummaryDecimal(averagePoints)}分` : "--" },
+            { label: "最常选择的队长", value: favoriteName },
         ];
 
-        const paragraphOne = `这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，累计拿到了${mark(formatSummaryNumber(totalPoints))}分，平均每个队长都能拿到${mark(formatSummaryDecimal(averagePoints))}分，超过了这个联盟${mark(formatSummaryNumber(leaguePercentile))}%的玩家！`;
+        let paragraphOne = `这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，累计拿到了${mark(formatSummaryNumber(totalPoints))}分，平均每个队长都能拿到${mark(formatSummaryDecimal(averagePoints))}分，超过了这个联盟${mark(formatSummaryNumber(leaguePercentile))}%的玩家！`;
+        if (useCount > 0 && !hasCaptainDetails) {
+            paragraphOne = `这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，次数已经按 official history 的 phcapt 记录对齐；不过这次生成时，官方 Captain 详情接口只成功解析了${mark(formatSummaryNumber(resolvedCount))}次，所以具体得分我先不乱写。`;
+        }
 
         let paragraphTwo = "这个赛季你的 Captain 选择并没有只跟着模板走，而是慢慢形成了自己熟悉的偏好。";
-        if (favoriteCaptain?.captain_name) {
+        if (useCount > 0 && !hasCaptainDetails) {
+            paragraphTwo = "最常选择的队长、平均队长分数和高低光时刻，都依赖官方的 picks/live 详情接口；这次它没有完整返回，我先保留次数，不拿半截数据误导你。";
+        } else if (favoriteCaptain?.captain_name) {
             if (favoriteIsJokic) {
                 paragraphTwo = `${renderInlinePlayerMention(favoriteCaptain)}是你经常选择的队长，他也是很多人青睐的队长人选，跟着主流走永远不会错。你每次选他当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvg))}分，比他这个赛季的平均队长分数${averageDelta >= 0 ? "高" : "低"}${mark(formatSummaryDecimal(Math.abs(averageDelta)))}分，${averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这个塞尔维亚大胖子。" : "看来你选队长的时机还可以再打磨一下。"}`;
             } else {
@@ -570,12 +591,16 @@
         const lowestOwnershipPoints = `${formatSummaryNumber(lowestOwnership?.captain_points || 0)}分`;
 
         let paragraphThree = "等 Captain 记录再丰富一点，这一页会更像属于你自己的队长回忆录。";
-        if (bestCaptain?.captain_name && worstCaptain?.captain_name) {
+        if (useCount > 0 && !hasCaptainDetails) {
+            paragraphThree = "等官方 Captain 详情接口稳定一点，这一页就会恢复最常队长、平均得分，以及那次最爽和最痛的 Captain 记录。";
+        } else if (bestCaptain?.captain_name && worstCaptain?.captain_name) {
             paragraphThree = `最高分的一次队长来自${mark(bestCaptain.label || "")} · ${renderInlinePlayerMention(bestCaptain)} · ${mark(bestCaptainPoints)}；而最让人难过的那次，则是${mark(worstCaptain.label || "")} · ${renderInlinePlayerMention(worstCaptain)} · ${mark(worstCaptainPoints)}。整个赛季你一共 c 到过${mark(formatSummaryNumber(zeroCount))}次 0 分，${zeroCount > 0 ? "哎，运气也是这个游戏的一部分，希望你不要灰心，一个赛季总有起起伏伏。" : "不得不承认你真的太会选队长了。"}`;
         }
 
         let paragraphFour = "这个赛季你最像 DIFF 大师的那一次，还在等下一版数据把它完整抓出来。";
-        if (lowestOwnership?.captain_name) {
+        if (useCount > 0 && !hasCaptainDetails) {
+            paragraphFour = "";
+        } else if (lowestOwnership?.captain_name) {
             paragraphFour = `如果要说最 diff 的那一次，大概就是${mark(lowestOwnershipLabel)}的${renderInlinePlayerMention(lowestOwnership)}了。当时他的持有率只有${mark(lowestOwnershipPercent)}，却依然替你拿下了${mark(lowestOwnershipPoints)}，勇气可嘉，值得陈赞！`;
         }
 

@@ -413,13 +413,19 @@
     gap: 12px;
 }
 
-.season-summary-story-cards-player,
+.season-summary-story-cards-player {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .season-summary-story-cards-highlights {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.season-summary-story-cards-transfer,
 .season-summary-story-cards-captain {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.season-summary-story-cards-transfer {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
@@ -449,6 +455,45 @@
     font-size: clamp(18px, 1.9vw, 24px);
     letter-spacing: -0.02em;
     line-height: 1.12;
+}
+
+.season-summary-story-card-avatar {
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-align: center;
+}
+
+.season-summary-story-card-value-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 92px;
+}
+
+.season-summary-story-card-headshot {
+    width: min(100%, 92px);
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 999px;
+    display: block;
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
+}
+
+.season-summary-story-card-avatar-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 100%;
+    min-height: 1em;
+    padding: 0 4px;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.24;
+    text-align: center;
+    word-break: break-word;
+    color: #64748b;
 }
 
 .season-summary-story-copy {
@@ -700,12 +745,16 @@
     }
 
     .season-summary-story-cards-player {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .season-summary-story-cards-captain {
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 8px;
     }
 
-    .season-summary-story-cards-transfer,
-    .season-summary-story-cards-captain {
+    .season-summary-story-cards-transfer {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
     }
@@ -728,6 +777,14 @@
 
     .season-summary-story-card-value-time-slot {
         font-size: clamp(14px, 3.8vw, 18px);
+    }
+
+    .season-summary-story-card-headshot {
+        width: min(100%, 72px);
+    }
+
+    .season-summary-story-card-value-avatar {
+        min-height: 72px;
     }
 
     .season-summary-story-copy {
