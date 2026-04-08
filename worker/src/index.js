@@ -4457,10 +4457,26 @@ async function buildLongestHeldPlayerSummary(uidNumber, latestEventId, rowEventI
     snapshotByEvent.set(previousEventId, new Set(roster));
   }
 
+  const liveElementsByEvent = new Map();
+  async function getLiveElementsForEvent(eventId) {
+    if (liveElementsByEvent.has(eventId)) return liveElementsByEvent.get(eventId);
+    const liveRes = await fetchJsonSafe(`/event/${eventId}/live/`, 1);
+    const liveElements = {};
+    const rawElements = liveRes.ok ? liveRes.data?.elements : null;
+    if (Array.isArray(rawElements)) {
+      for (const item of rawElements) liveElements[Number(item?.id || 0)] = item;
+    } else if (rawElements && typeof rawElements === "object") {
+      for (const [key, value] of Object.entries(rawElements)) liveElements[Number(key)] = value;
+    }
+    liveElementsByEvent.set(eventId, liveElements);
+    return liveElements;
+  }
+
   const totals = new Map();
   for (const eventId of eventIds) {
     const snapshot = snapshotByEvent.get(eventId);
     if (!snapshot) continue;
+    const liveElements = await getLiveElementsForEvent(eventId);
     for (const elementId of snapshot) {
       const existing = totals.get(elementId) || {
         element_id: elementId,
@@ -4468,17 +4484,25 @@ async function buildLongestHeldPlayerSummary(uidNumber, latestEventId, rowEventI
         headshot_url: elements[elementId]?.headshot_url || null,
         ownership_percent: Number(elements[elementId]?.selected_by_percent || 0),
         points_per_game: Number(elements[elementId]?.points_per_game || 0) / 10,
+        held_fantasy_total: 0,
         days_held: 0,
         first_event: eventId,
         last_event: eventId,
       };
+      const hasLiveStats = !!liveElements?.[elementId]?.stats;
+      const heldFantasyPoints = hasLiveStats ? Number(getPlayerStats(elementId, liveElements, elements)?.fantasy || 0) : 0;
       existing.days_held += 1;
+      existing.held_fantasy_total += heldFantasyPoints;
       existing.last_event = eventId;
       totals.set(elementId, existing);
     }
   }
 
   return [...totals.values()]
+    .map((item) => ({
+      ...item,
+      held_average_points: Number((((Number(item?.held_fantasy_total || 0)) / Math.max(1, Number(item?.days_held || 0))) || 0).toFixed(1)),
+    }))
     .sort((a, b) =>
       Number(b?.days_held || 0) - Number(a?.days_held || 0) ||
       String(a?.player_name || "").localeCompare(String(b?.player_name || ""))
@@ -4827,7 +4851,8 @@ async function buildSeasonSummaryPayload(uidInput) {
           player_name: lowestOwnershipHeldPlayer.player_name || "",
           headshot_url: lowestOwnershipHeldPlayer.headshot_url || null,
           ownership_percent: Number(lowestOwnershipHeldPlayer.ownership_percent || 0),
-          average_points: Number(lowestOwnershipHeldPlayer.points_per_game || 0),
+          held_average_points: Number(lowestOwnershipHeldPlayer.held_average_points || 0),
+          season_average_points: Number(lowestOwnershipHeldPlayer.points_per_game || 0),
           days_held: Number(lowestOwnershipHeldPlayer.days_held || 0),
         } : null,
         longest_hold: longestHold ? {
@@ -4913,6 +4938,7 @@ async function buildSeasonSummaryPayload(uidInput) {
           count: Number(favoriteCaptain[1] || 0),
           average_points: Number(favoriteCaptainAverage.toFixed(1)),
           season_average_points: Number(favoriteCaptainSeasonAverage || 0),
+          season_average_captain_points: Number((favoriteCaptainSeasonAverage * 2).toFixed(1)),
           headshot_url: favoriteCaptainRecord?.headshot_url || null,
         } : null,
         best: bestCaptain ? {

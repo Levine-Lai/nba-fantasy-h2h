@@ -426,9 +426,10 @@
 .season-summary-story-card {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    min-height: 104px;
-    padding: 14px 16px 12px;
+    justify-content: space-between;
+    align-items: flex-start;
+    min-height: 96px;
+    padding: 14px 16px;
     border-radius: 22px;
     border: 1px solid #e3ebf4;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(246, 249, 253, 0.98));
@@ -436,7 +437,7 @@
 }
 
 .season-summary-story-card-value {
-    margin-top: 8px;
+    margin-top: auto;
     font-size: clamp(36px, 4vw, 50px);
     line-height: 0.94;
     font-weight: 900;
@@ -447,15 +448,7 @@
 .season-summary-story-card-value-time-slot {
     font-size: clamp(18px, 1.9vw, 24px);
     letter-spacing: -0.02em;
-    line-height: 1.08;
-}
-
-.season-summary-story-card-note {
-    margin-top: 7px;
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1.38;
-    color: #64748b;
+    line-height: 1.12;
 }
 
 .season-summary-story-copy {
@@ -601,7 +594,7 @@
 
 @media (max-width: 768px) {
     .season-summary-layout {
-        padding: 0 8px 8px;
+        padding: max(10px, env(safe-area-inset-top)) 8px 8px;
     }
 
     .season-summary-hero-player {
@@ -638,7 +631,7 @@
     }
 
     .season-summary-page {
-        padding: 0 10px 10px;
+        padding: 8px 10px 10px;
         gap: 8px;
         align-content: start;
     }
@@ -702,6 +695,8 @@
     .season-summary-page-title {
         margin: 0;
         font-size: 36px;
+        line-height: 1.04;
+        padding-top: 2px;
     }
 
     .season-summary-story-cards-player {
@@ -721,24 +716,18 @@
     }
 
     .season-summary-story-card {
-        min-height: 78px;
-        padding: 10px 10px 9px;
+        min-height: 74px;
+        padding: 10px;
         border-radius: 18px;
     }
 
     .season-summary-story-card-value {
-        margin-top: 6px;
+        margin-top: auto;
         font-size: clamp(27px, 7vw, 36px);
     }
 
     .season-summary-story-card-value-time-slot {
         font-size: clamp(14px, 3.8vw, 18px);
-    }
-
-    .season-summary-story-card-note {
-        margin-top: 5px;
-        font-size: 10px;
-        line-height: 1.32;
     }
 
     .season-summary-story-copy {

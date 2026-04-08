@@ -6,22 +6,22 @@
         {
             key: "daytime",
             match: (startHour) => startHour >= 8 && startHour < 20,
-            text: "你好像更喜欢在{slot}换人，伤病报告都是小事，心情＞fantasy。",
+            text: "你好像更喜欢在{slot}换人，伤病报告都是小事，心情＞fantasy",
         },
         {
             key: "late-night",
             match: (startHour) => startHour >= 20 && startHour < 24,
-            text: "你好像更喜欢在{slot}换人，谨慎而大胆的选择，等到消息更完整再操作，也不耽误睡觉时间。",
+            text: "你好像更喜欢在{slot}换人，谨慎而大胆的选择，等到消息更完整再操作，也不耽误睡觉时间",
         },
         {
             key: "overnight",
             match: (startHour) => startHour >= 0 && startHour < 6,
-            text: "你好像更喜欢在{slot}换人，夜生活才是你的舞台，必须看到要换的球员available再睡觉。",
+            text: "你好像更喜欢在{slot}换人，夜生活才是你的舞台，必须看到要换的球员available再睡觉",
         },
         {
             key: "early-morning",
             match: (startHour) => startHour >= 6 && startHour < 8,
-            text: "你好像更喜欢在{slot}换人，定闹钟早起卡ddl，伍哥别装了，我知道是你。",
+            text: "你好像更喜欢在{slot}换人，定闹钟早起卡ddl，伍哥别装了，我知道是你!",
         },
     ];
 
@@ -29,12 +29,12 @@
         {
             key: "early-day",
             match: (day) => day >= 1 && day <= 3,
-            text: "{day}也是你最常出手的日子，拿到 FT 就该趁早用。",
+            text: "{day}也是你最常出手的日子，拿到 FT 就该赶紧用,早早填满一周挂机才是王道",
         },
         {
             key: "late-day",
             match: (day) => day >= 4 && day <= 7,
-            text: "经常把转会留到{day}再出手，规划好再出手，真沉得住气~",
+            text: "经常把转会留到{day}再出手，规划好再出手，沉着冷静，临危不乱",
         },
     ];
 
@@ -323,7 +323,6 @@
                     <div class="${buildStoryCardClasses(card)}">
                         <div class="season-summary-story-card-label">${escapeHtml(card?.label || "")}</div>
                         <div class="${buildStoryCardValueClasses(card)}">${escapeHtml(card?.value || "")}</div>
-                        <div class="season-summary-story-card-note">${escapeHtml(card?.note || "")}</div>
                     </div>
                 `).join("")}
             </div>
@@ -450,9 +449,17 @@
         ];
 
         const paragraphOne = `整个赛季你一共选过${mark(formatSummaryNumber(totalUniquePlayers))}名不同的球员，即使可能你并不是他们的球迷，却也见证了他们为你上分的努力；这${mark(formatSummaryNumber(totalUniquePlayers))}名球员平均每一个人都能在每个比赛日给你拿下${mark(formatSummaryDecimal(averagePlayerScore))}分，超过这个联盟${mark(formatSummaryNumber(leaguePercentile))}%的玩家，似乎你的每一个选择都充满着智慧。`;
-        const paragraphTwo = lowestOwnershipPlayer?.player_name
-            ? `${renderInlinePlayerMention(lowestOwnershipPlayer)}是你选择过持有率最低的球员，全服持有率仅有${mark(`${formatSummaryDecimal(lowestOwnershipPlayer.ownership_percent)}%`)}，这位宝藏球员也没有辜负你的信任，在你持有他的${mark(formatSummaryNumber(lowestOwnershipPlayer.days_held))}天里平均每场砍下${mark(formatSummaryDecimal(lowestOwnershipPlayer.average_points))}分，群友们都夸你是 DIFF 大师！`
-            : "这个赛季你也曾把目光投向一些不那么热门的名字，正是这些看起来离谱的决定，慢慢拼出了只属于你的阵容性格。";
+        let paragraphTwo = "这个赛季你也曾把目光投向一些不那么热门的名字，正是这些看起来离谱的决定，慢慢拼出了只属于你的阵容性格。";
+        if (lowestOwnershipPlayer?.player_name) {
+            const heldAveragePoints = Number(lowestOwnershipPlayer.held_average_points || 0);
+            const seasonAveragePoints = Number(lowestOwnershipPlayer.season_average_points || 0);
+            const averageDelta = Number((heldAveragePoints - seasonAveragePoints).toFixed(1));
+            const deltaLabel = formatSummaryDecimal(Math.abs(averageDelta));
+            const performanceSentence = averageDelta >= 0
+                ? `这位宝藏球员也没有辜负你的信任，在你持有他的${mark(formatSummaryNumber(lowestOwnershipPlayer.days_held))}天里平均每场砍下${mark(formatSummaryDecimal(heldAveragePoints))}分，比他的赛季平均分高${mark(deltaLabel)}分，群友们都夸你是 DIFF 大师！`
+                : `可惜他没有对得起你的信任，在你持有他的${mark(formatSummaryNumber(lowestOwnershipPlayer.days_held))}天里平均每场砍下${mark(formatSummaryDecimal(heldAveragePoints))}分，比他的赛季平均分低${mark(deltaLabel)}分，想必你已经痛骂了他一顿。`;
+            paragraphTwo = `${renderInlinePlayerMention(lowestOwnershipPlayer)}是你选择过持有率最低的球员，全服持有率仅有${mark(`${formatSummaryDecimal(lowestOwnershipPlayer.ownership_percent)}%`)}，${performanceSentence}`;
+        }
         const paragraphThree = longestHold?.player_name
             ? `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，平均每一位球员在你阵容中能停留${mark(formatSummaryDecimal(averageHoldDays))}天，相遇短暂，希望他们也在你的 fantasy 故事中留下了美好的一页；不过，不知道你有没有猜到，留在你阵容中最久的人是${renderInlinePlayerMention(longestHold)}呢，相信陪伴你走过了${mark(formatSummaryNumber(longestHold.days_held))}天，他已经成为你心中的第一爱酱了吧！`
             : `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，你的阵容不断迎来送往，平均每一位球员在你这里停留${mark(formatSummaryDecimal(averageHoldDays))}天，这本身就已经是一种只属于 fantasy 的陪伴。`;
@@ -529,8 +536,8 @@
         const zeroCount = Number(summary.zero_count || 0);
         const favoriteName = String(favoriteCaptain?.captain_name || "暂无");
         const favoriteAvg = Number(favoriteCaptain?.average_points || 0);
-        const favoriteSeasonAvg = Number(favoriteCaptain?.season_average_points || 0);
-        const averageDelta = Number((favoriteAvg - favoriteSeasonAvg).toFixed(1));
+        const favoriteSeasonCaptainAvg = Number(favoriteCaptain?.season_average_captain_points || 0);
+        const averageDelta = Number((favoriteAvg - favoriteSeasonCaptainAvg).toFixed(1));
         const favoriteIsJokic = /Jokic$/i.test(favoriteName);
         const lowestLabel = lowestOwnership ? `GW${formatSummaryNumber(lowestOwnership.gw)} Day${formatSummaryNumber(lowestOwnership.day)}` : "暂无记录";
         const countNote = totalWeeks > 0
@@ -550,9 +557,9 @@
         let paragraphTwo = "这个赛季你的 Captain 选择并没有只跟着模板走，而是慢慢形成了自己熟悉的偏好。";
         if (favoriteCaptain?.captain_name) {
             if (favoriteIsJokic) {
-                paragraphTwo = `${renderInlinePlayerMention(favoriteCaptain)}是你经常选择的队长，他也是很多人青睐的队长人选，跟着主流走永远不会错。你每次选他当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvg))}分，比他这个赛季的平均分数${averageDelta >= 0 ? "高" : "低"}${mark(formatSummaryDecimal(Math.abs(averageDelta)))}分，${averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这个塞尔维亚大胖子。" : "看来你选队长的时机还可以再打磨一下。"}`;
+                paragraphTwo = `${renderInlinePlayerMention(favoriteCaptain)}是你经常选择的队长，他也是很多人青睐的队长人选，跟着主流走永远不会错。你每次选他当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvg))}分，比他这个赛季的平均队长分数${averageDelta >= 0 ? "高" : "低"}${mark(formatSummaryDecimal(Math.abs(averageDelta)))}分，${averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这个塞尔维亚大胖子。" : "看来你选队长的时机还可以再打磨一下。"}`;
             } else {
-                paragraphTwo = `什么？！你最常选的队长居然不是约基奇？看来你的品味非常之独特，保持特立独行永远是范特西游戏中最酷的精神，继续保持！你每次选${renderInlinePlayerMention(favoriteCaptain)}当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvg))}分，比他这个赛季的平均分数${averageDelta >= 0 ? "高" : "低"}${mark(formatSummaryDecimal(Math.abs(averageDelta)))}分，${averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这名球员。" : "看来你选队长的时机还可以再打磨一下。"}`;
+                paragraphTwo = `什么？！你最常选的队长居然不是约基奇？看来你的品味非常之独特，保持特立独行永远是范特西游戏中最酷的精神，继续保持！你每次选${renderInlinePlayerMention(favoriteCaptain)}当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvg))}分，比他这个赛季的平均队长分数${averageDelta >= 0 ? "高" : "低"}${mark(formatSummaryDecimal(Math.abs(averageDelta)))}分，${averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这名球员。" : "看来你选队长的时机还可以再打磨一下。"}`;
             }
         }
 
