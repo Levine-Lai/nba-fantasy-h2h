@@ -4638,6 +4638,13 @@ async function buildSeasonSummaryPayload(uidInput) {
   const entryData = entryRes.ok ? entryRes.data : null;
   const elements = buildElementsMap(bootstrap);
   const eventMetaById = buildEventMetaById(bootstrap.events || []);
+  const seasonTeamsById = {};
+  for (const team of bootstrap?.teams || []) {
+    seasonTeamsById[Number(team?.id || 0)] = {
+      name: String(team?.name || "").trim(),
+      short_name: String(team?.short_name || "").trim(),
+    };
+  }
 
   const rows = getSortedHistoryRows(historyData);
   const latestRow = rows[rows.length - 1] || {};
@@ -4698,17 +4705,22 @@ async function buildSeasonSummaryPayload(uidInput) {
   const outgoingCounts = new Map();
   const returningCounts = new Map();
   for (const transfer of qualifiedTransfers) {
-    const inName = String(transfer?.in_name || "").trim();
-    const outName = String(transfer?.out_name || "").trim();
-    if (inName) incomingCounts.set(inName, Number(incomingCounts.get(inName) || 0) + 1);
-    if (outName) outgoingCounts.set(outName, Number(outgoingCounts.get(outName) || 0) + 1);
+    const inId = Number(transfer?.element_in || 0);
+    const outId = Number(transfer?.element_out || 0);
+    if (inId > 0) incomingCounts.set(inId, Number(incomingCounts.get(inId) || 0) + 1);
+    if (outId > 0) outgoingCounts.set(outId, Number(outgoingCounts.get(outId) || 0) + 1);
   }
-  for (const [name, count] of incomingCounts.entries()) {
-    if (count > 1) returningCounts.set(name, count);
+  for (const [elementId, count] of incomingCounts.entries()) {
+    if (count > 1) returningCounts.set(elementId, count);
   }
-  const favoriteIncoming = [...incomingCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
-  const favoriteOutgoing = [...outgoingCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
-  const favoriteReturner = [...returningCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
+  const compareElementCounts = (left, right) =>
+    Number(right?.[1] || 0) - Number(left?.[1] || 0) ||
+    String(elements?.[Number(left?.[0] || 0)]?.name || `#${left?.[0] || ""}`).localeCompare(
+      String(elements?.[Number(right?.[0] || 0)]?.name || `#${right?.[0] || ""}`)
+    );
+  const favoriteIncoming = [...incomingCounts.entries()].sort(compareElementCounts)[0] || null;
+  const favoriteOutgoing = [...outgoingCounts.entries()].sort(compareElementCounts)[0] || null;
+  const favoriteReturner = [...returningCounts.entries()].sort(compareElementCounts)[0] || null;
   const latestEventId = Number(latestRow?.event || rowEventIds[rowEventIds.length - 1] || 0);
   const holdRanking = await buildLongestHeldPlayerSummary(uidNumber, latestEventId, rowEventIds, rawTransfers, elements);
   const longestHold = holdRanking?.[0] || null;
@@ -4760,15 +4772,20 @@ async function buildSeasonSummaryPayload(uidInput) {
   const captainDetailComplete = captainUseCount === 0 || captainResolvedCount === captainUseCount;
   const captainTotalPoints = captainRecords.reduce((sum, item) => sum + Number(item?.captain_points || 0), 0);
   const captainAveragePoints = captainRecords.length > 0 ? captainTotalPoints / captainRecords.length : 0;
-  const captainNameCounts = new Map();
+  const captainCountsByElement = new Map();
   for (const record of captainRecords) {
-    const name = String(record?.captain_name || "").trim();
-    if (!name) continue;
-    captainNameCounts.set(name, Number(captainNameCounts.get(name) || 0) + 1);
+    const elementId = Number(record?.element_id || 0);
+    if (!elementId) continue;
+    captainCountsByElement.set(elementId, Number(captainCountsByElement.get(elementId) || 0) + 1);
   }
-  const favoriteCaptain = [...captainNameCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
+  const favoriteCaptain = [...captainCountsByElement.entries()].sort((a, b) =>
+    Number(b?.[1] || 0) - Number(a?.[1] || 0) ||
+    String(elements[Number(a?.[0] || 0)]?.name || `#${a?.[0] || ""}`).localeCompare(
+      String(elements[Number(b?.[0] || 0)]?.name || `#${b?.[0] || ""}`)
+    )
+  )[0] || null;
   const favoriteCaptainRecords = favoriteCaptain
-    ? captainRecords.filter((record) => String(record?.captain_name || "") === String(favoriteCaptain[0] || ""))
+    ? captainRecords.filter((record) => Number(record?.element_id || 0) === Number(favoriteCaptain[0] || 0))
     : [];
   const favoriteCaptainRecord = favoriteCaptainRecords[0] || null;
   const favoriteCaptainAverage = favoriteCaptainRecords.length
@@ -4935,18 +4952,25 @@ async function buildSeasonSummaryPayload(uidInput) {
         penalty_points: Number(transferPenaltyPoints || 0),
         penalty_event_count: Number(transferPenaltyEvents || 0),
         most_in: favoriteIncoming ? {
-          name: favoriteIncoming[0],
+          element_id: Number(favoriteIncoming[0] || 0) || null,
+          name: elements[Number(favoriteIncoming[0] || 0)]?.name || `#${favoriteIncoming[0] || ""}`,
           count: Number(favoriteIncoming[1] || 0),
-          headshot_url: Object.values(elements).find((item) => String(item?.name || "") === String(favoriteIncoming[0] || ""))?.headshot_url || null,
+          team_short: seasonTeamsById[Number(elements[Number(favoriteIncoming[0] || 0)]?.team || 0)]?.short_name || "",
+          headshot_url: elements[Number(favoriteIncoming[0] || 0)]?.headshot_url || null,
         } : null,
         most_out: favoriteOutgoing ? {
-          name: favoriteOutgoing[0],
+          element_id: Number(favoriteOutgoing[0] || 0) || null,
+          name: elements[Number(favoriteOutgoing[0] || 0)]?.name || `#${favoriteOutgoing[0] || ""}`,
           count: Number(favoriteOutgoing[1] || 0),
-          headshot_url: Object.values(elements).find((item) => String(item?.name || "") === String(favoriteOutgoing[0] || ""))?.headshot_url || null,
+          team_short: seasonTeamsById[Number(elements[Number(favoriteOutgoing[0] || 0)]?.team || 0)]?.short_name || "",
+          headshot_url: elements[Number(favoriteOutgoing[0] || 0)]?.headshot_url || null,
         } : null,
         favorite_returner: favoriteReturner ? {
-          name: favoriteReturner[0],
+          element_id: Number(favoriteReturner[0] || 0) || null,
+          name: elements[Number(favoriteReturner[0] || 0)]?.name || `#${favoriteReturner[0] || ""}`,
           count: Number(favoriteReturner[1] || 0),
+          team_short: seasonTeamsById[Number(elements[Number(favoriteReturner[0] || 0)]?.team || 0)]?.short_name || "",
+          headshot_url: elements[Number(favoriteReturner[0] || 0)]?.headshot_url || null,
         } : null,
         favorite_day: transferPreferences.favorite_day ? {
           day: Number(transferPreferences.favorite_day.day || 0),
@@ -4996,13 +5020,15 @@ async function buildSeasonSummaryPayload(uidInput) {
         average_points: Number(captainAveragePoints.toFixed(1)),
         league_percentile: leaguePercentile,
         favorite_captain: favoriteCaptain ? {
-          captain_name: String(favoriteCaptain[0] || ""),
+          element_id: Number(favoriteCaptain[0] || 0) || null,
+          captain_name: favoriteCaptainRecord?.captain_name || String(elements[Number(favoriteCaptain[0] || 0)]?.name || ""),
           count: Number(favoriteCaptain[1] || 0),
           average_points: Number(favoriteCaptainAverage.toFixed(1)),
           season_average_points: Number(favoriteCaptainSeasonAverage || 0),
           season_average_captain_points: Number((favoriteCaptainSeasonAverage * 2).toFixed(1)),
           headshot_url: favoriteCaptainRecord?.headshot_url || null,
-          is_jokic: /Jokic$/i.test(String(favoriteCaptain[0] || "")),
+          team_short: seasonTeamsById[Number(elements[Number(favoriteCaptain[0] || 0)]?.team || 0)]?.short_name || "",
+          is_jokic: /Jokic$/i.test(String(favoriteCaptainRecord?.captain_name || elements[Number(favoriteCaptain[0] || 0)]?.name || "")),
         } : null,
         best: bestCaptain ? {
           label: bestCaptain.label || "",
