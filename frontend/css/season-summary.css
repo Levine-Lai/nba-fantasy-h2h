@@ -359,6 +359,15 @@
     color: #24364d;
 }
 
+.season-summary-cover-followup {
+    margin: 0;
+    max-width: 92%;
+    font-size: clamp(14px, 1.28vw, 17px);
+    line-height: 1.65;
+    font-weight: 700;
+    color: #2f4662;
+}
+
 .season-summary-cover-panel {
     position: relative;
     display: flex;
@@ -1069,6 +1078,12 @@
         max-width: 100%;
         font-size: 13px;
         line-height: 1.5;
+    }
+
+    .season-summary-cover-followup {
+        max-width: 100%;
+        font-size: 12px;
+        line-height: 1.55;
     }
 
     .season-summary-cover-panel {

@@ -303,7 +303,6 @@
         const rankTicks = buildNiceTicks(maxRank, 5);
         const xTicks = sampleXAxisTicks(points, 7);
         const yMax = Math.max(1, rankTicks[rankTicks.length - 1] || maxRank);
-        const note = "短短的一个赛季，还是留下来很多让人印象深刻的精彩时刻，不知道在你心里印象最深的是什么呢，一起来看一下属于你的年度报告吧";
 
         return `
             <aside class="season-summary-cover-panel">
@@ -338,7 +337,6 @@
                         <path d="${linePath}" fill="none" stroke="url(#season-summary-cover-line)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </div>
-                <p class="season-summary-cover-chart-note">${escapeHtml(note)}</p>
             </aside>
         `;
     }
@@ -347,6 +345,7 @@
         const cover = profile?.cover || {};
         const realName = String(cover.real_name || [cover.first_name, cover.last_name].filter(Boolean).join(" ").trim() || profile.managerName || "").trim();
         const stats = Array.isArray(cover.stats) ? cover.stats : [];
+        const followUp = "短短的一个赛季，还是留下来很多让人印象深刻的精彩时刻，不知道在你心里印象最深的是什么呢，一起来看一下属于你的年度报告吧";
 
         return `
             <section class="season-summary-page season-summary-page-cover active">
@@ -363,6 +362,7 @@
                         `).join("")}
                     </div>
                     <div class="season-summary-cover-message">${escapeHtml(cover.opening_message || "")}</div>
+                    <p class="season-summary-cover-followup">${escapeHtml(followUp)}</p>
                 </div>
                 ${renderOrCurvePanel(profile)}
             </section>
@@ -775,7 +775,7 @@
 
         const bestName = getStoryPlayerName(bestCaptain);
         const bestParagraph = bestCaptain?.captain_name
-            ? `（${mark(formatDateText(bestCaptain))}）似乎是一个特别的日子，那一天${mark(bestName)}大发神威，砍下了${mark(buildStatsText(bestCaptain))}，拿到了${mark(`${formatSummaryNumber(bestCaptain?.base_points || 0)}分`)}的高分，而你也有如神助，选择了他当作你那一周的队长，这种珍贵的瞬间相信你一定不会忘记。`
+            ? `${mark(formatDateText(bestCaptain))}似乎是一个特别的日子，那一天${mark(bestName)}大发神威，砍下了${mark(buildStatsText(bestCaptain))}，拿到了${mark(`${formatSummaryNumber(bestCaptain?.base_points || 0)}分`)}的高分，而你也有如神助，选择了他当作你那一周的队长，这样珍贵的瞬间相信你一定不会忘记😄`
             : "这个赛季还没有抓到完整的最佳队长记录。";
 
         const worstName = getStoryPlayerName(worstCaptain);
@@ -783,8 +783,8 @@
         const worstParagraph = !worstCaptain?.captain_name
             ? "这个赛季还没有抓到完整的最低队长记录。"
             : (worstDidPlay
-                ? `（${mark(formatDateText(worstCaptain))}）似乎是一个更特别的日子，${mark(worstName)}被你寄予厚望，却只拿下了${mark(buildStatsText(worstCaptain))}，只有可怜的${mark(`${formatSummaryNumber(worstCaptain?.base_points || 0)}分`)}，相信你那天在心里已经把他骂了无数遍了吧。`
-                : `（${mark(formatDateText(worstCaptain))}）似乎是一个更特别的日子，${mark(worstName)}被你寄予厚望，却因为赛前突发状况🤕未能出场，留下你孤单的背影任人嘲笑，相信你那天在心里已经把他骂了无数遍了吧。`);
+                ? `${mark(formatDateText(worstCaptain))}似乎是一个更特别的日子，${mark(worstName)}被你寄予厚望担任队长，却只拿下了${mark(buildStatsText(worstCaptain))}，只有可怜的${mark(`${formatSummaryNumber(worstCaptain?.base_points || 0)}分🙁`)}，相信你那天在心里已经把他骂了无数遍了吧`
+                : `${mark(formatDateText(worstCaptain))}似乎是一个更特别的日子，${mark(worstName)}被你寄予厚望担任队长，却因为赛前突然宣布受伤🤕未能出场，留下一个刺眼的0分任他人嘲笑，相信你那天在心里已经把他骂了无数遍了吧`);
 
         return `
             <section class="season-summary-page season-summary-page-story season-summary-page-captain-moments">
