@@ -374,13 +374,15 @@
     }
 
     function renderStoryCards(cards, extraClass = "") {
+        const safeCards = Array.isArray(cards) ? cards : [];
+        if (!safeCards.length) return "";
+
         return `
             <div class="season-summary-story-cards${extraClass ? ` ${extraClass}` : ""}">
-                ${(Array.isArray(cards) ? cards : []).map((card) => `
+                ${safeCards.map((card) => `
                     <div class="${buildStoryCardClasses(card)}">
                         <div class="season-summary-story-card-label">${escapeHtml(card?.label || "")}</div>
                         <div class="${buildStoryCardValueClasses(card)}">${card?.valueHtml || escapeHtml(card?.value || "")}</div>
-                        ${card?.note ? `<div class="season-summary-story-card-note">${escapeHtml(card.note)}</div>` : ""}
                     </div>
                 `).join("")}
             </div>
@@ -458,7 +460,7 @@
                 <div class="season-summary-story-main">
                     <div class="season-summary-story-shell${copyClass ? ` ${copyClass}` : ""}">
                         <div class="season-summary-page-title">${escapeHtml(title)}</div>
-                        ${renderStoryCards(cards, cardGridClass)}
+                        ${cards.length ? renderStoryCards(cards, cardGridClass) : ""}
                         ${renderParagraphs(paragraphs)}
                     </div>
                 </div>
@@ -602,43 +604,30 @@
         const averagePlayerScore = Number(details.average_player_score || 0);
         const averageHoldDays = Number(details.average_hold_days || 0);
         const seasonDays = Number(details.season_days || 0);
-        const leaguePercentile = Number(details.league_percentile || 0);
         const lowestOwnershipPlayer = details.lowest_ownership_player || null;
         const longestHold = details.longest_hold || null;
+        const bench = details.bench || {};
+        const benchTotalPoints = Number(bench.total_points || 0);
+        const bestBenchPlayer = bench.best_single || null;
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
 
-        const cards = [
-            {
-                label: "持有球员总人数",
-                value: `${formatSummaryNumber(totalUniquePlayers)}人`,
-                note: "整个赛季进入过阵容的不同球员",
-            },
-            {
-                label: "平均持有球员分数",
-                value: `${formatSummaryDecimal(averagePlayerScore)}分`,
-                note: leaguePercentile ? `超过这个联盟${formatSummaryNumber(leaguePercentile)}%的玩家` : "按本联盟玩家口径估算",
-            },
-            {
-                label: "平均持有球员天数",
-                value: `${formatSummaryDecimal(averageHoldDays)}天`,
-                note: `${formatSummaryNumber(seasonDays)}个比赛日里的平均陪伴`,
-            },
-        ];
-
-        const paragraphOne = `整个赛季你一共选过${mark(formatSummaryNumber(totalUniquePlayers))}名不同的球员，即使可能你并不是他们的球迷，却也见证了他们为你上分的努力；这${mark(formatSummaryNumber(totalUniquePlayers))}名球员平均每一个人都能在每个比赛日给你拿下${mark(formatSummaryDecimal(averagePlayerScore))}分，${leaguePercentile ? `超过这个联盟${mark(formatSummaryNumber(leaguePercentile))}%的玩家，` : ""}似乎你的每一个选择都充满着智慧。`;
+        const paragraphOne = `整个赛季你一共选过${mark(formatSummaryNumber(totalUniquePlayers))}名不同的球员，即使可能你并不是他们的球迷，却也见证了他们为你上分的努力；这${mark(formatSummaryNumber(totalUniquePlayers))}名球员平均每一个人都能在每个比赛日给你拿下${mark(formatSummaryDecimal(averagePlayerScore))}分，似乎你的每一个选择都充满着智慧。`;
         const paragraphTwo = lowestOwnershipPlayer?.player_name
             ? `${renderInlinePlayerMention(lowestOwnershipPlayer)}是你选择过持有率最低的球员，全服持有率仅有${mark(`${formatSummaryDecimal(lowestOwnershipPlayer.ownership_percent)}%`)}，这位宝藏球员也没有辜负你的信任，在你持有他的${mark(formatSummaryNumber(lowestOwnershipPlayer.days_held))}天里平均每场砍下${mark(formatSummaryDecimal(lowestOwnershipPlayer.average_points))}分，群友们都夸你是 DIFF 大师！`
             : "这个赛季你也曾把目光投向一些不那么热门的名字，正是这些看起来离谱的决定，慢慢拼出了只属于你的阵容性格。";
         const paragraphThree = longestHold?.player_name
             ? `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，平均每一位球员在你阵容中能停留${mark(formatSummaryDecimal(averageHoldDays))}天，相遇短暂，希望他们也在你的 fantasy 故事中留下了美好的一页；不过，不知道你有没有猜到，留在你阵容中最久的人是${renderInlinePlayerMention(longestHold)}呢，相信陪伴你走过了${mark(formatSummaryNumber(longestHold.days_held))}天，他已经成为你心中的第一爱酱了吧！`
             : `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，你的阵容不断迎来送往，平均每一位球员在你这里停留${mark(formatSummaryDecimal(averageHoldDays))}天，这本身就已经是一种只属于 fantasy 的陪伴。`;
+        const paragraphFour = bestBenchPlayer?.player_name
+            ? `这个赛季你的替补席总得分为${mark(formatSummaryNumber(benchTotalPoints))}分，其中最高分的一次是${renderInlinePlayerMention(bestBenchPlayer)}为你拿下的${mark(formatSummaryNumber(bestBenchPlayer.points))}分，不知道你是否有过后悔要不要首发他呢。`
+            : `这个赛季你的替补席总得分为${mark(formatSummaryNumber(benchTotalPoints))}分，替补席上也留下过不少值得回头看的遗憾瞬间。`;
 
         return renderStoryPage({
             pageClass: "season-summary-page-player-details",
             title: "球员详情",
-            cards,
+            cards: [],
             cardGridClass: "season-summary-story-cards-player",
-            paragraphs: [paragraphOne, paragraphTwo, paragraphThree],
+            paragraphs: [paragraphOne, paragraphTwo, paragraphThree, paragraphFour],
         });
     }
 
@@ -653,26 +642,17 @@
         const mostOut = summary.most_out || null;
         const favoriteDay = summary.favorite_day || null;
         const favoriteTimeSlot = summary.favorite_time_slot || null;
-        const timeSlotLabel = String(favoriteTimeSlot?.full_label || "暂无");
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
 
         const cards = [
-            { label: "总换人次数", value: `${formatSummaryNumber(totalTransfers)}次`, note: "不含 WC / AS" },
+            { label: "总换人次数", value: `${formatSummaryNumber(totalTransfers)}次` },
             {
                 label: "操作周数",
                 value: `${formatSummaryNumber(activeWeeks)}/${formatSummaryNumber(seasonWeeks)}`,
-                note: transferEveryWeek ? "每一周都坚持换人" : "并不是每周都要把 FT 用完",
             },
             {
                 label: "扣分总计",
                 value: penaltyPoints > 0 ? `-${formatSummaryNumber(penaltyPoints)}` : "0",
-                note: penaltyPoints > 200 ? "大胆而奔放的操作" : "谨慎精确的节奏",
-            },
-            {
-                label: "偏爱换人时段",
-                value: timeSlotLabel,
-                note: favoriteTimeSlot?.count ? `${formatSummaryNumber(favoriteTimeSlot.count)}次发生在这里` : "这季还没有固定生物钟",
-                valueClass: "season-summary-story-card-value-time-slot",
             },
         ];
 
@@ -714,21 +694,12 @@
             : 0;
         const favoriteIsJokic = !!favoriteCaptain?.is_jokic;
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
-        const countNote = useCount >= totalWeeks
-            ? "一次都没忘，太能操作了！"
-            : (useCount >= Math.max(0, totalWeeks - 2) ? "咦，你还留了一手" : "也给自己留了一点观察空间");
 
         const cards = [
-            { label: "Captain 次数", value: `${formatSummaryNumber(useCount)}/${formatSummaryNumber(totalWeeks)}`, note: countNote },
-            {
-                label: "队长累积得分",
-                value: hasCaptainScores ? `${formatSummaryNumber(totalPoints)}分` : "--",
-                note: hasCaptainScores ? "按真实 Captain x2 后得分累计" : "还没有解析到 Captain 得分",
-            },
+            { label: "Captain 次数", value: `${formatSummaryNumber(useCount)}/${formatSummaryNumber(totalWeeks)}` },
             {
                 label: "队长平均得分",
                 value: hasCaptainScores ? `${formatSummaryDecimal(averagePoints)}分` : "--",
-                note: hasCaptainScores ? "按 x2 后平均分计算" : "还没有解析到 Captain 得分",
             },
         ];
 
@@ -764,7 +735,7 @@
 
         let paragraphFour = "这个赛季你最像 DIFF 大师的那一次，也说明你不是只会跟着模板走。";
         if (lowestOwnership?.captain_name) {
-            paragraphFour = `如果要说最 diff 的那一次，大概就是${mark(lowestOwnershipLabel)}的${renderInlinePlayerMention(lowestOwnership)}了。当时他的持有率只有${mark(lowestOwnershipPercent)}，却依然替你拿下了${mark(lowestOwnershipPoints)}，勇气可嘉，值得陈赞！`;
+            paragraphFour = `如果要说最 diff 的那一次，大概就是${mark(lowestOwnershipLabel)}的${renderInlinePlayerMention(lowestOwnership)}了。当时他的持有率只有${mark(lowestOwnershipPercent)}，却依然替你拿下了${mark(lowestOwnershipPoints)}，勇气可嘉，值得称赞！`;
         }
 
         return renderStoryPage({

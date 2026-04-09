@@ -440,7 +440,7 @@
 }
 
 .season-summary-story-cards-captain {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .season-summary-story-cards-captain .season-summary-story-card-value {
@@ -452,7 +452,7 @@
 }
 
 .season-summary-story-cards-transfer {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .season-summary-story-card {
@@ -478,11 +478,7 @@
 }
 
 .season-summary-story-card-note {
-    margin-top: 8px;
-    font-size: 12px;
-    line-height: 1.35;
-    font-weight: 700;
-    color: #64748b;
+    display: none;
 }
 
 .season-summary-story-card-value-time-slot {
@@ -1144,9 +1140,7 @@
     }
 
     .season-summary-story-card-note {
-        margin-top: 6px;
-        font-size: 10px;
-        line-height: 1.3;
+        display: none;
     }
 
     .season-summary-story-card-value-time-slot {

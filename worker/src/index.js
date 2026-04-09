@@ -1,4 +1,4 @@
-import {
+﻿import {
   jsonResponse,
   fetchJson,
   fetchJsonSafe,
@@ -4653,6 +4653,77 @@ async function buildSeasonHighlightLineupPayload(uidInput, eventInput) {
   };
 }
 
+async function buildSeasonBenchSummary(uidNumber, rows, bootstrap, elements, eventMetaById) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const totalPoints = formatFantasyScore(
+    safeRows.reduce((sum, row) => sum + Number(row?.points_on_bench || 0), 0)
+  );
+  const candidateRows = safeRows
+    .map((row) => ({
+      row,
+      event: Number(row?.event || 0),
+      benchTotal: formatFantasyScore(row?.points_on_bench || 0),
+    }))
+    .filter((item) => item.event > 0 && item.benchTotal > 0)
+    .sort((a, b) => Number(b?.benchTotal || 0) - Number(a?.benchTotal || 0) || Number(b?.event || 0) - Number(a?.event || 0));
+
+  if (!candidateRows.length) {
+    return {
+      total_points: totalPoints,
+      best_single: null,
+    };
+  }
+
+  const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
+  let bestSingle = null;
+
+  for (const candidate of candidateRows) {
+    if (bestSingle && Number(bestSingle?.points || 0) >= Number(candidate?.benchTotal || 0)) {
+      break;
+    }
+
+    const eventId = Number(candidate?.event || 0);
+    const [picksRes, liveRes] = await Promise.all([
+      fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 2),
+      fetchJsonSafe(`/event/${eventId}/live/`, 2),
+    ]);
+
+    if (!picksRes.ok || !liveRes.ok) continue;
+
+    const liveElements = buildLiveElementsMap(liveRes.data);
+    const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
+    const benchPlayers = picks
+      .filter((pick) => Number(pick?.lineup_position || 0) > 5)
+      .sort((a, b) =>
+        Number(b?.base_points || 0) - Number(a?.base_points || 0) ||
+        Number(a?.lineup_position || 0) - Number(b?.lineup_position || 0)
+      );
+
+    const topBench = benchPlayers[0] || null;
+    if (!topBench) continue;
+
+    const benchPoints = Number(topBench?.base_points || 0);
+    if (!bestSingle || benchPoints > Number(bestSingle?.points || 0)) {
+      const meta = eventMetaById?.[eventId] || {};
+      bestSingle = {
+        event: eventId,
+        gw: Number(meta?.gw || 0) || null,
+        day: Number(meta?.day || 0) || null,
+        label: toGwDayLabel(meta?.gw, meta?.day),
+        element_id: Number(topBench?.element_id || 0) || null,
+        player_name: String(topBench?.name || `#${topBench?.element_id || ""}`).trim(),
+        headshot_url: topBench?.headshot_url || elements[Number(topBench?.element_id || 0)]?.headshot_url || null,
+        points: benchPoints,
+      };
+    }
+  }
+
+  return {
+    total_points: totalPoints,
+    best_single: bestSingle,
+  };
+}
+
 function computeLeaguePercentileByRank(rank, managerCount) {
   const safeRank = Number(rank || 0);
   const safeCount = Number(managerCount || 0);
@@ -4790,6 +4861,7 @@ async function buildSeasonSummaryPayload(uidInput) {
   );
   const transferPenaltyEvents = rows.filter((row) => Number(row?.event_transfers_cost || 0) > 0).length;
   const transferEveryWeek = seasonWeeksTracked > 0 && transferWeeksActive >= seasonWeeksTracked;
+  const benchSummary = await buildSeasonBenchSummary(uidNumber, rows, bootstrap, elements, eventMetaById);
 
   const captainEvents = [...new Map(
     (Array.isArray(historyData?.chips) ? historyData.chips : [])
@@ -4891,9 +4963,9 @@ async function buildSeasonSummaryPayload(uidInput) {
         rankDelta === null
           ? "恭喜你陪这个游戏走过了第二个年头。"
           : rankDelta > 0
-            ? `恭喜你陪这个游戏走过了第二个年头，居然还在上个赛季的基础上进步了 ${formatDisplayNumber(rankDelta)} 名，可喜可贺！`
+            ? `恭喜你陪这个游戏走过了第二个年头，相比上个赛季还进步了 ${formatDisplayNumber(rankDelta)} 名，看来你逐渐摸清了这个游戏的套路了`
             : rankDelta < 0
-              ? `恭喜你陪这个游戏走过了第二个年头，可惜比上个赛季还退步了 ${formatDisplayNumber(Math.abs(rankDelta))} 名，再接再厉！`
+              ? `恭喜你陪这个游戏走过了第二个年头，可惜比上个赛季退步了 ${formatDisplayNumber(Math.abs(rankDelta))} 名，继续努力吧！`
               : "恭喜你陪这个游戏走过了第二个年头，而且和上个赛季保持住了同样的名次。"
       )
       : (
@@ -4987,6 +5059,19 @@ async function buildSeasonSummaryPayload(uidInput) {
           average_points: Number(longestHold.points_per_game || 0),
           days_held: Number(longestHold.days_held || 0),
         } : null,
+        bench: {
+          total_points: Number(benchSummary?.total_points || 0),
+          best_single: benchSummary?.best_single ? {
+            event: Number(benchSummary.best_single.event || 0) || null,
+            gw: Number(benchSummary.best_single.gw || 0) || null,
+            day: Number(benchSummary.best_single.day || 0) || null,
+            label: benchSummary.best_single.label || "",
+            element_id: Number(benchSummary.best_single.element_id || 0) || null,
+            player_name: benchSummary.best_single.player_name || "",
+            headshot_url: benchSummary.best_single.headshot_url || null,
+            points: Number(benchSummary.best_single.points || 0),
+          } : null,
+        },
       },
     },
     transfers: {
