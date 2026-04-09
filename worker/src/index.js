@@ -4574,7 +4574,7 @@ function formatHighlightPlayerDisplayName(player) {
   return String(player?.web_name || player?.second_name || player?.first_name || "PLAYER").trim().toUpperCase();
 }
 
-async function buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap, elements, eventMetaById) {
+async function buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap, elements, eventMetaById, captainEnabled = false) {
   const safeEventId = Number(eventId || 0);
   if (!safeEventId) return null;
 
@@ -4612,7 +4612,7 @@ async function buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap,
         team_logo_url: player?.team_logo_url || "/nba-team-logos/_.png",
         team_color: String(teamMeta?.color || "").trim() || null,
         position_type: Number(player?.position_type || 0) || null,
-        is_captain: !!player?.is_captain,
+        is_captain: !!captainEnabled && !!player?.is_captain,
         points,
       };
     });
@@ -4627,9 +4627,10 @@ async function buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap,
   };
 }
 
-async function buildSeasonHighlightLineupPayload(uidInput, eventInput) {
+async function buildSeasonHighlightLineupPayload(uidInput, eventInput, captainEnabledInput = false) {
   const uidNumber = uidToNumber(uidInput);
   const safeEventId = Number(eventInput || 0);
+  const captainEnabled = String(captainEnabledInput || "").toLowerCase() === "true" || captainEnabledInput === true || captainEnabledInput === "1";
   if (!uidNumber) {
     throw new Error("uid is required");
   }
@@ -4640,7 +4641,7 @@ async function buildSeasonHighlightLineupPayload(uidInput, eventInput) {
   const bootstrap = await fetchJson("/bootstrap-static/", 1);
   const elements = buildElementsMap(bootstrap);
   const eventMetaById = buildEventMetaById(bootstrap.events || []);
-  const lineup = await buildSeasonHighlightLineupSnapshot(uidNumber, safeEventId, bootstrap, elements, eventMetaById);
+  const lineup = await buildSeasonHighlightLineupSnapshot(uidNumber, safeEventId, bootstrap, elements, eventMetaById, captainEnabled);
   if (!lineup || !Array.isArray(lineup?.players) || !lineup.players.length) {
     throw new Error(`highlight lineup not found for uid ${uidNumber} event ${safeEventId}`);
   }
@@ -4650,88 +4651,6 @@ async function buildSeasonHighlightLineupPayload(uidInput, eventInput) {
     uid: uidNumber,
     event: safeEventId,
     lineup,
-  };
-}
-
-async function buildSeasonBenchSummary(uidNumber, rows, bootstrap, elements, eventMetaById) {
-  const safeRows = Array.isArray(rows) ? rows : [];
-  const totalPoints = formatFantasyScore(
-    safeRows.reduce((sum, row) => sum + Number(row?.points_on_bench || 0), 0)
-  );
-  const candidateRows = safeRows
-    .map((row) => ({
-      row,
-      event: Number(row?.event || 0),
-      benchTotal: formatFantasyScore(row?.points_on_bench || 0),
-    }))
-    .filter((item) => item.event > 0 && item.benchTotal > 0)
-    .sort((a, b) => Number(b?.benchTotal || 0) - Number(a?.benchTotal || 0) || Number(b?.event || 0) - Number(a?.event || 0));
-
-  if (!candidateRows.length) {
-    return {
-      total_points: totalPoints,
-      best_single: null,
-    };
-  }
-
-  const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
-  let bestSingle = null;
-  const batchSize = 4;
-
-  for (let startIndex = 0; startIndex < candidateRows.length; startIndex += batchSize) {
-    const nextCandidate = candidateRows[startIndex];
-    if (bestSingle && Number(bestSingle?.points || 0) >= Number(nextCandidate?.benchTotal || 0)) {
-      break;
-    }
-
-    const batch = candidateRows.slice(startIndex, startIndex + batchSize);
-    const batchResults = await Promise.all(
-      batch.map(async (candidate) => {
-        const eventId = Number(candidate?.event || 0);
-        const [picksRes, liveRes] = await Promise.all([
-          fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 2),
-          fetchJsonSafe(`/event/${eventId}/live/`, 2),
-        ]);
-
-        if (!picksRes.ok || !liveRes.ok) return null;
-
-        const liveElements = buildLiveElementsMap(liveRes.data);
-        const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
-        const benchPlayers = picks
-          .filter((pick) => Number(pick?.lineup_position || 0) > 5)
-          .sort((a, b) =>
-            Number(b?.base_points || 0) - Number(a?.base_points || 0) ||
-            Number(a?.lineup_position || 0) - Number(b?.lineup_position || 0)
-          );
-
-        const topBench = benchPlayers[0] || null;
-        if (!topBench) return null;
-
-        const meta = eventMetaById?.[eventId] || {};
-        return {
-          event: eventId,
-          gw: Number(meta?.gw || 0) || null,
-          day: Number(meta?.day || 0) || null,
-          label: toGwDayLabel(meta?.gw, meta?.day),
-          element_id: Number(topBench?.element_id || 0) || null,
-          player_name: String(topBench?.name || `#${topBench?.element_id || ""}`).trim(),
-          headshot_url: topBench?.headshot_url || elements[Number(topBench?.element_id || 0)]?.headshot_url || null,
-          points: Number(topBench?.base_points || 0),
-        };
-      })
-    );
-
-    for (const result of batchResults) {
-      if (!result) continue;
-      if (!bestSingle || Number(result?.points || 0) > Number(bestSingle?.points || 0)) {
-        bestSingle = result;
-      }
-    }
-  }
-
-  return {
-    total_points: totalPoints,
-    best_single: bestSingle,
   };
 }
 
@@ -4872,7 +4791,6 @@ async function buildSeasonSummaryPayload(uidInput) {
   );
   const transferPenaltyEvents = rows.filter((row) => Number(row?.event_transfers_cost || 0) > 0).length;
   const transferEveryWeek = seasonWeeksTracked > 0 && transferWeeksActive >= seasonWeeksTracked;
-  const benchSummary = await buildSeasonBenchSummary(uidNumber, rows, bootstrap, elements, eventMetaById);
 
   const captainEvents = [...new Map(
     (Array.isArray(historyData?.chips) ? historyData.chips : [])
@@ -4892,6 +4810,7 @@ async function buildSeasonSummaryPayload(uidInput) {
       })
       .filter(([eventId, item]) => eventId && item.name === "phcapt")
   ).values()].sort((a, b) => Number(a?.event || 0) - Number(b?.event || 0));
+  const captainEventSet = new Set(captainEvents.map((item) => Number(item?.event || 0)).filter(Boolean));
 
   const captainRecords = await buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eventMetaById);
   const captainUseCount = captainEvents.length;
@@ -4936,15 +4855,24 @@ async function buildSeasonSummaryPayload(uidInput) {
   const bestDayRow = [...rows].sort((a, b) => Number(b?.points || 0) - Number(a?.points || 0))[0] || null;
   const bestDayMeta = eventMetaById?.[Number(bestDayRow?.event || 0)] || {};
   const bestDayPoints = bestDayRow ? formatFantasyScore(bestDayRow.points) : 0;
+  const getHistoryGameRank = (row) => {
+    const rankSort = Number(row?.rank_sort || 0);
+    if (Number.isFinite(rankSort) && rankSort > 0) return rankSort;
+    const rank = Number(row?.rank || 0);
+    return Number.isFinite(rank) && rank > 0 ? rank : 0;
+  };
   const bestRankRow = rows
-    .filter((row) => Number(row?.overall_rank || 0) > 0)
-    .sort((a, b) => Number(a?.overall_rank || 0) - Number(b?.overall_rank || 0))[0] || null;
+    .filter((row) => getHistoryGameRank(row) > 0)
+    .sort((a, b) => getHistoryGameRank(a) - getHistoryGameRank(b))[0] || null;
   const bestRankMeta = eventMetaById?.[Number(bestRankRow?.event || 0)] || {};
   const highlightEventIds = [...new Set(
     [Number(bestDayRow?.event || 0), Number(bestRankRow?.event || 0)].filter((value) => value > 0)
   )];
   const highlightLineupEntries = await Promise.all(
-    highlightEventIds.map(async (eventId) => [eventId, await buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap, elements, eventMetaById)])
+    highlightEventIds.map(async (eventId) => [
+      eventId,
+      await buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap, elements, eventMetaById, captainEventSet.has(Number(eventId || 0))),
+    ])
   );
   const highlightLineupsByEvent = Object.fromEntries(highlightLineupEntries);
 
@@ -5070,19 +4998,6 @@ async function buildSeasonSummaryPayload(uidInput) {
           average_points: Number(longestHold.points_per_game || 0),
           days_held: Number(longestHold.days_held || 0),
         } : null,
-        bench: {
-          total_points: Number(benchSummary?.total_points || 0),
-          best_single: benchSummary?.best_single ? {
-            event: Number(benchSummary.best_single.event || 0) || null,
-            gw: Number(benchSummary.best_single.gw || 0) || null,
-            day: Number(benchSummary.best_single.day || 0) || null,
-            label: benchSummary.best_single.label || "",
-            element_id: Number(benchSummary.best_single.element_id || 0) || null,
-            player_name: benchSummary.best_single.player_name || "",
-            headshot_url: benchSummary.best_single.headshot_url || null,
-            points: Number(benchSummary.best_single.points || 0),
-          } : null,
-        },
       },
     },
     transfers: {
@@ -5236,7 +5151,7 @@ async function buildSeasonSummaryPayload(uidInput) {
       lead: "最后一页先收集这个赛季最容易被记住的几个瞬间，让整份总结不会只剩下表格和排名。",
       cards: [
         ["赛季最高单日", bestDayRow ? formatDisplayNumber(bestDayPoints) : "-", bestDayRow ? `${toGwDayLabel(bestDayMeta?.gw, bestDayMeta?.day)} 打出来的最高单日` : "还没有足够的历史数据"],
-        ["最高全球排名", bestRankRow ? formatDisplayRank(bestRankRow.overall_rank) : "-", bestRankRow ? `${toGwDayLabel(bestRankMeta?.gw, bestRankMeta?.day)} 达到的最好位置` : "官方若缺 rank 字段，这里会留空"],
+        ["最佳单日排名", bestRankRow ? formatDisplayRank(getHistoryGameRank(bestRankRow)) : "-", bestRankRow ? `${toGwDayLabel(bestRankMeta?.gw, bestRankMeta?.day)} 打出来的最佳 game rank` : "官方若缺 rank 字段，这里会留空"],
       ],
       summary: {
         best_day: bestDayRow ? {
@@ -5245,6 +5160,7 @@ async function buildSeasonSummaryPayload(uidInput) {
           day: Number(bestDayMeta?.day || 0) || null,
           event: Number(bestDayRow?.event || 0) || null,
           points: Number(bestDayPoints || 0),
+          captain_enabled: captainEventSet.has(Number(bestDayRow?.event || 0)),
           lineup: highlightLineupsByEvent[Number(bestDayRow?.event || 0)] || null,
         } : null,
         best_rank: bestRankRow ? {
@@ -5253,7 +5169,8 @@ async function buildSeasonSummaryPayload(uidInput) {
           day: Number(bestRankMeta?.day || 0) || null,
           event: Number(bestRankRow?.event || 0) || null,
           points: formatFantasyScore(bestRankRow?.points || 0),
-          overall_rank: Number(bestRankRow?.overall_rank || 0) || null,
+          game_rank: Number(getHistoryGameRank(bestRankRow) || 0) || null,
+          captain_enabled: captainEventSet.has(Number(bestRankRow?.event || 0)),
           lineup: highlightLineupsByEvent[Number(bestRankRow?.event || 0)] || null,
         } : null,
       },
@@ -5262,12 +5179,12 @@ async function buildSeasonSummaryPayload(uidInput) {
         : "等真实数据补齐后，这一页会成为整份总结最适合做动效收尾的位置。",
       sideTitle: "高光页",
       sideBullets: [
-        bestRankRow ? `目前已经能抓到全季最佳单日和最好 global rank 那一天。` : "最高排名这块还取决于官方历史里有没有稳定 rank 字段。",
+        bestRankRow ? `目前已经能抓到全季最佳单日和最佳单日 game rank 那一天。` : "最高排名这块还取决于官方历史里有没有稳定 rank 字段。",
         "这页后面最适合加轻动效和一句赛季收刀文案。",
       ],
       sideKpis: [
         ["Best Day", bestDayRow ? toGwDayLabel(bestDayMeta?.gw, bestDayMeta?.day) : "-"],
-        ["Best OR", bestRankRow ? formatDisplayRank(bestRankRow.overall_rank) : "-"],
+        ["Best OR", bestRankRow ? formatDisplayRank(getHistoryGameRank(bestRankRow)) : "-"],
       ],
     },
   };
@@ -5342,6 +5259,7 @@ export default {
       if (path === "/api/season-summary-highlight-lineup") {
         const uid = url.searchParams.get("uid") || url.searchParams.get("entry_id");
         const event = url.searchParams.get("event") || url.searchParams.get("event_id");
+        const captainEnabled = url.searchParams.get("captain_enabled");
         if (!uid || !event) {
           return jsonResponse(
             { success: false, error: "uid and event are required" },
@@ -5351,7 +5269,7 @@ export default {
         }
         try {
           return jsonResponse(
-            await buildSeasonHighlightLineupPayload(uid, event),
+            await buildSeasonHighlightLineupPayload(uid, event, captainEnabled),
             200,
             { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
           );

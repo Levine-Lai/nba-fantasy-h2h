@@ -148,13 +148,13 @@
         return data;
     }
 
-    async function requestHighlightLineup(uid, eventId) {
+    async function requestHighlightLineup(uid, eventId, captainEnabled = false) {
         const normalizedUid = String(uid || "").trim();
         const safeEventId = Number(eventId || 0);
         if (!normalizedUid || !safeEventId) return null;
 
         const base = (window.__API_BASE__ || "").trim().replace(/\/+$/, "");
-        const target = `${base}/api/season-summary-highlight-lineup?uid=${encodeURIComponent(normalizedUid)}&event=${encodeURIComponent(safeEventId)}&_=${Date.now()}`;
+        const target = `${base}/api/season-summary-highlight-lineup?uid=${encodeURIComponent(normalizedUid)}&event=${encodeURIComponent(safeEventId)}&captain_enabled=${captainEnabled ? "1" : "0"}&_=${Date.now()}`;
         const response = await fetch(target, { cache: "no-store" });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data?.success === false) {
@@ -172,11 +172,13 @@
                 key: "best_day",
                 event: Number(summary.best_day?.event || 0),
                 hasLineup: Array.isArray(summary.best_day?.lineup?.players) && summary.best_day.lineup.players.length > 0,
+                captainEnabled: !!summary.best_day?.captain_enabled,
             } : null,
             summary?.best_rank ? {
                 key: "best_rank",
                 event: Number(summary.best_rank?.event || 0),
                 hasLineup: Array.isArray(summary.best_rank?.lineup?.players) && summary.best_rank.lineup.players.length > 0,
+                captainEnabled: !!summary.best_rank?.captain_enabled,
             } : null,
         ].filter((item) => item && item.event && !item.hasLineup);
 
@@ -185,7 +187,7 @@
         const results = await Promise.all(
             targets.map(async (target) => {
                 try {
-                    const lineup = await requestHighlightLineup(uid, target.event);
+                    const lineup = await requestHighlightLineup(uid, target.event, target.captainEnabled);
                     return { key: target.key, lineup };
                 } catch (error) {
                     console.warn(`Highlight lineup hydrate failed for ${target.key}:`, error);
@@ -606,9 +608,6 @@
         const seasonDays = Number(details.season_days || 0);
         const lowestOwnershipPlayer = details.lowest_ownership_player || null;
         const longestHold = details.longest_hold || null;
-        const bench = details.bench || {};
-        const benchTotalPoints = Number(bench.total_points || 0);
-        const bestBenchPlayer = bench.best_single || null;
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
 
         const paragraphOne = `整个赛季你一共选过${mark(formatSummaryNumber(totalUniquePlayers))}名不同的球员，即使可能你并不是他们的球迷，却也见证了他们为你上分的努力；这${mark(formatSummaryNumber(totalUniquePlayers))}名球员平均每一个人都能在每个比赛日给你拿下${mark(formatSummaryDecimal(averagePlayerScore))}分，似乎你的每一个选择都充满着智慧。`;
@@ -618,16 +617,13 @@
         const paragraphThree = longestHold?.player_name
             ? `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，平均每一位球员在你阵容中能停留${mark(formatSummaryDecimal(averageHoldDays))}天，相遇短暂，希望他们也在你的 fantasy 故事中留下了美好的一页；不过，不知道你有没有猜到，留在你阵容中最久的人是${renderInlinePlayerMention(longestHold)}呢，相信陪伴你走过了${mark(formatSummaryNumber(longestHold.days_held))}天，他已经成为你心中的第一爱酱了吧！`
             : `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，你的阵容不断迎来送往，平均每一位球员在你这里停留${mark(formatSummaryDecimal(averageHoldDays))}天，这本身就已经是一种只属于 fantasy 的陪伴。`;
-        const paragraphFour = bestBenchPlayer?.player_name
-            ? `这个赛季你的替补席总得分为${mark(formatSummaryNumber(benchTotalPoints))}分，其中最高分的一次是${renderInlinePlayerMention(bestBenchPlayer)}为你拿下的${mark(formatSummaryNumber(bestBenchPlayer.points))}分，不知道你是否有过后悔要不要首发他呢。`
-            : `这个赛季你的替补席总得分为${mark(formatSummaryNumber(benchTotalPoints))}分，替补席上也留下过不少值得回头看的遗憾瞬间。`;
 
         return renderStoryPage({
             pageClass: "season-summary-page-player-details",
             title: "球员详情",
             cards: [],
             cardGridClass: "season-summary-story-cards-player",
-            paragraphs: [paragraphOne, paragraphTwo, paragraphThree, paragraphFour],
+            paragraphs: [paragraphOne, paragraphTwo, paragraphThree],
         });
     }
 
@@ -768,7 +764,7 @@
         if (bestRank) {
             stories.push(`
                 <div class="season-summary-highlight-story">
-                    <p class="season-summary-story-paragraph">${mark(bestRank.label)}也是一个特殊的日子，你拿到了${mark(`${formatSummaryNumber(bestRank.points)}分`)}，最关键的是单日OR为${mark(formatSummaryNumber(bestRank.overall_rank || 0))}，比起一场比赛的输赢，这种站上更高位置的瞬间更像赛季里真正的高光</p>
+                    <p class="season-summary-story-paragraph">${mark(bestRank.label)}也是一个特殊的日子，你拿到了${mark(`${formatSummaryNumber(bestRank.points)}分`)}，最关键的是单日OR为${mark(formatSummaryNumber(bestRank.game_rank || 0))}，比起一场比赛的输赢，这种站上更高位置的瞬间更像赛季里真正的高光</p>
                     ${renderHighlightPlayerCards(bestRank?.lineup)}
                 </div>
             `);
