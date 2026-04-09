@@ -5184,14 +5184,26 @@ export default {
       if (path === "/api/season-summary") {
         const uid = url.searchParams.get("uid") || url.searchParams.get("entry_id");
         if (!uid) {
-          return jsonResponse({ success: false, error: "uid is required" }, 400);
+          return jsonResponse(
+            { success: false, error: "uid is required" },
+            400,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
         }
         try {
-          return jsonResponse(await buildSeasonSummaryPayload(uid));
+          return jsonResponse(
+            await buildSeasonSummaryPayload(uid),
+            200,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
         } catch (error) {
           const message = String(error?.message || error || "season summary failed");
           const status = /not found|required/i.test(message) ? 404 : 500;
-          return jsonResponse({ success: false, error: message }, status);
+          return jsonResponse(
+            { success: false, error: message },
+            status,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
         }
       }
 

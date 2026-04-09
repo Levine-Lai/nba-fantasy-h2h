@@ -139,8 +139,8 @@
 
     async function requestSummary(uid) {
         const base = (window.__API_BASE__ || "").trim().replace(/\/+$/, "");
-        const target = `${base}/api/season-summary?uid=${encodeURIComponent(uid)}`;
-        const response = await fetch(target);
+        const target = `${base}/api/season-summary?uid=${encodeURIComponent(uid)}&_=${Date.now()}`;
+        const response = await fetch(target, { cache: "no-store" });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data?.success === false) {
             throw new Error(data?.error || `Request failed: ${response.status}`);
@@ -576,7 +576,6 @@
         const totalWeeks = Number(summary.total_weeks || 25) || 25;
         const resolvedCount = Number(summary.resolved_count || 0);
         const hasCaptainScores = resolvedCount > 0;
-        const showPartialNote = hasCaptainScores && resolvedCount < useCount;
         const totalPoints = Number(summary.total_points || 0);
         const averagePoints = Number(summary.average_points || 0);
         const favoriteCaptain = summary.favorite_captain || null;
@@ -596,30 +595,24 @@
         const countNote = useCount >= totalWeeks
             ? "一次都没忘，太能操作了！"
             : (useCount >= Math.max(0, totalWeeks - 2) ? "咦，你还留了一手" : "也给自己留了一点观察空间");
-        const scoreNote = showPartialNote
-            ? `按已解析的 ${formatSummaryNumber(resolvedCount)}/${formatSummaryNumber(useCount)} 次 Captain 记录计算`
-            : "按真实 Captain x2 后得分累计";
-        const averageNote = showPartialNote
-            ? `基于 ${formatSummaryNumber(resolvedCount)} 次已解析记录求均值`
-            : "按 x2 后平均分计算";
 
         const cards = [
             { label: "Captain 次数", value: `${formatSummaryNumber(useCount)}/${formatSummaryNumber(totalWeeks)}`, note: countNote },
             {
                 label: "队长累积得分",
                 value: hasCaptainScores ? `${formatSummaryNumber(totalPoints)}分` : "--",
-                note: hasCaptainScores ? scoreNote : "还没有解析到 Captain 得分",
+                note: hasCaptainScores ? "按真实 Captain x2 后得分累计" : "还没有解析到 Captain 得分",
             },
             {
                 label: "队长平均得分",
                 value: hasCaptainScores ? `${formatSummaryDecimal(averagePoints)}分` : "--",
-                note: hasCaptainScores ? averageNote : "还没有解析到 Captain 得分",
+                note: hasCaptainScores ? "按 x2 后平均分计算" : "还没有解析到 Captain 得分",
             },
         ];
 
         let paragraphOne = "这个赛季你的 Captain 选择，像是在一场场比赛里不断给自己加注。";
         if (useCount > 0 && hasCaptainScores) {
-            paragraphOne = `这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，累计拿到了${mark(formatSummaryNumber(totalPoints))}分，平均每个队长都能拿到${mark(formatSummaryDecimal(averagePoints))}分。${showPartialNote ? `这次先顺着 history → picks → live 抓到了${mark(formatSummaryNumber(resolvedCount))}次完整 Captain 记录，但整体轮廓已经很清楚了。` : "每一次落子都在决定这一周的上限。"}`;
+            paragraphOne = `这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，累计拿到了${mark(formatSummaryNumber(totalPoints))}分，平均每个队长都能拿到${mark(formatSummaryDecimal(averagePoints))}分。每一次落子都在决定这一周的上限。`;
         } else if (useCount > 0) {
             paragraphOne = `这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，次数已经按 /entry/{entry_id}/history/ 里的 phcapt 记录对齐了。等这次子调用把每个 event 的 picks/live 都补齐，这页就会把完整得分重新写出来。`;
         }

@@ -1,7 +1,7 @@
 // Shared HTTP utilities for upstream NBA Fantasy and public JSON responses.
 const BASE_URL = "https://nbafantasy.nba.com/api";
 
-export function jsonResponse(data, status = 200) {
+export function jsonResponse(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
@@ -9,6 +9,7 @@ export function jsonResponse(data, status = 200) {
       "access-control-allow-origin": "*",
       "access-control-allow-methods": "GET,POST,OPTIONS",
       "access-control-allow-headers": "content-type,authorization",
+      ...extraHeaders,
     },
   });
 }
