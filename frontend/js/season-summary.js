@@ -148,6 +148,62 @@
         return data;
     }
 
+    async function requestHighlightLineup(uid, eventId) {
+        const normalizedUid = String(uid || "").trim();
+        const safeEventId = Number(eventId || 0);
+        if (!normalizedUid || !safeEventId) return null;
+
+        const base = (window.__API_BASE__ || "").trim().replace(/\/+$/, "");
+        const target = `${base}/api/season-summary-highlight-lineup?uid=${encodeURIComponent(normalizedUid)}&event=${encodeURIComponent(safeEventId)}&_=${Date.now()}`;
+        const response = await fetch(target, { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data?.success === false) {
+            throw new Error(data?.error || `Highlight lineup request failed: ${response.status}`);
+        }
+        return data?.lineup || null;
+    }
+
+    async function hydrateHighlightLineups(profile, uid) {
+        const summary = profile?.highlights?.summary;
+        if (!summary) return profile;
+
+        const targets = [
+            summary?.best_day ? {
+                key: "best_day",
+                event: Number(summary.best_day?.event || 0),
+                hasLineup: Array.isArray(summary.best_day?.lineup?.players) && summary.best_day.lineup.players.length > 0,
+            } : null,
+            summary?.best_rank ? {
+                key: "best_rank",
+                event: Number(summary.best_rank?.event || 0),
+                hasLineup: Array.isArray(summary.best_rank?.lineup?.players) && summary.best_rank.lineup.players.length > 0,
+            } : null,
+        ].filter((item) => item && item.event && !item.hasLineup);
+
+        if (!targets.length) return profile;
+
+        const results = await Promise.all(
+            targets.map(async (target) => {
+                try {
+                    const lineup = await requestHighlightLineup(uid, target.event);
+                    return { key: target.key, lineup };
+                } catch (error) {
+                    console.warn(`Highlight lineup hydrate failed for ${target.key}:`, error);
+                    return null;
+                }
+            })
+        );
+
+        for (const result of results) {
+            if (!result?.lineup || !Array.isArray(result.lineup?.players) || !result.lineup.players.length) continue;
+            if (summary?.[result.key]) {
+                summary[result.key].lineup = result.lineup;
+            }
+        }
+
+        return profile;
+    }
+
     function formatSummaryNumber(value) {
         const numeric = Number(value || 0);
         if (!Number.isFinite(numeric)) return "-";
@@ -825,6 +881,7 @@
 
         try {
             const profile = await requestSummary(normalizedUid);
+            await hydrateHighlightLineups(profile, normalizedUid);
             await playIntroExit(profile, normalizedUid);
         } catch (error) {
             console.error("Season summary load failed:", error);

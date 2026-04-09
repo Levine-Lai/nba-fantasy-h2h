@@ -4579,8 +4579,8 @@ async function buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap,
   if (!safeEventId) return null;
 
   const [picksRes, liveRes] = await Promise.all([
-    fetchJsonSafe(`/entry/${uidNumber}/event/${safeEventId}/picks/`, 2),
-    fetchJsonSafe(`/event/${safeEventId}/live/`, 2),
+    fetchJsonSafe(`/entry/${uidNumber}/event/${safeEventId}/picks/`, 4),
+    fetchJsonSafe(`/event/${safeEventId}/live/`, 4),
   ]);
 
   if (!picksRes.ok || !liveRes.ok) return null;
@@ -4623,6 +4623,32 @@ async function buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap,
     day: Number(meta?.day || 0) || null,
     label: toGwDayLabel(meta?.gw, meta?.day),
     players: lineupPlayers,
+  };
+}
+
+async function buildSeasonHighlightLineupPayload(uidInput, eventInput) {
+  const uidNumber = uidToNumber(uidInput);
+  const safeEventId = Number(eventInput || 0);
+  if (!uidNumber) {
+    throw new Error("uid is required");
+  }
+  if (!safeEventId) {
+    throw new Error("event is required");
+  }
+
+  const bootstrap = await fetchJson("/bootstrap-static/", 1);
+  const elements = buildElementsMap(bootstrap);
+  const eventMetaById = buildEventMetaById(bootstrap.events || []);
+  const lineup = await buildSeasonHighlightLineupSnapshot(uidNumber, safeEventId, bootstrap, elements, eventMetaById);
+  if (!lineup || !Array.isArray(lineup?.players) || !lineup.players.length) {
+    throw new Error(`highlight lineup not found for uid ${uidNumber} event ${safeEventId}`);
+  }
+
+  return {
+    success: true,
+    uid: uidNumber,
+    event: safeEventId,
+    lineup,
   };
 }
 
@@ -5207,6 +5233,33 @@ export default {
           );
         } catch (error) {
           const message = String(error?.message || error || "season summary failed");
+          const status = /not found|required/i.test(message) ? 404 : 500;
+          return jsonResponse(
+            { success: false, error: message },
+            status,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
+        }
+      }
+
+      if (path === "/api/season-summary-highlight-lineup") {
+        const uid = url.searchParams.get("uid") || url.searchParams.get("entry_id");
+        const event = url.searchParams.get("event") || url.searchParams.get("event_id");
+        if (!uid || !event) {
+          return jsonResponse(
+            { success: false, error: "uid and event are required" },
+            400,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
+        }
+        try {
+          return jsonResponse(
+            await buildSeasonHighlightLineupPayload(uid, event),
+            200,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
+        } catch (error) {
+          const message = String(error?.message || error || "highlight lineup failed");
           const status = /not found|required/i.test(message) ? 404 : 500;
           return jsonResponse(
             { success: false, error: message },
