@@ -4493,48 +4493,30 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
   ).values()];
   if (!chips.length) return [];
 
-  const picksByEvent = await Promise.all(chips.map(async (chip) => {
+  const records = [];
+  for (const chip of chips) {
     const eventId = Number(chip?.event || 0);
+    if (!eventId) continue;
+
     const picksRes = await fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 4);
-    if (!picksRes.ok) {
-      return { eventId, captainPick: null };
-    }
+    if (!picksRes.ok) continue;
+
     const picks = Array.isArray(picksRes.data?.picks) ? picksRes.data.picks : [];
     const captainPick = picks.find((pick) => pick?.is_captain || Number(pick?.multiplier || 1) > 1) || null;
-    return { eventId, captainPick };
-  }));
+    if (!captainPick) continue;
 
-  const liveEventIds = [...new Set(
-    picksByEvent
-      .filter((item) => item?.captainPick)
-      .map((item) => Number(item?.eventId || 0))
-      .filter((eventId) => eventId > 0)
-  )];
-
-  const liveCacheEntries = await Promise.all(liveEventIds.map(async (eventId) => {
     const liveRes = await fetchJsonSafe(`/event/${eventId}/live/`, 4);
+    if (!liveRes.ok) continue;
+
     const liveElements = {};
-    const rawElements = liveRes.ok ? liveRes.data?.elements : null;
+    const rawElements = liveRes.data?.elements || null;
     if (Array.isArray(rawElements)) {
       for (const item of rawElements) liveElements[item.id] = item;
     } else if (rawElements && typeof rawElements === "object") {
       for (const [key, value] of Object.entries(rawElements)) liveElements[Number(key)] = value;
     }
-    return [eventId, { ok: liveRes.ok, elements: liveElements }];
-  }));
-  const liveCache = Object.fromEntries(liveCacheEntries);
-
-  const records = [];
-  for (const item of picksByEvent) {
-    const eventId = Number(item?.eventId || 0);
-    const captainPick = item?.captainPick || null;
-    if (!eventId || !captainPick) continue;
 
     const elementId = Number(captainPick?.element || 0);
-    const liveEntry = liveCache[eventId] || {};
-    const liveElements = liveEntry?.elements || {};
-    if (!liveEntry?.ok) continue;
-
     const livePlayer = liveElements?.[elementId] || null;
     const rawLiveFantasy = Number(livePlayer?.stats?.total_points);
     let baseFantasyPoints = null;
