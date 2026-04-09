@@ -4485,6 +4485,53 @@ async function buildLongestHeldPlayerSummary(uidNumber, latestEventId, rowEventI
     );
 }
 
+async function buildSeasonCaptainRecord(uidNumber, chip, elements, eventMetaById, retries = 6) {
+  const eventId = Number(chip?.event || 0);
+  if (!eventId) return null;
+
+  const picksRes = await fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, retries);
+  if (!picksRes.ok) return null;
+
+  const picks = Array.isArray(picksRes.data?.picks) ? picksRes.data.picks : [];
+  const captainPick = picks.find((pick) => pick?.is_captain || Number(pick?.multiplier || 1) > 1) || null;
+  if (!captainPick) return null;
+
+  const liveRes = await fetchJsonSafe(`/event/${eventId}/live/`, retries);
+  if (!liveRes.ok) return null;
+
+  const liveElements = buildLiveElementsMap(liveRes.data);
+  const elementId = Number(captainPick?.element || 0);
+  const livePlayer = liveElements?.[elementId] || null;
+  const rawLiveFantasy = Number(livePlayer?.stats?.total_points);
+  let baseFantasyPoints = null;
+  if (Number.isFinite(rawLiveFantasy)) {
+    baseFantasyPoints = Number((rawLiveFantasy / 10).toFixed(1));
+  } else if (livePlayer?.stats) {
+    baseFantasyPoints = Number(getPlayerStats(elementId, liveElements, elements)?.fantasy || 0);
+  }
+  if (!Number.isFinite(baseFantasyPoints)) return null;
+
+  const rawMultiplier = Number(captainPick?.multiplier || 1);
+  const captainMultiplier = rawMultiplier > 1 ? rawMultiplier : (captainPick?.is_captain ? 2 : 1);
+  const fantasyPoints = Number(baseFantasyPoints || 0) * captainMultiplier;
+  const meta = eventMetaById?.[eventId] || {};
+  return {
+    event: eventId,
+    gw: Number(meta?.gw || 0) || null,
+    day: Number(meta?.day || 0) || null,
+    label: toGwDayLabel(meta?.gw, meta?.day),
+    element_id: elementId,
+    captain_name: elements[elementId]?.name || `#${elementId}`,
+    headshot_url: elements[elementId]?.headshot_url || null,
+    season_average_points: Number((Number(elements[elementId]?.points_per_game || 0) / 10).toFixed(1)),
+    base_points: Number(Number(baseFantasyPoints || 0).toFixed(1)),
+    captain_multiplier: captainMultiplier,
+    captain_points: Number(Number(fantasyPoints || 0).toFixed(1)),
+    minutes: Number(liveElements?.[elementId]?.stats?.minutes || 0) || 0,
+    ownership_percent: Number(elements[elementId]?.selected_by_percent || 0),
+  };
+}
+
 async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eventMetaById) {
   const chips = [...new Map(
     (captainEvents || [])
@@ -4493,62 +4540,27 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
   ).values()];
   if (!chips.length) return [];
 
-  const records = [];
+  const recordsByEvent = new Map();
+  const unresolved = [];
+
   for (const chip of chips) {
-    const eventId = Number(chip?.event || 0);
-    if (!eventId) continue;
-
-    const picksRes = await fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 4);
-    if (!picksRes.ok) continue;
-
-    const picks = Array.isArray(picksRes.data?.picks) ? picksRes.data.picks : [];
-    const captainPick = picks.find((pick) => pick?.is_captain || Number(pick?.multiplier || 1) > 1) || null;
-    if (!captainPick) continue;
-
-    const liveRes = await fetchJsonSafe(`/event/${eventId}/live/`, 4);
-    if (!liveRes.ok) continue;
-
-    const liveElements = {};
-    const rawElements = liveRes.data?.elements || null;
-    if (Array.isArray(rawElements)) {
-      for (const item of rawElements) liveElements[item.id] = item;
-    } else if (rawElements && typeof rawElements === "object") {
-      for (const [key, value] of Object.entries(rawElements)) liveElements[Number(key)] = value;
+    const record = await buildSeasonCaptainRecord(uidNumber, chip, elements, eventMetaById, 6);
+    if (record) {
+      recordsByEvent.set(Number(record?.event || 0), record);
+    } else {
+      unresolved.push(chip);
     }
-
-    const elementId = Number(captainPick?.element || 0);
-    const livePlayer = liveElements?.[elementId] || null;
-    const rawLiveFantasy = Number(livePlayer?.stats?.total_points);
-    let baseFantasyPoints = null;
-    if (Number.isFinite(rawLiveFantasy)) {
-      baseFantasyPoints = Number((rawLiveFantasy / 10).toFixed(1));
-    } else if (livePlayer?.stats) {
-      baseFantasyPoints = Number(getPlayerStats(elementId, liveElements, elements)?.fantasy || 0);
-    }
-    if (!Number.isFinite(baseFantasyPoints)) continue;
-
-    const rawMultiplier = Number(captainPick?.multiplier || 1);
-    const captainMultiplier = rawMultiplier > 1 ? rawMultiplier : (captainPick?.is_captain ? 2 : 1);
-    const fantasyPoints = Number(baseFantasyPoints || 0) * captainMultiplier;
-    const meta = eventMetaById?.[eventId] || {};
-    records.push({
-      event: eventId,
-      gw: Number(meta?.gw || 0) || null,
-      day: Number(meta?.day || 0) || null,
-      label: toGwDayLabel(meta?.gw, meta?.day),
-      element_id: elementId,
-      captain_name: elements[elementId]?.name || `#${elementId}`,
-      headshot_url: elements[elementId]?.headshot_url || null,
-      season_average_points: Number((Number(elements[elementId]?.points_per_game || 0) / 10).toFixed(1)),
-      base_points: Number(Number(baseFantasyPoints || 0).toFixed(1)),
-      captain_multiplier: captainMultiplier,
-      captain_points: Number(Number(fantasyPoints || 0).toFixed(1)),
-      minutes: Number(liveElements?.[elementId]?.stats?.minutes || 0) || 0,
-      ownership_percent: Number(elements[elementId]?.selected_by_percent || 0),
-    });
   }
 
-  return records.sort((a, b) =>
+  if (unresolved.length) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    for (const chip of unresolved) {
+      const record = await buildSeasonCaptainRecord(uidNumber, chip, elements, eventMetaById, 8);
+      if (record) recordsByEvent.set(Number(record?.event || 0), record);
+    }
+  }
+
+  return [...recordsByEvent.values()].sort((a, b) =>
     Number(a?.event || 0) - Number(b?.event || 0)
   );
 }
