@@ -59,6 +59,7 @@ export function buildEventMetaById(events) {
       gw: meta.gw,
       day: meta.day,
       name: item?.name || "",
+      deadline_time: item?.deadline_time || null,
     };
   }
   return map;

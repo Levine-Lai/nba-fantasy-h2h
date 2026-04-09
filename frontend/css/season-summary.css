@@ -247,6 +247,24 @@
     scrollbar-width: thin;
 }
 
+.season-summary-page-captain-moments {
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.season-summary-page-captain-moments .season-summary-story-main {
+    justify-content: flex-start;
+    align-items: stretch;
+    height: auto;
+    min-height: 100%;
+}
+
+.season-summary-page-captain-moments .season-summary-story-shell {
+    width: min(100%, 980px);
+    padding-bottom: 68px;
+}
+
 .season-summary-page-highlights .season-summary-story-main {
     justify-content: flex-start;
     align-items: stretch;
@@ -344,7 +362,9 @@
 .season-summary-cover-panel {
     position: relative;
     display: flex;
+    flex-direction: column;
     align-items: stretch;
+    gap: 14px;
     min-height: 100%;
     padding: 14px;
     border-radius: 34px;
@@ -359,7 +379,7 @@
 .season-summary-cover-chart {
     position: relative;
     flex: 1 1 auto;
-    min-height: 100%;
+    min-height: 0;
     border-radius: 28px;
     background:
         radial-gradient(circle at top right, rgba(255, 255, 255, 0.74), transparent 26%),
@@ -371,6 +391,14 @@
     display: block;
     width: 100%;
     height: 100%;
+}
+
+.season-summary-cover-chart-note {
+    margin: 0;
+    font-size: clamp(14px, 1.28vw, 17px);
+    line-height: 1.65;
+    font-weight: 700;
+    color: #2f4662;
 }
 
 .season-summary-cover-grid line {
@@ -452,7 +480,7 @@
 }
 
 .season-summary-story-cards-transfer {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .season-summary-story-card {
@@ -573,6 +601,49 @@
 .season-summary-highlight-stories {
     display: grid;
     gap: 20px;
+}
+
+.season-summary-captain-moments {
+    display: grid;
+    gap: 22px;
+}
+
+.season-summary-captain-moment {
+    display: grid;
+    gap: 12px;
+}
+
+.season-summary-captain-moment-portrait {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.season-summary-captain-moment-headshot {
+    width: min(100%, 122px);
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 999px;
+    display: block;
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.14);
+}
+
+.season-summary-captain-moment-headshot-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: min(100%, 122px);
+    aspect-ratio: 1 / 1;
+    border-radius: 999px;
+    padding: 10px;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.3;
+    font-weight: 800;
+    color: #23364d;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(238, 246, 255, 0.97));
+    border: 1px solid #d5e4f4;
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1);
 }
 
 .season-summary-highlight-story {
@@ -914,7 +985,7 @@
     }
 
     .season-summary-cover-panel {
-        min-height: 300px;
+        min-height: 332px;
     }
 }
 
@@ -1001,13 +1072,19 @@
     }
 
     .season-summary-cover-panel {
-        min-height: 220px;
+        min-height: 248px;
         padding: 8px;
         border-radius: 24px;
+        gap: 10px;
     }
 
     .season-summary-cover-chart {
         border-radius: 18px;
+    }
+
+    .season-summary-cover-chart-note {
+        font-size: 12px;
+        line-height: 1.55;
     }
 
     .season-summary-cover-tick {
@@ -1019,6 +1096,10 @@
     }
 
     .season-summary-page-highlights .season-summary-story-shell {
+        padding-bottom: 64px;
+    }
+
+    .season-summary-page-captain-moments .season-summary-story-shell {
         padding-bottom: 64px;
     }
 
@@ -1051,6 +1132,10 @@
 
     .season-summary-highlight-stories {
         gap: 14px;
+    }
+
+    .season-summary-captain-moments {
+        gap: 16px;
     }
 
     .season-summary-highlight-cards {
@@ -1107,6 +1192,11 @@
         width: 54px;
         height: 54px;
         font-size: 20px;
+    }
+
+    .season-summary-captain-moment-headshot,
+    .season-summary-captain-moment-headshot-fallback {
+        width: min(100%, 92px);
     }
 
     .season-summary-highlight-card-bar {

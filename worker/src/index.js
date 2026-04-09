@@ -4182,6 +4182,22 @@ function formatBeijingDateTimeLabel(value = Date.now()) {
   return `${datePart} ${timePart}`;
 }
 
+function formatBeijingMonthDayLabel(value = Date.now()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const month = Number(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+  }).format(date));
+  const day = Number(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    day: "2-digit",
+  }).format(date));
+  if (!Number.isFinite(month) || !Number.isFinite(day) || month <= 0 || day <= 0) {
+    return "";
+  }
+  return `${month}月${day}日`;
+}
+
 function formatFantasyScore(value) {
   return Number(Math.round(Number(value || 0) / 10) || 0);
 }
@@ -4364,6 +4380,18 @@ function getBeijingHourFromIso(isoValue) {
   return Number.isFinite(hour) ? hour : null;
 }
 
+function formatBeijingClockFromIso(isoValue) {
+  if (!isoValue) return "";
+  const date = new Date(isoValue);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date).replace(/^0/, "");
+}
+
 function buildTransferPreferenceSummary(transfers) {
   const dayCounter = new Map();
   const slotCounter = new Map();
@@ -4403,6 +4431,18 @@ function buildTransferPreferenceSummary(transfers) {
   const favoriteSlotEntry = [...slotCounter.entries()]
     .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0) || Number(a[0] || 0) - Number(b[0] || 0))[0] || null;
   const favoriteSlotMeta = favoriteSlotEntry ? buildTimeSlotMeta(favoriteSlotEntry[0]) : null;
+  const favoriteSlotExample = favoriteSlotEntry
+    ? [...(transfers || [])]
+      .filter((transfer) => {
+        const slotMeta = buildTimeSlotMeta(getBeijingHourFromIso(transfer?.time));
+        return slotMeta && Number(slotMeta.start_hour) === Number(favoriteSlotEntry[0]);
+      })
+      .sort((a, b) =>
+        String(b?.time || "").localeCompare(String(a?.time || "")) ||
+        Number(b?.event || 0) - Number(a?.event || 0) ||
+        Number(b?.index || 0) - Number(a?.index || 0)
+      )[0] || null
+    : null;
 
   return {
     day_distribution: dayDistribution,
@@ -4417,6 +4457,10 @@ function buildTransferPreferenceSummary(transfers) {
       label: favoriteSlotMeta?.label || "",
       full_label: favoriteSlotMeta?.full_label || "",
       count: Number(favoriteSlotEntry[1] || 0),
+      example_transfer: favoriteSlotExample ? {
+        time_label: formatBeijingClockFromIso(favoriteSlotExample?.time),
+        player_in_name: String(favoriteSlotExample?.in_name || `#${favoriteSlotExample?.element_in || ""}`).trim(),
+      } : null,
     } : null,
   };
 }
@@ -4502,6 +4546,7 @@ async function buildSeasonCaptainRecord(uidNumber, chip, elements, eventMetaById
   const liveElements = buildLiveElementsMap(liveRes.data);
   const elementId = Number(captainPick?.element || 0);
   const livePlayer = liveElements?.[elementId] || null;
+  const liveStats = livePlayer?.stats || {};
   const rawLiveFantasy = Number(livePlayer?.stats?.total_points);
   let baseFantasyPoints = null;
   if (Number.isFinite(rawLiveFantasy)) {
@@ -4515,11 +4560,21 @@ async function buildSeasonCaptainRecord(uidNumber, chip, elements, eventMetaById
   const captainMultiplier = rawMultiplier > 1 ? rawMultiplier : (captainPick?.is_captain ? 2 : 1);
   const fantasyPoints = Number(baseFantasyPoints || 0) * captainMultiplier;
   const meta = eventMetaById?.[eventId] || {};
+  const pointsScored = Number(liveStats?.points_scored || 0) || 0;
+  const rebounds = Number(liveStats?.rebounds || 0) || 0;
+  const assists = Number(liveStats?.assists || 0) || 0;
+  const steals = Number(liveStats?.steals || 0) || 0;
+  const blocks = Number(liveStats?.blocks || 0) || 0;
+  const minutes = Number(liveStats?.minutes || 0) || 0;
+  const didPlay = minutes > 0 || pointsScored > 0 || rebounds > 0 || assists > 0 || steals > 0 || blocks > 0;
+  const dateLabel = formatBeijingMonthDayLabel(meta?.deadline_time || null);
+
   return {
     event: eventId,
     gw: Number(meta?.gw || 0) || null,
     day: Number(meta?.day || 0) || null,
     label: toGwDayLabel(meta?.gw, meta?.day),
+    date_label: dateLabel || null,
     element_id: elementId,
     captain_name: elements[elementId]?.name || `#${elementId}`,
     headshot_url: elements[elementId]?.headshot_url || null,
@@ -4527,7 +4582,13 @@ async function buildSeasonCaptainRecord(uidNumber, chip, elements, eventMetaById
     base_points: Number(Number(baseFantasyPoints || 0).toFixed(1)),
     captain_multiplier: captainMultiplier,
     captain_points: Number(Number(fantasyPoints || 0).toFixed(1)),
-    minutes: Number(liveElements?.[elementId]?.stats?.minutes || 0) || 0,
+    minutes,
+    points_scored: pointsScored,
+    rebounds,
+    assists,
+    steals,
+    blocks,
+    did_play: didPlay,
     ownership_percent: Number(elements[elementId]?.selected_by_percent || 0),
   };
 }
@@ -5040,6 +5101,10 @@ async function buildSeasonSummaryPayload(uidInput) {
           label: transferPreferences.favorite_time_slot.label || "",
           full_label: transferPreferences.favorite_time_slot.full_label || "",
           count: Number(transferPreferences.favorite_time_slot.count || 0),
+          example_transfer: transferPreferences.favorite_time_slot.example_transfer ? {
+            time_label: transferPreferences.favorite_time_slot.example_transfer.time_label || "",
+            player_in_name: transferPreferences.favorite_time_slot.example_transfer.player_in_name || "",
+          } : null,
         } : null,
       },
       day_distribution: transferPreferences.day_distribution || [],
@@ -5090,17 +5155,39 @@ async function buildSeasonSummaryPayload(uidInput) {
           is_jokic: /Jokic$/i.test(String(favoriteCaptainRecord?.captain_name || elements[Number(favoriteCaptain[0] || 0)]?.name || "")),
         } : null,
         best: bestCaptain ? {
+          event: Number(bestCaptain.event || 0) || null,
+          gw: Number(bestCaptain.gw || 0) || null,
+          day: Number(bestCaptain.day || 0) || null,
           label: bestCaptain.label || "",
+          date_label: bestCaptain.date_label || "",
           captain_name: bestCaptain.captain_name || "",
           captain_points: Number(bestCaptain.captain_points || 0),
           base_points: Number(bestCaptain.base_points || 0),
+          minutes: Number(bestCaptain.minutes || 0),
+          points_scored: Number(bestCaptain.points_scored || 0),
+          rebounds: Number(bestCaptain.rebounds || 0),
+          assists: Number(bestCaptain.assists || 0),
+          steals: Number(bestCaptain.steals || 0),
+          blocks: Number(bestCaptain.blocks || 0),
+          did_play: !!bestCaptain.did_play,
           headshot_url: bestCaptain.headshot_url || null,
         } : null,
         worst: worstCaptain ? {
+          event: Number(worstCaptain.event || 0) || null,
+          gw: Number(worstCaptain.gw || 0) || null,
+          day: Number(worstCaptain.day || 0) || null,
           label: worstCaptain.label || "",
+          date_label: worstCaptain.date_label || "",
           captain_name: worstCaptain.captain_name || "",
           captain_points: Number(worstCaptain.captain_points || 0),
           base_points: Number(worstCaptain.base_points || 0),
+          minutes: Number(worstCaptain.minutes || 0),
+          points_scored: Number(worstCaptain.points_scored || 0),
+          rebounds: Number(worstCaptain.rebounds || 0),
+          assists: Number(worstCaptain.assists || 0),
+          steals: Number(worstCaptain.steals || 0),
+          blocks: Number(worstCaptain.blocks || 0),
+          did_play: !!worstCaptain.did_play,
           headshot_url: worstCaptain.headshot_url || null,
         } : null,
         zero_count: zeroCaptainCount,
