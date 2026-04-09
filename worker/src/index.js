@@ -4495,7 +4495,7 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
 
   const picksByEvent = await Promise.all(chips.map(async (chip) => {
     const eventId = Number(chip?.event || 0);
-    const picksRes = await fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 1);
+    const picksRes = await fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 4);
     if (!picksRes.ok) {
       return { eventId, captainPick: null };
     }
@@ -4512,7 +4512,7 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
   )];
 
   const liveCacheEntries = await Promise.all(liveEventIds.map(async (eventId) => {
-    const liveRes = await fetchJsonSafe(`/event/${eventId}/live/`, 1);
+    const liveRes = await fetchJsonSafe(`/event/${eventId}/live/`, 4);
     const liveElements = {};
     const rawElements = liveRes.ok ? liveRes.data?.elements : null;
     if (Array.isArray(rawElements)) {
@@ -4520,7 +4520,7 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
     } else if (rawElements && typeof rawElements === "object") {
       for (const [key, value] of Object.entries(rawElements)) liveElements[Number(key)] = value;
     }
-    return [eventId, liveElements];
+    return [eventId, { ok: liveRes.ok, elements: liveElements }];
   }));
   const liveCache = Object.fromEntries(liveCacheEntries);
 
@@ -4531,11 +4531,20 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
     if (!eventId || !captainPick) continue;
 
     const elementId = Number(captainPick?.element || 0);
-    const liveElements = liveCache[eventId] || {};
-    const rawLiveFantasy = Number(liveElements?.[elementId]?.stats?.total_points);
-    const baseFantasyPoints = Number.isFinite(rawLiveFantasy)
-      ? Number((rawLiveFantasy / 10).toFixed(1))
-      : Number(getPlayerStats(elementId, liveElements, elements)?.fantasy || 0);
+    const liveEntry = liveCache[eventId] || {};
+    const liveElements = liveEntry?.elements || {};
+    if (!liveEntry?.ok) continue;
+
+    const livePlayer = liveElements?.[elementId] || null;
+    const rawLiveFantasy = Number(livePlayer?.stats?.total_points);
+    let baseFantasyPoints = null;
+    if (Number.isFinite(rawLiveFantasy)) {
+      baseFantasyPoints = Number((rawLiveFantasy / 10).toFixed(1));
+    } else if (livePlayer?.stats) {
+      baseFantasyPoints = Number(getPlayerStats(elementId, liveElements, elements)?.fantasy || 0);
+    }
+    if (!Number.isFinite(baseFantasyPoints)) continue;
+
     const rawMultiplier = Number(captainPick?.multiplier || 1);
     const captainMultiplier = rawMultiplier > 1 ? rawMultiplier : (captainPick?.is_captain ? 2 : 1);
     const fantasyPoints = Number(baseFantasyPoints || 0) * captainMultiplier;
