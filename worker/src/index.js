@@ -4676,45 +4676,56 @@ async function buildSeasonBenchSummary(uidNumber, rows, bootstrap, elements, eve
 
   const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
   let bestSingle = null;
+  const batchSize = 4;
 
-  for (const candidate of candidateRows) {
-    if (bestSingle && Number(bestSingle?.points || 0) >= Number(candidate?.benchTotal || 0)) {
+  for (let startIndex = 0; startIndex < candidateRows.length; startIndex += batchSize) {
+    const nextCandidate = candidateRows[startIndex];
+    if (bestSingle && Number(bestSingle?.points || 0) >= Number(nextCandidate?.benchTotal || 0)) {
       break;
     }
 
-    const eventId = Number(candidate?.event || 0);
-    const [picksRes, liveRes] = await Promise.all([
-      fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 2),
-      fetchJsonSafe(`/event/${eventId}/live/`, 2),
-    ]);
+    const batch = candidateRows.slice(startIndex, startIndex + batchSize);
+    const batchResults = await Promise.all(
+      batch.map(async (candidate) => {
+        const eventId = Number(candidate?.event || 0);
+        const [picksRes, liveRes] = await Promise.all([
+          fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 2),
+          fetchJsonSafe(`/event/${eventId}/live/`, 2),
+        ]);
 
-    if (!picksRes.ok || !liveRes.ok) continue;
+        if (!picksRes.ok || !liveRes.ok) return null;
 
-    const liveElements = buildLiveElementsMap(liveRes.data);
-    const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
-    const benchPlayers = picks
-      .filter((pick) => Number(pick?.lineup_position || 0) > 5)
-      .sort((a, b) =>
-        Number(b?.base_points || 0) - Number(a?.base_points || 0) ||
-        Number(a?.lineup_position || 0) - Number(b?.lineup_position || 0)
-      );
+        const liveElements = buildLiveElementsMap(liveRes.data);
+        const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
+        const benchPlayers = picks
+          .filter((pick) => Number(pick?.lineup_position || 0) > 5)
+          .sort((a, b) =>
+            Number(b?.base_points || 0) - Number(a?.base_points || 0) ||
+            Number(a?.lineup_position || 0) - Number(b?.lineup_position || 0)
+          );
 
-    const topBench = benchPlayers[0] || null;
-    if (!topBench) continue;
+        const topBench = benchPlayers[0] || null;
+        if (!topBench) return null;
 
-    const benchPoints = Number(topBench?.base_points || 0);
-    if (!bestSingle || benchPoints > Number(bestSingle?.points || 0)) {
-      const meta = eventMetaById?.[eventId] || {};
-      bestSingle = {
-        event: eventId,
-        gw: Number(meta?.gw || 0) || null,
-        day: Number(meta?.day || 0) || null,
-        label: toGwDayLabel(meta?.gw, meta?.day),
-        element_id: Number(topBench?.element_id || 0) || null,
-        player_name: String(topBench?.name || `#${topBench?.element_id || ""}`).trim(),
-        headshot_url: topBench?.headshot_url || elements[Number(topBench?.element_id || 0)]?.headshot_url || null,
-        points: benchPoints,
-      };
+        const meta = eventMetaById?.[eventId] || {};
+        return {
+          event: eventId,
+          gw: Number(meta?.gw || 0) || null,
+          day: Number(meta?.day || 0) || null,
+          label: toGwDayLabel(meta?.gw, meta?.day),
+          element_id: Number(topBench?.element_id || 0) || null,
+          player_name: String(topBench?.name || `#${topBench?.element_id || ""}`).trim(),
+          headshot_url: topBench?.headshot_url || elements[Number(topBench?.element_id || 0)]?.headshot_url || null,
+          points: Number(topBench?.base_points || 0),
+        };
+      })
+    );
+
+    for (const result of batchResults) {
+      if (!result) continue;
+      if (!bestSingle || Number(result?.points || 0) > Number(bestSingle?.points || 0)) {
+        bestSingle = result;
+      }
     }
   }
 
