@@ -422,7 +422,15 @@
 }
 
 .season-summary-story-cards-captain {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.season-summary-story-cards-captain .season-summary-story-card-value {
+    font-size: clamp(36px, 4vw, 58px);
+}
+
+.season-summary-story-cards-captain .season-summary-story-card-label {
+    font-size: 17px;
 }
 
 .season-summary-story-cards-transfer {

@@ -579,53 +579,47 @@
         const hasCaptainDetails = detailComplete && resolvedCount > 0;
         const totalPoints = Number(summary.total_points || 0);
         const averagePoints = Number(summary.average_points || 0);
-        const leaguePercentile = Number(summary.league_percentile || 0);
         const favoriteCaptain = summary.favorite_captain || null;
         const bestCaptain = summary.best || null;
         const worstCaptain = summary.worst || null;
         const lowestOwnership = summary.lowest_ownership || null;
         const zeroCount = Number(summary.zero_count || 0);
-        const favoriteName = hasCaptainDetails
-            ? String(favoriteCaptain?.captain_name || "暂无")
-            : (useCount > 0 ? "待补全" : "暂无");
-        const favoriteAvg = Number(favoriteCaptain?.average_points || 0);
-        const favoriteSeasonCaptainAvg = Number(favoriteCaptain?.season_average_captain_points || 0);
-        const averageDelta = Number((favoriteAvg - favoriteSeasonCaptainAvg).toFixed(1));
+        const favoriteAvgBase = Number(favoriteCaptain?.average_base_points || 0);
+        const favoriteSeasonAverage = Number(favoriteCaptain?.season_average_points || 0);
+        const averageDelta = Number((favoriteAvgBase - favoriteSeasonAverage).toFixed(1));
         const favoriteIsJokic = !!favoriteCaptain?.is_jokic;
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
         const countNote = useCount >= totalWeeks
             ? "一次都没忘，太能操作了！"
-            : (useCount >= Math.max(0, totalWeeks - 2) ? "咦，你还留了一手" : "有时候留白也是策略的一部分");
-        const lowestOwnershipNote = lowestOwnership?.label
-            ? `${lowestOwnership.label} · ${formatSummaryDecimal(lowestOwnership?.ownership_percent || 0)}%`
-            : "暂时还没有足够记录";
+            : (useCount >= Math.max(0, totalWeeks - 2) ? "咦，你还留了一手" : "也给自己留了一点观察空间");
 
         const cards = [
             { label: "Captain 次数", value: `${formatSummaryNumber(useCount)}/${formatSummaryNumber(totalWeeks)}`, note: countNote },
             {
+                label: "队长累积得分",
+                value: hasCaptainDetails ? `${formatSummaryNumber(totalPoints)}分` : "--",
+                note: hasCaptainDetails ? "按真实 Captain x2 后得分累计" : "Captain 详情待补全",
+            },
+            {
                 label: "队长平均得分",
                 value: hasCaptainDetails ? `${formatSummaryDecimal(averagePoints)}分` : "--",
-                note: hasCaptainDetails
-                    ? (leaguePercentile ? `超过这个联盟${formatSummaryNumber(leaguePercentile)}%的玩家` : `累计 ${formatSummaryNumber(totalPoints)} 分`)
-                    : "Captain 详情待补全",
+                note: hasCaptainDetails ? "按 x2 后平均分计算" : "Captain 详情待补全",
             },
-            { label: "最常选择的队长", value: favoriteName, note: favoriteCaptain?.count ? `一共选了 ${formatSummaryNumber(favoriteCaptain.count)} 次` : "还没有固定答案" },
-            { label: "最低持有率 Captain", value: lowestOwnership?.captain_name || "暂无", note: lowestOwnership?.label || lowestOwnershipNote },
         ];
 
-        let paragraphOne = `在这个没有 VC 的游戏中队长的选择就显得尤为关键，这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，累计拿到了${mark(formatSummaryNumber(totalPoints))}分，平均每个队长都能拿到${mark(formatSummaryDecimal(averagePoints))}分，${leaguePercentile ? `超过了这个联盟${mark(formatSummaryNumber(leaguePercentile))}%的玩家！` : "每一次落子都决定着这一周的上限。"}`;
+        let paragraphOne = `在这个没有 VC 的游戏中队长的选择就显得尤为关键，这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，累计拿到了${mark(formatSummaryNumber(totalPoints))}分，平均每个队长都能拿到${mark(formatSummaryDecimal(averagePoints))}分。每一次落子都在决定这一周的上限。`;
         if (useCount > 0 && !hasCaptainDetails) {
             paragraphOne = `这个赛季你一共开了${mark(formatSummaryNumber(useCount))}次 Captain，次数已经按 /entry/{entry_id}/history/ 里的 phcapt 记录对齐了；不过这次生成时，官方 Captain 详情接口只成功解析了${mark(formatSummaryNumber(resolvedCount))}次，所以具体得分我先不乱写。`;
         }
 
-        let paragraphTwo = "这个赛季你的 Captain 选择并没有只跟着模板走，而是慢慢形成了自己熟悉的偏好。";
+        let paragraphTwo = "这个赛季你的 Captain 选择并不是随手一按，而是慢慢形成了自己更熟悉的偏好。";
         if (useCount > 0 && !hasCaptainDetails) {
-            paragraphTwo = "最常选择的队长、平均队长分数和高低光时刻，都依赖官方的 picks/live 详情接口；这次它没有完整返回，我先保留次数，不拿半截数据误导你。";
+            paragraphTwo = "最常选择的队长、平均基础分和高低光时刻，都依赖官方的 picks/live 详情接口；这次它没有完整返回，我先保留次数，不拿半截数据误导你。";
         } else if (favoriteCaptain?.captain_name) {
             if (favoriteIsJokic) {
-                paragraphTwo = `${renderInlinePlayerMention(favoriteCaptain)}是你经常选择的队长，他也是很多人青睐的队长人选，跟着主流走永远不会错。你每次选他当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvg))}分，比他这个赛季的平均队长分数${averageDelta >= 0 ? "高" : "低"}${mark(formatSummaryDecimal(Math.abs(averageDelta)))}分，${averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这个塞尔维亚大胖子。" : "看来你选队长的时机还可以再打磨一下。"}`;
+                paragraphTwo = `${renderInlinePlayerMention(favoriteCaptain)}是你经常选择的队长，他也是很多人青睐的队长人选，跟着主流走永远不会错。你每次选他当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvgBase))}分，比他这个赛季的平均队长分数${averageDelta >= 0 ? "高" : "低"}${mark(formatSummaryDecimal(Math.abs(averageDelta)))}分，${averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这个塞尔维亚大胖子。" : "看来你选队长的时机还可以再打磨一下。"} `;
             } else {
-                paragraphTwo = `什么？！你最常选的队长居然不是约基奇？看来你的品味非常之独特，保持特立独行永远是范特西游戏中最酷的精神，继续保持！你每次选${renderInlinePlayerMention(favoriteCaptain)}当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvg))}分，比他这个赛季的平均队长分数${averageDelta >= 0 ? "高" : "低"}${mark(formatSummaryDecimal(Math.abs(averageDelta)))}分，${averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这名球员。" : "看来你选队长的时机还可以再打磨一下。"}`;
+                paragraphTwo = `什么？！你最常选的队长居然不是约基奇？看来你的品味非常之独特，保持特立独行永远是范特西游戏中最酷的精神，继续保持！你每次选${renderInlinePlayerMention(favoriteCaptain)}当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvgBase))}分，比他这个赛季的平均队长分数${averageDelta >= 0 ? "高" : "低"}${mark(formatSummaryDecimal(Math.abs(averageDelta)))}分，${averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这名球员。" : "看来你选队长的时机还可以再打磨一下。"} `;
             }
         }
 
@@ -637,9 +631,9 @@
 
         let paragraphThree = "等 Captain 记录再丰富一点，这一页会更像属于你自己的队长回忆录。";
         if (useCount > 0 && !hasCaptainDetails) {
-            paragraphThree = "等官方 Captain 详情接口稳定一点，这一页就会恢复最常队长、平均得分，以及那次最爽和最痛的 Captain 记录。";
+            paragraphThree = "等官方 Captain 详情接口稳定一点，这一页就会恢复最常队长、平均基础分，以及那次最值和最伤的 Captain 记录。";
         } else if (bestCaptain?.captain_name && worstCaptain?.captain_name) {
-            paragraphThree = `最高分的一次队长来自${mark(bestCaptain.label || "")} · ${renderInlinePlayerMention(bestCaptain)} · ${mark(bestCaptainPoints)}；而最让人难过的那次，则是${mark(worstCaptain.label || "")} · ${renderInlinePlayerMention(worstCaptain)} · ${mark(worstCaptainPoints)}。整个赛季你一共 c 到过${mark(formatSummaryNumber(zeroCount))}次 0 分，${zeroCount > 0 ? "哎，运气也是这个游戏的一部分，希望你不要灰心，一个赛季总有起起伏伏。" : "不得不承认你真的太会选队长了。"}`;
+            paragraphThree = `最高分的一次队长来自${mark(bestCaptain.label || "")} · ${renderInlinePlayerMention(bestCaptain)} · ${mark(bestCaptainPoints)}；而最让人难过的那次，则是${mark(worstCaptain.label || "")} · ${renderInlinePlayerMention(worstCaptain)} · ${mark(worstCaptainPoints)}。整个赛季你一共 c 到过${mark(formatSummaryNumber(zeroCount))}次 0 分，${zeroCount > 0 ? "哎，运气也是这个游戏的一部分，希望你不要灰心，一个赛季总有起起伏伏。" : "不得不承认你真的太会选队长了。"} `;
         }
 
         let paragraphFour = "这个赛季你最像 DIFF 大师的那一次，还在等下一版数据把它完整抓出来。";

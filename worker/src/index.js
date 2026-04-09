@@ -4536,7 +4536,9 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
     const baseFantasyPoints = Number.isFinite(rawLiveFantasy)
       ? Number((rawLiveFantasy / 10).toFixed(1))
       : Number(getPlayerStats(elementId, liveElements, elements)?.fantasy || 0);
-    const fantasyPoints = Number(baseFantasyPoints || 0) * Number(captainPick?.multiplier || 1);
+    const rawMultiplier = Number(captainPick?.multiplier || 1);
+    const captainMultiplier = rawMultiplier > 1 ? rawMultiplier : (captainPick?.is_captain ? 2 : 1);
+    const fantasyPoints = Number(baseFantasyPoints || 0) * captainMultiplier;
     const meta = eventMetaById?.[eventId] || {};
     records.push({
       event: eventId,
@@ -4546,8 +4548,11 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
       element_id: elementId,
       captain_name: elements[elementId]?.name || `#${elementId}`,
       headshot_url: elements[elementId]?.headshot_url || null,
-      season_average_points: Number(elements[elementId]?.points_per_game || 0) / 10,
-      captain_points: Math.round(fantasyPoints),
+      season_average_points: Number((Number(elements[elementId]?.points_per_game || 0) / 10).toFixed(1)),
+      base_points: Number(Number(baseFantasyPoints || 0).toFixed(1)),
+      captain_multiplier: captainMultiplier,
+      captain_points: Number(Number(fantasyPoints || 0).toFixed(1)),
+      minutes: Number(liveElements?.[elementId]?.stats?.minutes || 0) || 0,
       ownership_percent: Number(elements[elementId]?.selected_by_percent || 0),
     });
   }
@@ -4791,6 +4796,9 @@ async function buildSeasonSummaryPayload(uidInput) {
   const favoriteCaptainAverage = favoriteCaptainRecords.length
     ? favoriteCaptainRecords.reduce((sum, item) => sum + Number(item?.captain_points || 0), 0) / favoriteCaptainRecords.length
     : 0;
+  const favoriteCaptainBaseAverage = favoriteCaptainRecords.length
+    ? favoriteCaptainRecords.reduce((sum, item) => sum + Number(item?.base_points || 0), 0) / favoriteCaptainRecords.length
+    : 0;
   const favoriteCaptainSeasonAverage = Number(favoriteCaptainRecord?.season_average_points || 0);
   const bestCaptain = [...captainRecords].sort((a, b) => Number(b?.captain_points || 0) - Number(a?.captain_points || 0))[0] || null;
   const worstCaptain = [...captainRecords].sort((a, b) => Number(a?.captain_points || 0) - Number(b?.captain_points || 0))[0] || null;
@@ -5024,6 +5032,7 @@ async function buildSeasonSummaryPayload(uidInput) {
           captain_name: favoriteCaptainRecord?.captain_name || String(elements[Number(favoriteCaptain[0] || 0)]?.name || ""),
           count: Number(favoriteCaptain[1] || 0),
           average_points: Number(favoriteCaptainAverage.toFixed(1)),
+          average_base_points: Number(favoriteCaptainBaseAverage.toFixed(1)),
           season_average_points: Number(favoriteCaptainSeasonAverage || 0),
           season_average_captain_points: Number((favoriteCaptainSeasonAverage * 2).toFixed(1)),
           headshot_url: favoriteCaptainRecord?.headshot_url || null,
@@ -5034,12 +5043,14 @@ async function buildSeasonSummaryPayload(uidInput) {
           label: bestCaptain.label || "",
           captain_name: bestCaptain.captain_name || "",
           captain_points: Number(bestCaptain.captain_points || 0),
+          base_points: Number(bestCaptain.base_points || 0),
           headshot_url: bestCaptain.headshot_url || null,
         } : null,
         worst: worstCaptain ? {
           label: worstCaptain.label || "",
           captain_name: worstCaptain.captain_name || "",
           captain_points: Number(worstCaptain.captain_points || 0),
+          base_points: Number(worstCaptain.base_points || 0),
           headshot_url: worstCaptain.headshot_url || null,
         } : null,
         zero_count: zeroCaptainCount,
@@ -5054,10 +5065,9 @@ async function buildSeasonSummaryPayload(uidInput) {
         } : null,
       },
       cards: [
-        ["Captain 次数", formatDisplayNumber(captainUseCount), "严格按 /entry/{id}/history/ 里的 phcapt 次数统计"],
-        ["队长总得分", formatDisplayNumber(captainTotalPoints), "已按当日 Captain 球员真实 fantasy 分回算"],
-        ["最爱 Captain", favoriteCaptain ? favoriteCaptain[0] : "暂无", favoriteCaptain ? `一共选了 ${favoriteCaptain[1]} 次` : "暂时还没有 Captain 记录"],
-        ["最低持有率 Captain", lowestOwnershipCaptain ? `${lowestOwnershipCaptain.label}` : "暂无", lowestOwnershipCaptain ? `${formatDisplayNumber(lowestOwnershipCaptain.ownership_percent)}% 持有率` : "暂时还没有足够记录"],
+        ["Captain 次数", `${formatDisplayNumber(captainUseCount)}/${formatDisplayNumber(25)}`, "严格按 /entry/{id}/history/ 里的 phcapt 次数统计"],
+        ["队长累积得分", formatDisplayNumber(captainTotalPoints), "已按当日 Captain 球员 x2 后真实 fantasy 分回算"],
+        ["队长平均得分", formatDisplayNumber(Number(captainAveragePoints.toFixed(1))), "按 x2 后得分求均值"],
       ],
       rows: [
         ["最高队长", bestCaptain ? `${bestCaptain.label} · ${bestCaptain.captain_name} · ${formatDisplayNumber(bestCaptain.captain_points)} 分` : "暂无 Captain 记录"],
