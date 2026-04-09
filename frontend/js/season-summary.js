@@ -410,37 +410,101 @@
         `;
     }
 
+    function getHighlightRoleTheme(positionType) {
+        if (Number(positionType || 0) === 2) {
+            return {
+                accentSolid: "#ec2e6b",
+                accentGradient: "linear-gradient(90deg, #cf0c2b 0%, #f02f8f 100%)",
+                fallbackGradient: "linear-gradient(135deg, #c40f2e 0%, #f13f93 100%)",
+            };
+        }
+        return {
+            accentSolid: "#2c58bf",
+            accentGradient: "linear-gradient(90deg, #2b4f9b 0%, #3565c9 100%)",
+            fallbackGradient: "linear-gradient(135deg, #1f3f86 0%, #4a79d8 100%)",
+        };
+    }
+
+    function getHighlightDisplayName(player) {
+        const safeName = String(player?.display_name || getStoryPlayerName(player) || "PLAYER").trim();
+        return safeName.toUpperCase();
+    }
+
+    function getHighlightMonogram(name) {
+        const letters = String(name || "").replace(/[^A-Z]/g, "");
+        return (letters.slice(0, 2) || "NBA").toUpperCase();
+    }
+
     function renderHighlightPlayerCards(snapshot) {
         const players = Array.isArray(snapshot?.players) ? snapshot.players : [];
         if (!players.length) return "";
 
+        const buildCard = (player) => {
+            const safeName = getHighlightDisplayName(player);
+            const safePoints = formatSummaryNumber(player?.points || 0);
+            const safeHeadshot = String(player?.headshot_url || "").trim();
+            const safeLogo = String(player?.team_logo_url || "").trim();
+            const safeTeamShort = String(player?.team_short || "").trim();
+            const roleTheme = getHighlightRoleTheme(player?.position_type);
+            const scoreClass = String(safePoints).length >= 3 ? " season-summary-highlight-card-score-wide" : "";
+            const stateClasses = [
+                "season-summary-highlight-card",
+                !safeLogo ? "is-logo-fallback" : "",
+                !safeHeadshot ? "is-headshot-fallback" : "",
+            ].filter(Boolean).join(" ");
+            const style = [
+                `--season-highlight-team-color:${String(player?.team_color || "#17408b").trim() || "#17408b"}`,
+                `--season-highlight-accent-solid:${roleTheme.accentSolid}`,
+                `--season-highlight-accent-gradient:${roleTheme.accentGradient}`,
+                `--season-highlight-fallback-gradient:${roleTheme.fallbackGradient}`,
+            ].join(";");
+
+            return `
+                <div class="season-summary-highlight-card-shell">
+                    <article class="${stateClasses}" style="${escapeHtml(style)}">
+                        <div class="season-summary-highlight-card-top">
+                            <div class="season-summary-highlight-card-logo-wrap" aria-hidden="true">
+                                ${safeLogo
+                                    ? `<img class="season-summary-highlight-card-logo" src="${escapeHtml(safeLogo)}" alt="" loading="lazy" decoding="async" onerror="const card=this.closest('.season-summary-highlight-card'); if(card){ card.classList.add('is-logo-fallback'); } this.remove();">`
+                                    : ""}
+                                <span class="season-summary-highlight-card-logo-fallback">${escapeHtml(safeTeamShort || "NBA")}</span>
+                            </div>
+                            <div class="season-summary-highlight-card-team">${escapeHtml(safeTeamShort || "NBA")}</div>
+                        </div>
+                        <div class="season-summary-highlight-card-visual">
+                            <div class="season-summary-highlight-card-headshot-shell">
+                                ${safeHeadshot
+                                    ? `<img class="season-summary-highlight-card-headshot" src="${escapeHtml(safeHeadshot)}" alt="${escapeHtml(safeName)}" loading="lazy" decoding="async" onerror="const card=this.closest('.season-summary-highlight-card'); if(card){ card.classList.add('is-headshot-fallback'); } this.remove();">`
+                                    : ""}
+                                <span class="season-summary-highlight-card-headshot-fallback">${escapeHtml(getHighlightMonogram(safeName))}</span>
+                            </div>
+                        </div>
+                        <div class="season-summary-highlight-card-bar"></div>
+                        <div class="season-summary-highlight-card-name">${escapeHtml(safeName)}</div>
+                        <div class="season-summary-highlight-card-score${scoreClass}">${escapeHtml(safePoints)}</div>
+                    </article>
+                </div>
+            `;
+        };
+
+        const frontCourt = players.filter((player) => Number(player?.position_type || 0) === 2);
+        const backCourt = players.filter((player) => Number(player?.position_type || 0) === 1);
+        const extras = players.filter((player) => Number(player?.position_type || 0) !== 1 && Number(player?.position_type || 0) !== 2);
+        const rows = [];
+
+        if (frontCourt.length) {
+            rows.push(`<section class="season-summary-highlight-row season-summary-highlight-row-front">${frontCourt.map(buildCard).join("")}</section>`);
+        }
+        if (backCourt.length) {
+            rows.push(`<section class="season-summary-highlight-row season-summary-highlight-row-back">${backCourt.map(buildCard).join("")}</section>`);
+        }
+        if (extras.length) {
+            rows.push(`<section class="season-summary-highlight-row season-summary-highlight-row-back">${extras.map(buildCard).join("")}</section>`);
+        }
+
         return `
             <div class="season-summary-highlight-cards">
-                ${players.map((player) => {
-                    const roleClass = Number(player?.position_type || 0) === 2
-                        ? "season-summary-highlight-card-fc"
-                        : "season-summary-highlight-card-bc";
-                    const safeName = getStoryPlayerName(player).toUpperCase();
-                    const safePoints = formatSummaryNumber(player?.points || 0);
-                    const safeHeadshot = String(player?.headshot_url || "").trim();
-                    const safeLogo = String(player?.team_logo_url || "").trim();
-                    return `
-                        <article class="season-summary-highlight-card ${roleClass}">
-                            <div class="season-summary-highlight-card-top">
-                                ${safeLogo ? `<img class="season-summary-highlight-card-logo" src="${escapeHtml(safeLogo)}" alt="${escapeHtml(player?.team_short || "")}" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'season-summary-highlight-card-logo-fallback',textContent:this.alt||''}))">` : `<span class="season-summary-highlight-card-logo-fallback">${escapeHtml(player?.team_short || "")}</span>`}
-                                <span class="season-summary-highlight-card-team">${escapeHtml(player?.team_short || "")}</span>
-                            </div>
-                            <div class="season-summary-highlight-card-visual">
-                                ${safeHeadshot
-                                    ? `<img class="season-summary-highlight-card-headshot" src="${escapeHtml(safeHeadshot)}" alt="${escapeHtml(safeName)}" loading="lazy" decoding="async" onerror="this.style.display='none';this.parentElement.classList.add('is-fallback');this.parentElement.innerHTML='<span class=&quot;season-summary-highlight-card-headshot-fallback&quot;>${escapeHtml(safeName.slice(0, 2) || "P")}</span>';">`
-                                    : `<span class="season-summary-highlight-card-headshot-fallback">${escapeHtml(safeName.slice(0, 2) || "P")}</span>`}
-                            </div>
-                            <div class="season-summary-highlight-card-bar"></div>
-                            <div class="season-summary-highlight-card-name">${escapeHtml(safeName)}</div>
-                            <div class="season-summary-highlight-card-score">${escapeHtml(safePoints)}</div>
-                        </article>
-                    `;
-                }).join("")}
+                ${rows.join("")}
             </div>
         `;
     }
@@ -661,41 +725,33 @@
         const bestDay = summary.best_day || null;
         const bestRank = summary.best_rank || null;
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
-        const cards = [
-            {
-                label: "赛季最高单日",
-                value: bestDay ? `${formatSummaryNumber(bestDay.points)}分` : "-",
-                note: bestDay?.label || "还没有足够的历史数据",
-            },
-            {
-                label: "最高全球排名",
-                value: bestRank?.overall_rank ? formatSummaryNumber(bestRank.overall_rank) : "-",
-                note: bestRank?.label || "还没有足够的历史数据",
-            },
-        ];
+        const stories = [];
 
-        const paragraphOne = bestDay
-            ? `${mark(bestDay.label)}大概会是你这个赛季最容易被重新想起的一天，那天你一口气拿到了${mark(`${formatSummaryNumber(bestDay.points)}分`)}，也是你这个赛季得过的最高分，你还记得都是哪些爱酱替你冲锋陷阵吗？`
-            : "总会有那么一天，你的阵容像突然一起开花，那种成就感会让人忍不住反复回看。";
-        const paragraphTwo = bestRank
-            ? `${mark(bestRank.label)}也是一个特殊的日子，你拿到了${mark(`${formatSummaryNumber(bestRank.points)}分`)}，最关键的是单日 OR 为${mark(formatSummaryNumber(bestRank.overall_rank || 0))}，比起一场比赛的输赢，这种站上更高位置的瞬间更像赛季里真正的高光。`
-            : "有些高光不只是分数本身，而是你终于看到自己在更大榜单里往上爬的那一刻。";
+        if (bestDay) {
+            stories.push(`
+                <div class="season-summary-highlight-story">
+                    <p class="season-summary-story-paragraph">${mark(bestDay.label)}大概会是你这个赛季最容易被重新想起的一天，那天你一口气拿到了${mark(`${formatSummaryNumber(bestDay.points)}分`)}，也是你这个赛季得过的最高分，你还记得都是哪些爱酱替你冲锋陷阵吗</p>
+                    ${renderHighlightPlayerCards(bestDay?.lineup)}
+                </div>
+            `);
+        }
+
+        if (bestRank) {
+            stories.push(`
+                <div class="season-summary-highlight-story">
+                    <p class="season-summary-story-paragraph">${mark(bestRank.label)}也是一个特殊的日子，你拿到了${mark(`${formatSummaryNumber(bestRank.points)}分`)}，最关键的是单日OR为${mark(formatSummaryNumber(bestRank.overall_rank || 0))}，比起一场比赛的输赢，这种站上更高位置的瞬间更像赛季里真正的高光</p>
+                    ${renderHighlightPlayerCards(bestRank?.lineup)}
+                </div>
+            `);
+        }
 
         return `
             <section class="season-summary-page season-summary-page-story season-summary-page-highlights">
                 <div class="season-summary-story-main">
                     <div class="season-summary-story-shell season-summary-highlights-copy">
                         <div class="season-summary-page-title">高光时刻</div>
-                        ${renderStoryCards(cards, "season-summary-story-cards-highlights")}
                         <div class="season-summary-highlight-stories">
-                            <div class="season-summary-highlight-story">
-                                <p class="season-summary-story-paragraph">${paragraphOne}</p>
-                                ${renderHighlightPlayerCards(bestDay?.lineup)}
-                            </div>
-                            <div class="season-summary-highlight-story">
-                                <p class="season-summary-story-paragraph">${paragraphTwo}</p>
-                                ${renderHighlightPlayerCards(bestRank?.lineup)}
-                            </div>
+                            ${stories.length ? stories.join("") : `<p class="season-summary-story-paragraph">还没有足够的历史数据</p>`}
                         </div>
                     </div>
                 </div>

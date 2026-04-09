@@ -4565,42 +4565,52 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
   );
 }
 
+function formatHighlightPlayerDisplayName(player) {
+  const first = String(player?.first_name || "").trim();
+  const last = String(player?.second_name || player?.web_name || "").trim();
+  if (first && last) {
+    return `${first.charAt(0)}.${last}`.toUpperCase();
+  }
+  return String(player?.web_name || player?.second_name || player?.first_name || "PLAYER").trim().toUpperCase();
+}
+
 async function buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap, elements, eventMetaById) {
   const safeEventId = Number(eventId || 0);
   if (!safeEventId) return null;
 
-  const [picksRes, liveRes, fixturesRes] = await Promise.all([
+  const [picksRes, liveRes] = await Promise.all([
     fetchJsonSafe(`/entry/${uidNumber}/event/${safeEventId}/picks/`, 2),
     fetchJsonSafe(`/event/${safeEventId}/live/`, 2),
-    fetchJsonSafe(`/fixtures/?event=${safeEventId}`, 1),
   ]);
 
   if (!picksRes.ok || !liveRes.ok) return null;
 
   const liveElements = buildLiveElementsMap(liveRes.data);
   const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
-  const fixtures = Array.isArray(fixturesRes.data) ? fixturesRes.data : [];
-  const teamsPlayingToday = fixtures.length
-    ? buildTeamsPlayingToday(fixtures)
-    : new Set((Array.isArray(picksRes.data?.picks) ? picksRes.data.picks : [])
-      .map((pick) => Number(elements[Number(pick?.element || 0)]?.team || 0))
-      .filter(Boolean));
+  const bootstrapElementsById = Object.fromEntries(
+    (bootstrap?.elements || []).map((player) => [Number(player?.id || 0), player])
+  );
   const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
-  const [, effectivePlayers, formation] = calculateEffectiveScore(picks, teamsPlayingToday);
-  const lineupPlayers = (effectivePlayers.length ? effectivePlayers : picks.filter((item) => Number(item?.multiplier || 0) > 0))
+  const lineupPlayers = picks
+    .filter((item) => Number(item?.multiplier || 0) > 0)
     .sort((a, b) => Number(a?.lineup_position || 0) - Number(b?.lineup_position || 0))
     .slice(0, 5)
     .map((player) => {
-      const rawLiveFantasy = Number(liveElements?.[Number(player?.element_id || 0)]?.stats?.total_points);
+      const elementId = Number(player?.element_id || 0);
+      const rawLiveFantasy = Number(liveElements?.[elementId]?.stats?.total_points);
+      const bootstrapPlayer = bootstrapElementsById[elementId] || {};
+      const teamMeta = teamsMetaById[Number(player?.team_id || 0)] || {};
       const points = Number.isFinite(rawLiveFantasy)
         ? Math.round((rawLiveFantasy / 10) * (Number(player?.multiplier || 1) || 1))
         : Number(player?.final_points || 0);
       return {
-        element_id: Number(player?.element_id || 0) || null,
+        element_id: elementId || null,
         player_name: String(player?.name || `#${player?.element_id || ""}`).trim(),
+        display_name: formatHighlightPlayerDisplayName(bootstrapPlayer),
         headshot_url: player?.headshot_url || null,
         team_short: String(player?.team_short || "").trim(),
         team_logo_url: player?.team_logo_url || "/nba-team-logos/_.png",
+        team_color: String(teamMeta?.color || "").trim() || null,
         position_type: Number(player?.position_type || 0) || null,
         points,
       };
@@ -4612,7 +4622,6 @@ async function buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap,
     gw: Number(meta?.gw || 0) || null,
     day: Number(meta?.day || 0) || null,
     label: toGwDayLabel(meta?.gw, meta?.day),
-    formation: formation || null,
     players: lineupPlayers,
   };
 }

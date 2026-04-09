@@ -558,134 +558,229 @@
 
 .season-summary-highlight-stories {
     display: grid;
-    gap: 18px;
+    gap: 24px;
 }
 
 .season-summary-highlight-story {
     display: grid;
-    gap: 12px;
+    gap: 16px;
 }
 
 .season-summary-highlight-cards {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 14px;
-    align-items: stretch;
+    --season-highlight-card-width: 176px;
+    --season-highlight-card-height: 268px;
+    --season-highlight-card-radius: 7px;
+    display: flex;
+    flex-direction: column;
+    gap: 46px;
+    align-items: center;
+    width: min(100%, 980px);
+    padding: 4px 0 2px;
+}
+
+.season-summary-highlight-row {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.season-summary-highlight-row-front {
+    gap: 132px;
+}
+
+.season-summary-highlight-row-back {
+    gap: 84px;
+}
+
+.season-summary-highlight-card-shell {
+    position: relative;
+    width: var(--season-highlight-card-width);
+    flex: 0 0 var(--season-highlight-card-width);
+    padding-top: 6px;
 }
 
 .season-summary-highlight-card {
     position: relative;
-    min-height: 246px;
-    padding: 12px 12px 10px;
-    border-radius: 20px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(245, 248, 252, 0.98));
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
+    width: var(--season-highlight-card-width);
+    height: var(--season-highlight-card-height);
+    min-height: 0;
+    padding: 0;
+    border-radius: var(--season-highlight-card-radius);
+    background: #ffffff;
+    border: none;
+    box-shadow: 0 8px 20px rgba(26, 34, 56, 0.16);
     overflow: hidden;
+    isolation: isolate;
 }
 
-.season-summary-highlight-card-bc {
-    --season-highlight-accent: linear-gradient(90deg, #2248a8 0%, #3477ff 100%);
-    --season-highlight-solid: #2f60d3;
-}
-
-.season-summary-highlight-card-fc {
-    --season-highlight-accent: linear-gradient(90deg, #cc1540 0%, #ff5e8e 100%);
-    --season-highlight-solid: #ec407a;
+.season-summary-highlight-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 20%);
+    pointer-events: none;
+    z-index: 2;
 }
 
 .season-summary-highlight-card-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
 }
 
-.season-summary-highlight-card-logo,
-.season-summary-highlight-card-logo-fallback {
-    width: 34px;
-    height: 34px;
-    flex: 0 0 34px;
+.season-summary-highlight-card-logo-wrap {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
 }
 
 .season-summary-highlight-card-logo {
+    max-width: 100%;
+    max-height: 100%;
     object-fit: contain;
     display: block;
 }
 
 .season-summary-highlight-card-logo-fallback {
-    display: inline-flex;
+    display: none;
+    width: 100%;
+    height: 100%;
     align-items: center;
     justify-content: center;
-    border-radius: 10px;
-    background: rgba(15, 23, 42, 0.06);
-    color: #475569;
-    font-size: 11px;
-    font-weight: 800;
+    border-radius: 12px;
+    background: rgba(15, 21, 35, 0.08);
+    color: #0f1523;
+    font-size: 17px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: -0.03em;
 }
 
 .season-summary-highlight-card-team {
-    color: var(--season-highlight-solid);
-    font-size: 24px;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    color: var(--season-highlight-team-color, #17408b);
+    font-size: 33px;
     line-height: 1;
     font-weight: 900;
     letter-spacing: -0.06em;
 }
 
 .season-summary-highlight-card-visual {
-    min-height: 120px;
+    position: absolute;
+    inset: 52px 0 100px;
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    padding-top: 4px;
+    z-index: 1;
+}
+
+.season-summary-highlight-card-headshot-shell {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
 }
 
 .season-summary-highlight-card-headshot {
-    width: 100%;
-    max-width: 128px;
-    max-height: 132px;
+    max-width: 130px;
+    max-height: 146px;
     object-fit: contain;
     display: block;
-    filter: drop-shadow(0 10px 16px rgba(15, 23, 42, 0.16));
+    filter: drop-shadow(0 5px 10px rgba(14, 23, 38, 0.12));
 }
 
 .season-summary-highlight-card-headshot-fallback {
-    display: inline-flex;
+    display: none;
     align-items: center;
     justify-content: center;
-    width: 92px;
-    height: 92px;
+    width: 108px;
+    height: 108px;
     border-radius: 999px;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(236, 72, 153, 0.18));
-    color: #0f172a;
-    font-size: 34px;
-    font-weight: 900;
+    background: var(--season-highlight-fallback-gradient, linear-gradient(135deg, #1f3f86 0%, #4a79d8 100%));
+    color: #ffffff;
+    font-size: 42px;
+    line-height: 1;
+    font-weight: 700;
+    box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+.season-summary-highlight-card.is-logo-fallback .season-summary-highlight-card-logo {
+    display: none;
+}
+
+.season-summary-highlight-card.is-logo-fallback .season-summary-highlight-card-logo-fallback {
+    display: flex;
+}
+
+.season-summary-highlight-card.is-headshot-fallback .season-summary-highlight-card-headshot {
+    display: none;
+}
+
+.season-summary-highlight-card.is-headshot-fallback .season-summary-highlight-card-headshot-fallback {
+    display: flex;
 }
 
 .season-summary-highlight-card-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 96px;
     height: 5px;
-    border-radius: 999px;
-    background: var(--season-highlight-accent);
+    background: var(--season-highlight-accent-solid, #2c58bf);
+    z-index: 1;
 }
 
 .season-summary-highlight-card-name {
-    margin-top: 10px;
-    font-size: 18px;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 56px;
+    height: 40px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
     line-height: 1;
-    font-weight: 900;
-    letter-spacing: -0.05em;
+    font-weight: 700;
+    letter-spacing: -0.065em;
     text-align: center;
-    color: #0f172a;
+    text-transform: uppercase;
+    color: #0d111a;
+    white-space: nowrap;
+    overflow: hidden;
+    z-index: 1;
 }
 
 .season-summary-highlight-card-score {
-    margin-top: 10px;
-    font-size: 44px;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--season-highlight-accent-gradient, linear-gradient(90deg, #2b4f9b 0%, #3565c9 100%));
+    color: #ffffff;
+    font-size: 46px;
     line-height: 1;
-    font-weight: 900;
-    letter-spacing: -0.06em;
-    text-align: center;
-    color: #0f172a;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    z-index: 1;
+}
+
+.season-summary-highlight-card-score-wide {
+    font-size: 36px;
 }
 
 .season-summary-footer {
@@ -917,42 +1012,66 @@
     }
 
     .season-summary-highlight-cards {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
+        --season-highlight-card-width: 116px;
+        --season-highlight-card-height: 186px;
+        gap: 18px;
+        padding: 0;
     }
 
-    .season-summary-highlight-card {
-        min-height: 198px;
-        padding: 10px;
-        border-radius: 18px;
+    .season-summary-highlight-row-front,
+    .season-summary-highlight-row-back {
+        gap: 12px;
     }
 
-    .season-summary-highlight-card-logo,
-    .season-summary-highlight-card-logo-fallback {
+    .season-summary-highlight-card-logo-wrap {
+        top: 8px;
+        left: 8px;
         width: 28px;
         height: 28px;
-        flex-basis: 28px;
     }
 
     .season-summary-highlight-card-team {
-        font-size: 19px;
+        top: 8px;
+        right: 8px;
+        font-size: 20px;
+    }
+
+    .season-summary-highlight-card-logo-fallback {
+        font-size: 12px;
     }
 
     .season-summary-highlight-card-visual {
-        min-height: 94px;
+        inset: 34px 0 67px;
     }
 
     .season-summary-highlight-card-headshot {
-        max-width: 96px;
-        max-height: 102px;
+        max-width: 86px;
+        max-height: 96px;
+    }
+
+    .season-summary-highlight-card-headshot-fallback {
+        width: 72px;
+        height: 72px;
+        font-size: 28px;
+    }
+
+    .season-summary-highlight-card-bar {
+        bottom: 65px;
     }
 
     .season-summary-highlight-card-name {
-        font-size: 15px;
+        bottom: 39px;
+        height: 26px;
+        font-size: 14px;
     }
 
     .season-summary-highlight-card-score {
-        font-size: 34px;
+        height: 38px;
+        font-size: 30px;
+    }
+
+    .season-summary-highlight-card-score-wide {
+        font-size: 24px;
     }
 
     .season-summary-story-card {
