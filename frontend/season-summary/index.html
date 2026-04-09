@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
-    <link rel="stylesheet" href="/css/season-summary.css?v=20260409m">
+    <link rel="stylesheet" href="/css/season-summary.css?v=20260409n">
     <script>
         (function () {
             const params = new URLSearchParams(window.location.search);
@@ -32,10 +32,11 @@
             <div class="season-summary-intro" id="season-summary-intro">
                 <div class="season-summary-intro-visual" id="season-summary-intro-visual">
                     <img
-                        src="./assets/raynaud.gif"
+                        src="./assets/raynaud-transparent.gif"
                         alt="Raynaud Intro Visual"
                         loading="eager"
-                        decoding="async">
+                        decoding="async"
+                        onerror="this.src='./assets/raynaud.gif';">
                 </div>
                 <div class="season-summary-search-stage" id="season-summary-search-stage">
                     <form class="season-summary-search" id="season-summary-search-form">
