@@ -2419,6 +2419,12 @@
     line-height: 0.95;
 }
 
+.season-summary-story-cards-player-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(10px, 1.1vw, 16px);
+    max-width: min(100%, 980px);
+}
+
 .season-summary-story-paragraph,
 .season-summary-cover-message,
 .season-summary-cover-followup,
@@ -2428,10 +2434,14 @@
 }
 
 .season-summary-inline-player {
-    width: 3.3em;
-    height: 3.3em;
+    width: 3.55em;
+    height: 3.55em;
     margin: 0 0.14em;
-    vertical-align: -0.82em;
+    vertical-align: -0.88em;
+}
+
+.season-summary-story-card-headshot {
+    width: min(100%, 104px);
 }
 
 .season-summary-page-highlights .season-summary-story-shell,
@@ -2454,8 +2464,13 @@
 }
 
 @media (max-width: 768px) {
+    .season-summary-layout {
+        padding: max(12px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
+    }
+
     .season-summary-page {
         padding: 12px 12px 74px;
+        box-shadow: 4px 4px 0 #000000;
     }
 
     .season-summary-page-cover {
@@ -2502,6 +2517,11 @@
         font-size: clamp(34px, 8.6vw, 50px);
     }
 
+    .season-summary-story-cards-player-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
     .season-summary-story-paragraph,
     .season-summary-cover-message,
     .season-summary-cover-followup,
@@ -2511,14 +2531,24 @@
     }
 
     .season-summary-inline-player {
-        width: 2.6em;
-        height: 2.6em;
+        width: 2.85em;
+        height: 2.85em;
         margin: 0 0.1em;
-        vertical-align: -0.58em;
+        vertical-align: -0.64em;
+    }
+
+    .season-summary-story-card-headshot {
+        width: min(100%, 82px);
     }
 
     .season-summary-page-btn {
         width: 44px;
         height: 44px;
+    }
+}
+
+@media (max-width: 480px) {
+    .season-summary-story-cards-player-summary {
+        grid-template-columns: 1fr;
     }
 }

@@ -615,6 +615,16 @@
         const lowestOwnershipPlayer = details.lowest_ownership_player || null;
         const longestHold = details.longest_hold || null;
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+        const cards = [
+            {
+                label: "赛季总球员数",
+                value: `${formatSummaryNumber(totalUniquePlayers)}人`,
+            },
+            {
+                label: "球员平均分",
+                value: `${formatSummaryDecimal(averagePlayerScore)}分`,
+            },
+        ];
 
         const paragraphOne = `整个赛季你邂逅了${mark(formatSummaryNumber(totalUniquePlayers))}名不同的球员，即使可能你并不是他们的球迷，却也见证了他们为你上分的努力；这${mark(formatSummaryNumber(totalUniquePlayers))}名球员平均每一个人都能在每个比赛日给你拿下${mark(formatSummaryDecimal(averagePlayerScore))}分，似乎你的每一个选择都充满着智慧。`;
         const paragraphTwo = lowestOwnershipPlayer?.player_name
@@ -627,8 +637,8 @@
         return renderStoryPage({
             pageClass: "season-summary-page-player-details",
             title: "Players",
-            cards: [],
-            cardGridClass: "season-summary-story-cards-player",
+            cards,
+            cardGridClass: "season-summary-story-cards-player season-summary-story-cards-player-summary",
             paragraphs: [paragraphOne, paragraphTwo, paragraphThree],
         });
     }
