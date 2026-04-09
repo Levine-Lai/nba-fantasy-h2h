@@ -501,6 +501,7 @@
             const safeHeadshot = String(player?.headshot_url || "").trim();
             const safeLogo = String(player?.team_logo_url || "").trim();
             const safeTeamShort = String(player?.team_short || "").trim();
+            const isCaptain = !!player?.is_captain;
             const roleTheme = getHighlightRoleTheme(player?.position_type);
             const scoreClass = String(safePoints).length >= 3 ? " season-summary-highlight-card-score-wide" : "";
             const stateClasses = [
@@ -525,6 +526,7 @@
                                     : ""}
                                 <span class="season-summary-highlight-card-logo-fallback">${escapeHtml(safeTeamShort || "NBA")}</span>
                             </div>
+                            ${isCaptain ? `<span class="season-summary-highlight-card-captain">C</span>` : ""}
                             <div class="season-summary-highlight-card-team">${escapeHtml(safeTeamShort || "NBA")}</div>
                         </div>
                         <div class="season-summary-highlight-card-visual">

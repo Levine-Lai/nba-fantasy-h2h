@@ -4612,6 +4612,7 @@ async function buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap,
         team_logo_url: player?.team_logo_url || "/nba-team-logos/_.png",
         team_color: String(teamMeta?.color || "").trim() || null,
         position_type: Number(player?.position_type || 0) || null,
+        is_captain: !!player?.is_captain,
         points,
       };
     });

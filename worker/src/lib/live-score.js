@@ -285,6 +285,7 @@ export function buildLivePicksFromPicksData(picksData, elements, liveElements, t
     return {
       element_id: elementId,
       name: elem.name || `#${elementId}`,
+      headshot_url: elem.headshot_url || null,
       position_type: elem.position || 0,
       position_name: elem.position_name || "UNK",
       now_cost: Number(elem.now_cost || 0),
@@ -323,6 +324,7 @@ export function rebuildLivePicksFromCachedPlayers(players, elements, liveElement
       ...player,
       element_id: elementId,
       name: elem.name || player?.name || `#${elementId}`,
+      headshot_url: elem.headshot_url || player?.headshot_url || null,
       position_type: elem.position || Number(player?.position_type || 0),
       position_name: elem.position_name || player?.position_name || "UNK",
       now_cost: Number(elem.now_cost || player?.now_cost || 0),
