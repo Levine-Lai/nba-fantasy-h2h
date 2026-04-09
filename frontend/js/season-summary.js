@@ -906,7 +906,7 @@
         setHasProfile(false);
         setIntroLoading(true);
         setIntroLeaving(false);
-        setStatus("正在加载中，请稍候", "loading");
+        setStatus("首次加载可能需要一些时间，请耐心等待", "loading");
         if (pages) {
             pages.innerHTML = `<div class="season-summary-placeholder"></div>`;
         }

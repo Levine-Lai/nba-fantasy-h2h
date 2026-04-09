@@ -6,8 +6,11 @@
     <title>NBA Fantasy Season Summary</title>
     <meta name="robots" content="noindex,nofollow,noarchive">
     <link rel="icon" type="image/jpeg" href="/LOGO.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
-    <link rel="stylesheet" href="/css/season-summary.css?v=20260409l">
+    <link rel="stylesheet" href="/css/season-summary.css?v=20260409m">
     <script>
         (function () {
             const params = new URLSearchParams(window.location.search);
@@ -27,13 +30,12 @@
     <main class="container season-summary-layout active">
         <div class="season-summary-shell" id="season-summary-shell">
             <div class="season-summary-intro" id="season-summary-intro">
-                <div class="season-summary-hero-player left" id="season-summary-hero-left">
+                <div class="season-summary-intro-visual" id="season-summary-intro-visual">
                     <img
-                        src="./assets/wemby.png"
-                        alt="Victor Wembanyama"
+                        src="./assets/raynaud.gif"
+                        alt="Raynaud Intro Visual"
                         loading="eager"
-                        decoding="async"
-                        onerror="this.closest('.season-summary-hero-player').style.display='none';">
+                        decoding="async">
                 </div>
                 <div class="season-summary-search-stage" id="season-summary-search-stage">
                     <form class="season-summary-search" id="season-summary-search-form">
@@ -41,14 +43,6 @@
                         <button class="season-summary-submit" id="season-summary-generate-btn" type="submit">GO!</button>
                     </form>
                     <div class="season-summary-status" id="season-summary-status"></div>
-                </div>
-                <div class="season-summary-hero-player right" id="season-summary-hero-right">
-                    <img
-                        src="./assets/doncic.png"
-                        alt="Luka Doncic"
-                        loading="eager"
-                        decoding="async"
-                        onerror="this.closest('.season-summary-hero-player').style.display='none';">
                 </div>
             </div>
 
