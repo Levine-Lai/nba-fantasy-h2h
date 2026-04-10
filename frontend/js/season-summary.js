@@ -840,12 +840,18 @@
         const bestDay = summary.best_day || null;
         const bestRank = summary.best_rank || null;
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+        const formatHighlightLabel = (item) => {
+            const datePart = String(item?.date_label || "").trim();
+            const gwDayPart = String(item?.label || "").trim();
+            if (datePart && gwDayPart) return `${datePart} ${gwDayPart}`;
+            return datePart || gwDayPart || "";
+        };
         const stories = [];
 
         if (bestDay) {
             stories.push(`
                 <div class="season-summary-highlight-story">
-                    <p class="season-summary-story-paragraph">${mark(bestDay.label)}大概会是你这个赛季最容易被重新想起的一天，那天你一口气拿到了${mark(`${formatSummaryNumber(bestDay.points)}分`)}，也是你这个赛季得过的最高分，你还记得都是哪些爱酱替你冲锋陷阵吗</p>
+                    <p class="season-summary-story-paragraph">${mark(formatHighlightLabel(bestDay))}大概会是你这个赛季最容易被重新想起的一天，那天你一口气拿到了${mark(`${formatSummaryNumber(bestDay.points)}分`)}，也是你这个赛季得过的最高分，你还记得都是哪些爱酱替你冲锋陷阵吗</p>
                     ${renderHighlightPlayerCards(bestDay?.lineup)}
                 </div>
             `);

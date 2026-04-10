@@ -5251,6 +5251,7 @@ async function buildSeasonSummaryPayload(uidInput) {
       summary: {
         best_day: bestDayRow ? {
           label: toGwDayLabel(bestDayMeta?.gw, bestDayMeta?.day),
+          date_label: formatBeijingMonthDayLabel(bestDayMeta?.deadline_time || null),
           gw: Number(bestDayMeta?.gw || 0) || null,
           day: Number(bestDayMeta?.day || 0) || null,
           event: Number(bestDayRow?.event || 0) || null,
@@ -5260,6 +5261,7 @@ async function buildSeasonSummaryPayload(uidInput) {
         } : null,
         best_rank: bestRankRow ? {
           label: toGwDayLabel(bestRankMeta?.gw, bestRankMeta?.day),
+          date_label: formatBeijingMonthDayLabel(bestRankMeta?.deadline_time || null),
           gw: Number(bestRankMeta?.gw || 0) || null,
           day: Number(bestRankMeta?.day || 0) || null,
           event: Number(bestRankRow?.event || 0) || null,
