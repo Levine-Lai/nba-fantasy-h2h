@@ -2410,6 +2410,15 @@
     letter-spacing: -0.02em;
 }
 
+.season-summary-cover-stat-value-compact {
+    font-size: clamp(30px, 3.4vw, 52px);
+}
+
+.season-summary-cover-stat-value-tight {
+    font-size: clamp(26px, 2.9vw, 44px);
+    letter-spacing: 0;
+}
+
 .season-summary-story-card {
     min-height: 112px;
 }
@@ -2440,6 +2449,16 @@
     vertical-align: -0.88em;
 }
 
+.season-summary-inline-player-name {
+    display: inline-block;
+    margin-left: 0.16em;
+    font-size: 1em;
+    line-height: 1.1;
+    font-weight: 700;
+    color: rgba(0, 0, 0, 0.86);
+    vertical-align: baseline;
+}
+
 .season-summary-story-card-headshot {
     width: min(100%, 104px);
 }
@@ -2464,6 +2483,20 @@
 }
 
 @media (max-width: 768px) {
+    .season-summary-page-body,
+    .season-summary-input,
+    .season-summary-submit,
+    .season-summary-cover-title,
+    .season-summary-cover-subtitle,
+    .season-summary-page-title,
+    .season-summary-cover-stat-value,
+    .season-summary-story-card-value,
+    .season-summary-story-paragraph,
+    .season-summary-cover-message,
+    .season-summary-cover-followup {
+        font-family: "Sora", "Lexend", "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
     .season-summary-layout {
         padding: max(12px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
     }
@@ -2509,6 +2542,14 @@
         font-size: clamp(28px, 7.2vw, 42px);
     }
 
+    .season-summary-cover-stat-value-compact {
+        font-size: clamp(24px, 6.3vw, 34px);
+    }
+
+    .season-summary-cover-stat-value-tight {
+        font-size: clamp(22px, 5.8vw, 30px);
+    }
+
     .season-summary-story-card {
         min-height: 88px;
     }
@@ -2526,8 +2567,8 @@
     .season-summary-cover-message,
     .season-summary-cover-followup,
     .season-summary-cover-chart-note {
-        font-size: 15px;
-        line-height: 1.52;
+        font-size: clamp(16px, 1.18vw, 20px);
+        line-height: 1.64;
     }
 
     .season-summary-inline-player {
@@ -2535,6 +2576,10 @@
         height: 2.85em;
         margin: 0 0.1em;
         vertical-align: -0.64em;
+    }
+
+    .season-summary-inline-player-name {
+        font-size: 0.96em;
     }
 
     .season-summary-story-card-headshot {
@@ -2549,6 +2594,7 @@
 
 @media (max-width: 480px) {
     .season-summary-story-cards-player-summary {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
     }
 }

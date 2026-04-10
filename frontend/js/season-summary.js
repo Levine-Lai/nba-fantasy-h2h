@@ -346,6 +346,13 @@
         const realName = String(cover.real_name || [cover.first_name, cover.last_name].filter(Boolean).join(" ").trim() || profile.managerName || "").trim();
         const stats = Array.isArray(cover.stats) ? cover.stats : [];
         const followUp = "短短的一个赛季，还是留下来很多让人印象深刻的精彩时刻，不知道在你心里印象最深的是什么呢，一起来看一下属于你的年度报告吧";
+        const getCoverStatValueClass = (rawValue) => {
+            const text = String(rawValue ?? "").trim();
+            const digits = (text.match(/\d/g) || []).length;
+            if (digits >= 6) return " season-summary-cover-stat-value-tight";
+            if (digits >= 5) return " season-summary-cover-stat-value-compact";
+            return "";
+        };
 
         return `
             <section class="season-summary-page season-summary-page-cover active">
@@ -357,7 +364,7 @@
                         ${stats.map((item) => `
                             <div class="season-summary-cover-stat">
                                 <div class="season-summary-cover-stat-label">${escapeHtml(item?.[0])}</div>
-                                <div class="season-summary-cover-stat-value">${escapeHtml(item?.[1])}</div>
+                                <div class="season-summary-cover-stat-value${getCoverStatValueClass(item?.[1])}">${escapeHtml(item?.[1])}</div>
                             </div>
                         `).join("")}
                     </div>
@@ -397,27 +404,32 @@
         return String(item?.player_name || item?.captain_name || item?.name || "Player");
     }
 
-    function renderInlinePlayerMention(item, className = "") {
+    function renderInlinePlayerMention(item, className = "", showName = false) {
         const safeUrl = String(item?.headshot_url || "").trim();
         const safeName = getStoryPlayerName(item);
         if (!safeUrl) {
             return `<strong class="season-summary-transfer-emphasis">${escapeHtml(safeName)}</strong>`;
         }
+        const nameSuffix = showName
+            ? `<span class="season-summary-inline-player-name">${escapeHtml(safeName)}</span>`
+            : "";
         return `
             <span
                 class="season-summary-inline-player${className ? ` ${className}` : ""}"
                 title="${escapeHtml(safeName)}"
                 aria-label="${escapeHtml(safeName)}"
                 data-fallback="${escapeHtml(safeName)}"
+                data-show-name="${showName ? "1" : "0"}"
             >
                 <img
                     class="season-summary-inline-player-image"
                     src="${escapeHtml(safeUrl)}"
                     alt="${escapeHtml(safeName)}"
                     loading="lazy"
-                    onerror="const parent=this.parentElement;if(parent){const fallback=document.createElement('strong');fallback.className='season-summary-transfer-emphasis';fallback.textContent=parent.dataset.fallback||'';parent.replaceWith(fallback);}"
+                    onerror="const parent=this.parentElement;if(parent){const showName=parent.dataset.showName==='1';if(showName){parent.remove();}else{const fallback=document.createElement('strong');fallback.className='season-summary-transfer-emphasis';fallback.textContent=parent.dataset.fallback||'';parent.replaceWith(fallback);}}"
                 />
             </span>
+            ${nameSuffix}
         `;
     }
 
@@ -628,10 +640,10 @@
 
         const paragraphOne = `整个赛季你邂逅了${mark(formatSummaryNumber(totalUniquePlayers))}名不同的球员，即使可能你并不是他们的球迷，却也见证了他们为你上分的努力；这${mark(formatSummaryNumber(totalUniquePlayers))}名球员平均每一个人都能在每个比赛日给你拿下${mark(formatSummaryDecimal(averagePlayerScore))}分，似乎你的每一个选择都充满着智慧。`;
         const paragraphTwo = lowestOwnershipPlayer?.player_name
-            ? `${renderInlinePlayerMention(lowestOwnershipPlayer)}是你选择过持有率最低的球员，全服持有率仅有${mark(`${formatSummaryDecimal(lowestOwnershipPlayer.ownership_percent)}%`)}，这位宝藏球员也没有辜负你的信任，在你持有他的${mark(formatSummaryNumber(lowestOwnershipPlayer.days_held))}天里平均每场砍下${mark(formatSummaryDecimal(lowestOwnershipPlayer.average_points))}分，群友们都夸你是 DIFF 大师！`
+            ? `${renderInlinePlayerMention(lowestOwnershipPlayer, "", true)}是你选择过持有率最低的球员，全服持有率仅有${mark(`${formatSummaryDecimal(lowestOwnershipPlayer.ownership_percent)}%`)}，这位宝藏球员也没有辜负你的信任，在你持有他的${mark(formatSummaryNumber(lowestOwnershipPlayer.days_held))}天里平均每场砍下${mark(formatSummaryDecimal(lowestOwnershipPlayer.average_points))}分，群友们都夸你是 DIFF 大师！`
             : "这个赛季你也曾把目光投向一些不那么热门的名字，正是这些看起来离谱的决定，慢慢拼出了只属于你的阵容性格。";
         const paragraphThree = longestHold?.player_name
-            ? `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，平均每一位球员在你阵容中能停留${mark(formatSummaryDecimal(averageHoldDays))}天，相遇短暂，希望他们也在你的 fantasy 故事中留下了美好的一页；不过，不知道你有没有猜到，留在你阵容中最久的人是${renderInlinePlayerMention(longestHold)}呢，相信陪伴你走过了${mark(formatSummaryNumber(longestHold.days_held))}天，他已经成为你心中的第一爱酱了吧！`
+            ? `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，平均每一位球员在你阵容中能停留${mark(formatSummaryDecimal(averageHoldDays))}天，相遇短暂，希望他们也在你的 fantasy 故事中留下了美好的一页；不过，不知道你有没有猜到，留在你阵容中最久的人是${renderInlinePlayerMention(longestHold, "", true)}呢，相信陪伴你走过了${mark(formatSummaryNumber(longestHold.days_held))}天，他已经成为你心中的第一爱酱了吧！`
             : `在短短${mark(formatSummaryNumber(seasonDays))}个比赛日里，你的阵容不断迎来送往，平均每一位球员在你这里停留${mark(formatSummaryDecimal(averageHoldDays))}天，这本身就已经是一种只属于 fantasy 的陪伴。`;
 
         return renderStoryPage({
@@ -666,7 +678,7 @@
 
         const paragraphOne = `这个赛季总共转会${mark(formatSummaryNumber(totalTransfers))}次，${transferEveryWeek ? "并且每一周都坚持换人，相信最终的排名没有辜负你的努力~" : "机智的你选择以逸待劳，并不是把 FT 用完才是最好的选择。"}${penaltyPoints > 200 ? `整个赛季一共扣过${mark(`-${formatSummaryNumber(penaltyPoints)}`)}分，大胆而奔放的操作决定了你的上限。` : `整个赛季一共扣过${mark(`-${formatSummaryNumber(penaltyPoints)}`)}分，谨慎精确才是你的代名词。`}`;
         const paragraphTwo = mostIn?.name && mostOut?.name
-            ? `${renderInlinePlayerMention(mostIn)}被你换进来了${mark(formatSummaryNumber(mostIn.count))}次，是你心心念念的那个人吗？希望他的表现没有让你失望；而${renderInlinePlayerMention(mostOut)}被你送走了${mark(formatSummaryNumber(mostOut.count))}次，想必他的表现你也看在眼里吧。`
+            ? `${renderInlinePlayerMention(mostIn, "", true)}被你换进来了${mark(formatSummaryNumber(mostIn.count))}次，是你心心念念的那个人吗？希望他的表现没有让你失望；而${renderInlinePlayerMention(mostOut, "", true)}被你送走了${mark(formatSummaryNumber(mostOut.count))}次，想必他的表现你也看在眼里吧。`
             : "这个赛季你换人的节奏很有个人风格，人来人往之间，喜爱和犹豫都写在每一笔转会里。";
         const paragraphThree = buildTransferTimingParagraph(favoriteDay, favoriteTimeSlot);
 
@@ -723,9 +735,9 @@
                 ? `比他这个赛季的平均队长分数${averageDelta >= 0 ? "高" : "低"}${mark(formatSummaryDecimal(Math.abs(averageDelta)))}分，`
                 : "";
             if (favoriteIsJokic) {
-                paragraphTwo = `${renderInlinePlayerMention(favoriteCaptain)}是你经常选择的队长，他也是很多人青睐的队长人选，跟着主流走永远不会错。你每次选他当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvgCaptain))}分，${favoriteComparison}${hasFavoriteComparison && averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这个塞尔维亚大胖子。" : (hasFavoriteComparison ? "看来你选队长的时机还可以再打磨一下。" : "你和他的化学反应，确实已经打出来了。")}`;
+                paragraphTwo = `${renderInlinePlayerMention(favoriteCaptain, "", true)}是你经常选择的队长，他也是很多人青睐的队长人选，跟着主流走永远不会错。你每次选他当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvgCaptain))}分，${favoriteComparison}${hasFavoriteComparison && averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这个塞尔维亚大胖子。" : (hasFavoriteComparison ? "看来你选队长的时机还可以再打磨一下。" : "你和他的化学反应，确实已经打出来了。")}`;
             } else {
-                paragraphTwo = `什么？！你最常选的队长居然不是约基奇？看来你的品味非常之独特，保持特立独行永远是范特西游戏中最酷的精神，继续保持！你每次选${renderInlinePlayerMention(favoriteCaptain)}当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvgCaptain))}分，${favoriteComparison}${hasFavoriteComparison && averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这名球员。" : (hasFavoriteComparison ? "看来你选队长的时机还可以再打磨一下。" : "这份偏爱，已经很有你自己的味道了。")}`;
+                paragraphTwo = `什么？！你最常选的队长居然不是约基奇？看来你的品味非常之独特，保持特立独行永远是范特西游戏中最酷的精神，继续保持！你每次选${renderInlinePlayerMention(favoriteCaptain, "", true)}当队长平均能够拿下${mark(formatSummaryDecimal(favoriteAvgCaptain))}分，${favoriteComparison}${hasFavoriteComparison && averageDelta >= 0 ? "你不仅很懂这个游戏，更懂这名球员。" : (hasFavoriteComparison ? "看来你选队长的时机还可以再打磨一下。" : "这份偏爱，已经很有你自己的味道了。")}`;
             }
         }
 
@@ -737,12 +749,12 @@
 
         let paragraphThree = "等 Captain 记录再丰富一点，这一页会更像属于你自己的队长回忆录。";
         if (bestCaptain?.captain_name && worstCaptain?.captain_name) {
-            paragraphThree = `最高分的一次队长来自${mark(bestCaptain.label || "")} · ${renderInlinePlayerMention(bestCaptain)} · ${mark(bestCaptainPoints)}；而最让人难过的那次，则是${mark(worstCaptain.label || "")} · ${renderInlinePlayerMention(worstCaptain)} · ${mark(worstCaptainPoints)}。整个赛季你一共 c 到过${mark(formatSummaryNumber(zeroCount))}次 0 分，${zeroCount > 0 ? "哎，运气也是这个游戏的一部分，希望你不要灰心，一个赛季总有起起伏伏。" : "不得不承认你真的太会选队长了。"} `;
+            paragraphThree = `最高分的一次队长来自${mark(bestCaptain.label || "")} · ${renderInlinePlayerMention(bestCaptain, "", true)} · ${mark(bestCaptainPoints)}；而最让人难过的那次，则是${mark(worstCaptain.label || "")} · ${renderInlinePlayerMention(worstCaptain, "", true)} · ${mark(worstCaptainPoints)}。整个赛季你一共 c 到过${mark(formatSummaryNumber(zeroCount))}次 0 分，${zeroCount > 0 ? "哎，运气也是这个游戏的一部分，希望你不要灰心，一个赛季总有起起伏伏。" : "不得不承认你真的太会选队长了。"} `;
         }
 
         let paragraphFour = "这个赛季你最像 DIFF 大师的那一次，也说明你不是只会跟着模板走。";
         if (lowestOwnership?.captain_name) {
-            paragraphFour = `如果要说最 diff 的那一次，大概就是${mark(lowestOwnershipLabel)}的${renderInlinePlayerMention(lowestOwnership)}了。当时他的持有率只有${mark(lowestOwnershipPercent)}，却依然替你拿下了${mark(lowestOwnershipPoints)}，勇气可嘉，值得称赞！`;
+            paragraphFour = `如果要说最 diff 的那一次，大概就是${mark(lowestOwnershipLabel)}的${renderInlinePlayerMention(lowestOwnership, "", true)}了。当时他的持有率只有${mark(lowestOwnershipPercent)}，却依然替你拿下了${mark(lowestOwnershipPoints)}，勇气可嘉，值得称赞！`;
         }
 
         return renderStoryPage({
@@ -760,7 +772,12 @@
         const bestCaptain = summary.best || null;
         const worstCaptain = summary.worst || null;
         const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
-        const formatDateText = (item) => String(item?.date_label || item?.label || "那一天").trim() || "那一天";
+        const formatDateText = (item) => {
+            const datePart = String(item?.date_label || "").trim();
+            const gwDayPart = String(item?.label || "").trim();
+            if (datePart && gwDayPart) return `${datePart} ${gwDayPart}`;
+            return datePart || gwDayPart || "那一天";
+        };
         const buildStatsText = (item) => `${formatSummaryNumber(item?.points_scored || 0)}分${formatSummaryNumber(item?.rebounds || 0)}篮板${formatSummaryNumber(item?.assists || 0)}助攻${formatSummaryNumber(item?.steals || 0)}抢断${formatSummaryNumber(item?.blocks || 0)}盖帽`;
         const renderPortrait = (item) => {
             const safeName = getStoryPlayerName(item);
@@ -800,6 +817,7 @@
             <section class="season-summary-page season-summary-page-story season-summary-page-captain-moments">
                 <div class="season-summary-story-main">
                     <div class="season-summary-story-shell season-summary-captain-moments-copy">
+                        <div class="season-summary-page-title">Moment</div>
                         <div class="season-summary-captain-moments">
                             <article class="season-summary-captain-moment">
                                 <p class="season-summary-story-paragraph">${bestParagraph}</p>
@@ -836,7 +854,7 @@
         if (bestRank) {
             stories.push(`
                 <div class="season-summary-highlight-story">
-                    <p class="season-summary-story-paragraph">${mark(bestRank.label)}也是一个特殊的日子，你拿到了${mark(`${formatSummaryNumber(bestRank.points)}分`)}，最关键的是单日OR为${mark(formatSummaryNumber(bestRank.game_rank || 0))}，比起一场比赛的输赢，这种站上更高位置的瞬间更像赛季里真正的高光</p>
+                    <p class="season-summary-story-paragraph">${mark(bestRank.label)}则是一个更特殊一个特殊的日子，你拿到了${mark(`${formatSummaryNumber(bestRank.points)}分`)}，最关键的是单日OR为${mark(formatSummaryNumber(bestRank.game_rank || 0))}，比起一场比赛的输赢，这种站上更高位置的瞬间更像赛季里真正的高光</p>
                     ${renderHighlightPlayerCards(bestRank?.lineup)}
                 </div>
             `);

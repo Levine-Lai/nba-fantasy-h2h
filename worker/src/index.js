@@ -4184,6 +4184,10 @@ function formatBeijingDateTimeLabel(value = Date.now()) {
 
 function formatBeijingMonthDayLabel(value = Date.now()) {
   const date = value instanceof Date ? value : new Date(value);
+  const year = Number(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+  }).format(date));
   const month = Number(new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Shanghai",
     month: "2-digit",
@@ -4192,10 +4196,14 @@ function formatBeijingMonthDayLabel(value = Date.now()) {
     timeZone: "Asia/Shanghai",
     day: "2-digit",
   }).format(date));
-  if (!Number.isFinite(month) || !Number.isFinite(day) || month <= 0 || day <= 0) {
+  if (
+    !Number.isFinite(year) || year <= 0 ||
+    !Number.isFinite(month) || month <= 0 ||
+    !Number.isFinite(day) || day <= 0
+  ) {
     return "";
   }
-  return `${month}月${day}日`;
+  return `${year}年${month}月${day}日`;
 }
 
 function formatFantasyScore(value) {
