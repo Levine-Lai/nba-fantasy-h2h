@@ -55,6 +55,11 @@ import {
 } from "./lib/manager-meta.js";
 
 const LEAGUE_ID = 1653;
+const SEASON_SUMMARY_LEAGUE_ID = 1233;
+const SEASON_SUMMARY_CACHE_VERSION = "20260410c";
+const SEASON_SUMMARY_CACHE_PREFIX = `season_summary:${SEASON_SUMMARY_CACHE_VERSION}:`;
+const SEASON_SUMMARY_PREWARM_CURSOR_KEY = `season_summary_prewarm_cursor:${SEASON_SUMMARY_CACHE_VERSION}`;
+const SEASON_SUMMARY_PREWARM_META_KEY = `season_summary_prewarm_meta:${SEASON_SUMMARY_CACHE_VERSION}`;
 const CACHE_KEY = "latest_state";
 const CACHE_CURSOR_KEY = "refresh_cursor";
 const INJURY_CACHE_KEY = "injury_state";
@@ -666,14 +671,15 @@ function stripHtml(text) {
   return decodeHtmlEntities(String(text || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
 }
 
-async function fetchAllStandings(phase) {
+async function fetchAllStandings(phase, leagueId = LEAGUE_ID) {
   const rows = [];
   const seenEntries = new Set();
   const targetPhase = Number(phase || 0) || 1;
+  const targetLeagueId = Number(leagueId || LEAGUE_ID) || LEAGUE_ID;
 
   for (let page = 1; page <= 20; page += 1) {
     const data = await fetchJsonSafe(
-      `/leagues-classic/${LEAGUE_ID}/standings/?phase=${targetPhase}&page_standings=${page}`,
+      `/leagues-classic/${targetLeagueId}/standings/?phase=${targetPhase}&page_standings=${page}`,
       4
     );
     if (!data.ok) break;
@@ -698,7 +704,7 @@ async function fetchAllStandings(phase) {
 
   if (rows.length > 0) return rows;
 
-  const fallback = await fetchJsonSafe(`/leagues-classic/${LEAGUE_ID}/standings/?phase=${targetPhase}`, 4);
+  const fallback = await fetchJsonSafe(`/leagues-classic/${targetLeagueId}/standings/?phase=${targetPhase}`, 4);
   return Array.isArray(fallback.data?.standings?.results) ? fallback.data.standings.results : [];
 }
 
@@ -4731,7 +4737,7 @@ function computeLeaguePercentileByRank(rank, managerCount) {
   return Math.max(0, Math.min(100, Math.round(percentile)));
 }
 
-async function buildSeasonSummaryPayload(uidInput) {
+async function buildSeasonSummaryPayload(uidInput, options = {}) {
   const uidNumber = uidToNumber(uidInput);
   if (!uidNumber) {
     throw new Error("uid is required");
@@ -4783,7 +4789,9 @@ async function buildSeasonSummaryPayload(uidInput) {
   const previousSeasonPoints = previousSeason ? formatFantasyScore(previousSeason?.total_points || previousSeason?.points || previousSeason?.total || 0) : null;
   const previousSeasonRank = previousSeason ? Number(previousSeason?.rank || 0) || null : null;
   const pointsDelta = previousSeasonPoints !== null ? totalSeasonPoints - previousSeasonPoints : null;
-  const leagueStandingsRows = await fetchAllStandings(1);
+  const leagueStandingsRows = Array.isArray(options?.leagueStandingsRows)
+    ? options.leagueStandingsRows
+    : await fetchAllStandings(1, SEASON_SUMMARY_LEAGUE_ID);
   const leagueManagerCount = Math.max(1, Number(leagueStandingsRows.length || UID_LIST.length));
   const leagueStandingRow = leagueStandingsRows.find((row) => Number(row?.entry || 0) === Number(uidNumber || 0)) || null;
   const leagueRank = Number(leagueStandingRow?.rank || 0) || null;
@@ -5287,6 +5295,170 @@ async function buildSeasonSummaryPayload(uidInput) {
   };
 }
 
+function isTruthyQueryValue(value) {
+  const text = String(value || "").trim().toLowerCase();
+  return text === "1" || text === "true" || text === "yes" || text === "y";
+}
+
+function isAuthorizedRefreshRequest(url, env) {
+  const auth = env?.REFRESH_TOKEN;
+  if (!auth) return true;
+  return url.searchParams.get("token") === auth;
+}
+
+function getSeasonSummaryCacheKey(uidInput) {
+  const uidNumber = uidToNumber(uidInput);
+  return uidNumber ? `${SEASON_SUMMARY_CACHE_PREFIX}${uidNumber}` : "";
+}
+
+function withSeasonSummaryCacheMeta(payload, meta = {}) {
+  return {
+    ...(payload || {}),
+    cache_meta: {
+      version: SEASON_SUMMARY_CACHE_VERSION,
+      league_id: SEASON_SUMMARY_LEAGUE_ID,
+      ...meta,
+    },
+  };
+}
+
+async function readSeasonSummaryCache(env, uidInput) {
+  const key = getSeasonSummaryCacheKey(uidInput);
+  if (!key) return null;
+  const raw = await env.NBA_CACHE.get(key);
+  if (!raw) return null;
+  try {
+    const cached = JSON.parse(raw);
+    if (cached?.version === SEASON_SUMMARY_CACHE_VERSION && cached?.payload) {
+      return withSeasonSummaryCacheMeta(cached.payload, {
+        hit: true,
+        key,
+        generated_at: cached.generated_at || null,
+      });
+    }
+    if (cached?.success) {
+      return withSeasonSummaryCacheMeta(cached, { hit: true, key, generated_at: cached.generated_at || null });
+    }
+  } catch (error) {
+    console.warn(`season summary cache parse failed for ${key}:`, error?.message || error);
+  }
+  return null;
+}
+
+async function writeSeasonSummaryCache(env, uidInput, payload) {
+  const key = getSeasonSummaryCacheKey(uidInput);
+  if (!key || !payload?.success) return null;
+  const wrapper = {
+    version: SEASON_SUMMARY_CACHE_VERSION,
+    league_id: SEASON_SUMMARY_LEAGUE_ID,
+    uid: String(uidToNumber(uidInput)),
+    generated_at: new Date().toISOString(),
+    payload,
+  };
+  await env.NBA_CACHE.put(key, JSON.stringify(wrapper));
+  return key;
+}
+
+function extractSeasonSummaryLeagueUids(rows) {
+  const seen = new Set();
+  const uids = [];
+  for (const row of rows || []) {
+    const uid = uidToNumber(row?.entry);
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    uids.push(String(uid));
+  }
+  return uids;
+}
+
+async function fetchSeasonSummaryLeagueUids() {
+  const rows = await fetchAllStandings(1, SEASON_SUMMARY_LEAGUE_ID);
+  return {
+    rows,
+    uids: extractSeasonSummaryLeagueUids(rows),
+  };
+}
+
+async function buildCachedSeasonSummaryPayload(env, uidInput, options = {}) {
+  const refresh = !!options?.refresh;
+  if (!refresh) {
+    const cached = await readSeasonSummaryCache(env, uidInput);
+    if (cached) return cached;
+  }
+
+  const payload = await buildSeasonSummaryPayload(uidInput, options);
+  const key = await writeSeasonSummaryCache(env, uidInput, payload);
+  return withSeasonSummaryCacheMeta(payload, {
+    hit: false,
+    key,
+    generated_at: new Date().toISOString(),
+  });
+}
+
+async function buildSeasonSummaryPrewarmPayload(env, options = {}) {
+  const refresh = !!options?.refresh;
+  const requestedCursor = Number(options?.cursor);
+  const requestedLimit = Number(options?.limit);
+  const requestedConcurrency = Number(options?.concurrency);
+  const { rows, uids } = await fetchSeasonSummaryLeagueUids();
+
+  const storedCursorRaw = await env.NBA_CACHE.get(SEASON_SUMMARY_PREWARM_CURSOR_KEY);
+  const storedCursor = Number(storedCursorRaw || 0);
+  const cursor = Number.isFinite(requestedCursor) && requestedCursor >= 0
+    ? requestedCursor
+    : (Number.isFinite(storedCursor) && storedCursor >= 0 ? storedCursor : 0);
+  const limit = Math.max(1, Math.min(20, Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 8));
+  const concurrency = Math.max(1, Math.min(4, Number.isFinite(requestedConcurrency) && requestedConcurrency > 0 ? requestedConcurrency : 2));
+  const batch = uids.slice(cursor, cursor + limit);
+  const startedAt = new Date().toISOString();
+
+  const results = await mapLimit(batch, concurrency, async (uid) => {
+    try {
+      if (!refresh) {
+        const cached = await readSeasonSummaryCache(env, uid);
+        if (cached) {
+          return { uid, status: "cached" };
+        }
+      }
+      const payload = await buildSeasonSummaryPayload(uid, { leagueStandingsRows: rows });
+      await writeSeasonSummaryCache(env, uid, payload);
+      return { uid, status: "generated" };
+    } catch (error) {
+      return { uid, status: "error", error: String(error?.message || error || "failed") };
+    }
+  });
+
+  const nextCursor = cursor + batch.length >= uids.length ? 0 : cursor + batch.length;
+  const done = nextCursor === 0;
+  const meta = {
+    version: SEASON_SUMMARY_CACHE_VERSION,
+    league_id: SEASON_SUMMARY_LEAGUE_ID,
+    total_uids: uids.length,
+    cursor,
+    next_cursor: nextCursor,
+    done,
+    limit,
+    concurrency,
+    refresh,
+    started_at: startedAt,
+    finished_at: new Date().toISOString(),
+    generated_count: results.filter((item) => item?.status === "generated").length,
+    cached_count: results.filter((item) => item?.status === "cached").length,
+    error_count: results.filter((item) => item?.status === "error").length,
+  };
+
+  await env.NBA_CACHE.put(SEASON_SUMMARY_PREWARM_CURSOR_KEY, String(nextCursor));
+  await env.NBA_CACHE.put(SEASON_SUMMARY_PREWARM_META_KEY, JSON.stringify(meta));
+
+  return {
+    success: true,
+    ...meta,
+    uids,
+    batch,
+    results,
+  };
+}
+
 export default {
   async fetch(request, env, ctx) {
     try {
@@ -5327,6 +5499,34 @@ export default {
         });
       }
 
+      if (path === "/api/season-summary/prewarm") {
+        if (!isAuthorizedRefreshRequest(url, env)) {
+          return jsonResponse(
+            { success: false, error: "unauthorized" },
+            401,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
+        }
+        try {
+          return jsonResponse(
+            await buildSeasonSummaryPrewarmPayload(env, {
+              refresh: isTruthyQueryValue(url.searchParams.get("refresh")),
+              cursor: url.searchParams.has("cursor") ? Number(url.searchParams.get("cursor")) : undefined,
+              limit: url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : undefined,
+              concurrency: url.searchParams.has("concurrency") ? Number(url.searchParams.get("concurrency")) : undefined,
+            }),
+            200,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
+        } catch (error) {
+          return jsonResponse(
+            { success: false, error: String(error?.message || error || "season summary prewarm failed") },
+            500,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
+        }
+      }
+
       if (path === "/api/season-summary") {
         const uid = url.searchParams.get("uid") || url.searchParams.get("entry_id");
         if (!uid) {
@@ -5336,9 +5536,17 @@ export default {
             { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
           );
         }
+        const refresh = isTruthyQueryValue(url.searchParams.get("refresh"));
+        if (refresh && !isAuthorizedRefreshRequest(url, env)) {
+          return jsonResponse(
+            { success: false, error: "unauthorized" },
+            401,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
+        }
         try {
           return jsonResponse(
-            await buildSeasonSummaryPayload(uid),
+            await buildCachedSeasonSummaryPayload(env, uid, { refresh }),
             200,
             { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
           );
