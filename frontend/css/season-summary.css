@@ -2736,3 +2736,55 @@
         gap: 8px;
     }
 }
+
+/* ===== First Run Intro ===== */
+.season-summary-intro {
+    gap: clamp(16px, 3vh, 34px);
+    padding-top: clamp(18px, 4vh, 52px);
+    padding-bottom: clamp(28px, 6vh, 82px);
+}
+
+.season-summary-intro .season-summary-intro-matrix,
+.season-summary-shell.intro-ready .season-summary-intro-matrix,
+.season-summary-shell.intro-loading:not(.intro-leaving) .season-summary-intro-matrix {
+    width: min(680px, 76vw);
+    max-height: none;
+    margin-top: 0;
+}
+
+.season-summary-intro-matrix img {
+    width: 100%;
+    max-height: min(66vh, 720px);
+    object-fit: contain;
+    filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.22));
+}
+
+.season-summary-intro .season-summary-search-stage,
+.season-summary-shell.intro-loading:not(.intro-leaving) .season-summary-search-stage {
+    width: min(560px, 100%);
+    margin-top: 0;
+}
+
+@media (max-width: 768px) {
+    .season-summary-intro {
+        gap: 14px;
+        padding: max(16px, env(safe-area-inset-top)) 14px 34px;
+    }
+
+    .season-summary-intro .season-summary-intro-matrix,
+    .season-summary-shell.intro-ready .season-summary-intro-matrix,
+    .season-summary-shell.intro-loading:not(.intro-leaving) .season-summary-intro-matrix {
+        width: min(88vw, 360px);
+        max-height: none;
+    }
+
+    .season-summary-intro-matrix img {
+        max-height: min(58vh, 430px);
+    }
+
+    .season-summary-intro .season-summary-search-stage,
+    .season-summary-shell.intro-loading:not(.intro-leaving) .season-summary-search-stage {
+        width: min(100%, 390px);
+        margin-top: 0;
+    }
+}
