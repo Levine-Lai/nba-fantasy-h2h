@@ -860,7 +860,7 @@
         if (bestRank) {
             stories.push(`
                 <div class="season-summary-highlight-story">
-                    <p class="season-summary-story-paragraph">${mark(bestRank.label)}则是一个更特殊一个特殊的日子，你拿到了${mark(`${formatSummaryNumber(bestRank.points)}分`)}，最关键的是单日OR为${mark(formatSummaryNumber(bestRank.game_rank || 0))}，比起一场比赛的输赢，这种站上更高位置的瞬间更像赛季里真正的高光</p>
+                    <p class="season-summary-story-paragraph">${mark(formatHighlightLabel(bestRank))}则是一个更特殊一个特殊的日子，你拿到了${mark(`${formatSummaryNumber(bestRank.points)}分`)}，最关键的是单日OR为${mark(formatSummaryNumber(bestRank.game_rank || 0))}，比起一场比赛的输赢，这种站上更高位置的瞬间更像赛季里真正的高光</p>
                     ${renderHighlightPlayerCards(bestRank?.lineup)}
                 </div>
             `);
