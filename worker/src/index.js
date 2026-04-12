@@ -56,13 +56,10 @@ import {
 
 const LEAGUE_ID = 1653;
 const SEASON_SUMMARY_LEAGUE_ID = 1233;
-const SEASON_SUMMARY_CACHE_VERSION = "20260412f";
+const SEASON_SUMMARY_CACHE_VERSION = "20260412d";
 const SEASON_SUMMARY_CACHE_PREFIX = `season_summary:${SEASON_SUMMARY_CACHE_VERSION}:`;
 const SEASON_SUMMARY_PREWARM_CURSOR_KEY = `season_summary_prewarm_cursor:${SEASON_SUMMARY_CACHE_VERSION}`;
 const SEASON_SUMMARY_PREWARM_META_KEY = `season_summary_prewarm_meta:${SEASON_SUMMARY_CACHE_VERSION}`;
-const SEASON_SUMMARY_STANDINGS_CACHE_KEY = `season_summary_standings:${SEASON_SUMMARY_CACHE_VERSION}`;
-const SEASON_SUMMARY_STANDINGS_TTL_SEC = 300;
-const SEASON_SUMMARY_MOMENTS_CACHE_PREFIX = `season_summary_moments:${SEASON_SUMMARY_CACHE_VERSION}:`;
 const CACHE_KEY = "latest_state";
 const CACHE_CURSOR_KEY = "refresh_cursor";
 const INJURY_CACHE_KEY = "injury_state";
@@ -4620,23 +4617,22 @@ async function buildSeasonCaptainRecords(uidNumber, captainEvents, elements, eve
 
   const recordsByEvent = new Map();
   const unresolved = [];
-  await mapLimit(chips, 4, async (chip) => {
-    const record = await buildSeasonCaptainRecord(uidNumber, chip, elements, eventMetaById, 5);
+
+  for (const chip of chips) {
+    const record = await buildSeasonCaptainRecord(uidNumber, chip, elements, eventMetaById, 6);
     if (record) {
       recordsByEvent.set(Number(record?.event || 0), record);
     } else {
       unresolved.push(chip);
     }
-    return null;
-  });
+  }
 
   if (unresolved.length) {
-    await new Promise((resolve) => setTimeout(resolve, 220));
-    await mapLimit(unresolved, 3, async (chip) => {
-      const record = await buildSeasonCaptainRecord(uidNumber, chip, elements, eventMetaById, 7);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    for (const chip of unresolved) {
+      const record = await buildSeasonCaptainRecord(uidNumber, chip, elements, eventMetaById, 8);
       if (record) recordsByEvent.set(Number(record?.event || 0), record);
-      return null;
-    });
+    }
   }
 
   return [...recordsByEvent.values()].sort((a, b) =>
@@ -4774,8 +4770,7 @@ function buildSeasonMomentPlayerRecord(player, eventId, eventMetaById) {
   const meta = eventMetaById?.[safeEventId] || {};
   const stats = player?.stats || {};
   const basePoints = Number(player?.base_points || 0);
-  const eventPriceRaw = Number(player?.selling_price || player?.purchase_price || player?.now_cost || 0);
-  const price = eventPriceRaw > 0 ? eventPriceRaw / 10 : 0;
+  const price = Number(player?.now_cost || 0) / 10;
   const didPlay =
     Number(stats?.minutes || 0) > 0 ||
     Number(stats?.points || 0) > 0 ||
@@ -4822,7 +4817,6 @@ async function buildSeasonAdditionalMomentRecords(uidNumber, eventIds, bootstrap
   const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
   let bestBench = null;
   let bestStarterValue = null;
-  const failedEventIds = [];
 
   const pickBetterBench = (candidate) => {
     if (!candidate) return;
@@ -4862,43 +4856,27 @@ async function buildSeasonAdditionalMomentRecords(uidNumber, eventIds, bootstrap
     if (Number(candidate?.event || 0) < Number(bestStarterValue?.event || 0)) bestStarterValue = candidate;
   };
 
-  const processEvent = async (eventId, retries) => {
+  await mapLimit(safeEventIds, 4, async (eventId) => {
     const [picksRes, liveRes] = await Promise.all([
-      fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, retries),
-      fetchJsonSafe(`/event/${eventId}/live/`, retries),
+      fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 3),
+      fetchJsonSafe(`/event/${eventId}/live/`, 3),
     ]);
-    if (!picksRes.ok || !liveRes.ok) return false;
+    if (!picksRes.ok || !liveRes.ok) return null;
 
     const liveElements = buildLiveElementsMap(liveRes.data);
     const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
 
     for (const player of picks) {
       const record = buildSeasonMomentPlayerRecord(player, eventId, eventMetaById);
-      const lineupPosition = Number(player?.lineup_position || 0);
-      const isStarter = Number(player?.multiplier || 0) > 0 && lineupPosition > 0 && lineupPosition <= 5;
-      const isBench = lineupPosition > 5 || (lineupPosition > 0 && Number(player?.multiplier || 0) <= 0);
-
-      if (isBench) {
+      if (Number(player?.multiplier || 0) <= 0 || Number(player?.lineup_position || 0) > 5) {
         pickBetterBench(record);
       }
-      if (isStarter && Number(record?.price || 0) > 0) {
+      if (Number(player?.multiplier || 0) > 0 && Number(record?.price || 0) > 0) {
         pickBetterStarterValue(record);
       }
     }
-    return true;
-  };
-
-  await mapLimit(safeEventIds, 4, async (eventId) => {
-    const ok = await processEvent(eventId, 4);
-    if (!ok) failedEventIds.push(eventId);
     return null;
   });
-
-  if (failedEventIds.length) {
-    for (const eventId of failedEventIds) {
-      await processEvent(eventId, 8);
-    }
-  }
 
   return {
     bench_best: bestBench,
@@ -4935,8 +4913,6 @@ async function buildSeasonSummaryPayload(uidInput, options = {}) {
   const entryData = entryRes.ok ? entryRes.data : null;
   const elements = buildElementsMap(bootstrap);
   const eventMetaById = buildEventMetaById(bootstrap.events || []);
-  const includeAdditionalMoments = !!options?.includeAdditionalMoments;
-  const includeHighlightLineups = !!options?.includeHighlightLineups;
   const seasonTeamsById = {};
   for (const team of bootstrap?.teams || []) {
     seasonTeamsById[Number(team?.id || 0)] = {
@@ -5121,26 +5097,22 @@ async function buildSeasonSummaryPayload(uidInput, options = {}) {
     .filter((row) => getHistoryGameRank(row) > 0)
     .sort((a, b) => getHistoryGameRank(a) - getHistoryGameRank(b))[0] || null;
   const bestRankMeta = eventMetaById?.[Number(bestRankRow?.event || 0)] || {};
-  const additionalMoments = includeAdditionalMoments
-    ? await buildSeasonAdditionalMomentRecords(
-      uidNumber,
-      rowEventIds,
-      bootstrap,
-      elements,
-      eventMetaById
-    )
-    : { bench_best: null, starter_best_value: null };
+  const additionalMoments = await buildSeasonAdditionalMomentRecords(
+    uidNumber,
+    rowEventIds,
+    bootstrap,
+    elements,
+    eventMetaById
+  );
   const highlightEventIds = [...new Set(
     [Number(bestDayRow?.event || 0), Number(bestRankRow?.event || 0)].filter((value) => value > 0)
   )];
-  const highlightLineupEntries = includeHighlightLineups
-    ? await Promise.all(
-      highlightEventIds.map(async (eventId) => [
-        eventId,
-        await buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap, elements, eventMetaById, captainEventSet.has(Number(eventId || 0))),
-      ])
-    )
-    : [];
+  const highlightLineupEntries = await Promise.all(
+    highlightEventIds.map(async (eventId) => [
+      eventId,
+      await buildSeasonHighlightLineupSnapshot(uidNumber, eventId, bootstrap, elements, eventMetaById, captainEventSet.has(Number(eventId || 0))),
+    ])
+  );
   const highlightLineupsByEvent = Object.fromEntries(highlightLineupEntries);
 
   const managerName = getManagerDisplayName(uidNumber, historyData, entryData);
@@ -5604,83 +5576,12 @@ function extractSeasonSummaryLeagueUids(rows) {
   return uids;
 }
 
-async function getSeasonSummaryLeagueStandingsRows(env, options = {}) {
-  const force = !!options?.force;
-  if (!force) {
-    const raw = await env.NBA_CACHE.get(SEASON_SUMMARY_STANDINGS_CACHE_KEY);
-    if (raw) {
-      try {
-        const cached = JSON.parse(raw);
-        if (
-          cached?.version === SEASON_SUMMARY_CACHE_VERSION &&
-          Array.isArray(cached?.rows) &&
-          cached.rows.length
-        ) {
-          return cached.rows;
-        }
-      } catch (error) {
-        console.warn("season summary standings cache parse failed:", error?.message || error);
-      }
-    }
-  }
-
+async function fetchSeasonSummaryLeagueUids() {
   const rows = await fetchAllStandings(1, SEASON_SUMMARY_LEAGUE_ID);
-  const wrapper = {
-    version: SEASON_SUMMARY_CACHE_VERSION,
-    generated_at: new Date().toISOString(),
+  return {
     rows,
+    uids: extractSeasonSummaryLeagueUids(rows),
   };
-  await env.NBA_CACHE.put(
-    SEASON_SUMMARY_STANDINGS_CACHE_KEY,
-    JSON.stringify(wrapper),
-    { expirationTtl: SEASON_SUMMARY_STANDINGS_TTL_SEC }
-  );
-  return rows;
-}
-
-function getSeasonSummaryMomentCacheKey(uidInput) {
-  const uidNumber = uidToNumber(uidInput);
-  return uidNumber ? `${SEASON_SUMMARY_MOMENTS_CACHE_PREFIX}${uidNumber}` : "";
-}
-
-async function readSeasonSummaryMomentCache(env, uidInput) {
-  const key = getSeasonSummaryMomentCacheKey(uidInput);
-  if (!key) return null;
-  const raw = await env.NBA_CACHE.get(key);
-  if (!raw) return null;
-  try {
-    const cached = JSON.parse(raw);
-    if (cached?.version === SEASON_SUMMARY_CACHE_VERSION && cached?.payload?.success) {
-      return cached.payload;
-    }
-  } catch (error) {
-    console.warn(`season summary moments cache parse failed for ${key}:`, error?.message || error);
-  }
-  return null;
-}
-
-async function writeSeasonSummaryMomentCache(env, uidInput, payload) {
-  const key = getSeasonSummaryMomentCacheKey(uidInput);
-  if (!key || !payload?.success) return null;
-  const wrapper = {
-    version: SEASON_SUMMARY_CACHE_VERSION,
-    uid: String(uidToNumber(uidInput)),
-    generated_at: new Date().toISOString(),
-    payload,
-  };
-  await env.NBA_CACHE.put(key, JSON.stringify(wrapper));
-  return key;
-}
-
-async function buildCachedSeasonSummaryMomentExtrasPayload(env, uidInput, options = {}) {
-  const refresh = !!options?.refresh;
-  if (!refresh) {
-    const cached = await readSeasonSummaryMomentCache(env, uidInput);
-    if (cached) return cached;
-  }
-  const payload = await buildSeasonSummaryMomentExtrasPayload(uidInput);
-  await writeSeasonSummaryMomentCache(env, uidInput, payload);
-  return payload;
 }
 
 async function buildCachedSeasonSummaryPayload(env, uidInput, options = {}) {
@@ -5690,15 +5591,7 @@ async function buildCachedSeasonSummaryPayload(env, uidInput, options = {}) {
     if (cached) return cached;
   }
 
-  const leagueStandingsRows = Array.isArray(options?.leagueStandingsRows) && options.leagueStandingsRows.length
-    ? options.leagueStandingsRows
-    : await getSeasonSummaryLeagueStandingsRows(env, { force: refresh });
-  const payload = await buildSeasonSummaryPayload(uidInput, {
-    ...options,
-    leagueStandingsRows,
-    includeAdditionalMoments: false,
-    includeHighlightLineups: false,
-  });
+  const payload = await buildSeasonSummaryPayload(uidInput, options);
   const key = await writeSeasonSummaryCache(env, uidInput, payload);
   return withSeasonSummaryCacheMeta(payload, {
     hit: false,
@@ -5712,8 +5605,7 @@ async function buildSeasonSummaryPrewarmPayload(env, options = {}) {
   const requestedCursor = Number(options?.cursor);
   const requestedLimit = Number(options?.limit);
   const requestedConcurrency = Number(options?.concurrency);
-  const rows = await getSeasonSummaryLeagueStandingsRows(env, { force: refresh });
-  const uids = extractSeasonSummaryLeagueUids(rows);
+  const { rows, uids } = await fetchSeasonSummaryLeagueUids();
 
   const storedCursorRaw = await env.NBA_CACHE.get(SEASON_SUMMARY_PREWARM_CURSOR_KEY);
   const storedCursor = Number(storedCursorRaw || 0);
@@ -5858,15 +5750,8 @@ export default {
           );
         }
         try {
-          const payload = await buildCachedSeasonSummaryPayload(env, uid, { refresh });
-          if (!refresh) {
-            ctx.waitUntil(
-              buildCachedSeasonSummaryMomentExtrasPayload(env, uid, { refresh: false })
-                .catch((error) => console.warn("season summary moments background warm failed:", error?.message || error))
-            );
-          }
           return jsonResponse(
-            payload,
+            await buildCachedSeasonSummaryPayload(env, uid, { refresh }),
             200,
             { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
           );
@@ -5918,17 +5803,9 @@ export default {
             { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
           );
         }
-        const refresh = isTruthyQueryValue(url.searchParams.get("refresh"));
-        if (refresh && !isAuthorizedRefreshRequest(url, env)) {
-          return jsonResponse(
-            { success: false, error: "unauthorized" },
-            401,
-            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
-          );
-        }
         try {
           return jsonResponse(
-            await buildCachedSeasonSummaryMomentExtrasPayload(env, uid, { refresh }),
+            await buildSeasonSummaryMomentExtrasPayload(uid),
             200,
             { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
           );

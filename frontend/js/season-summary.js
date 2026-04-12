@@ -44,7 +44,6 @@
     const state = {
         currentPage: 0,
         lastUid: "",
-        loadToken: 0,
     };
 
     function isStandalonePage() {
@@ -180,33 +179,30 @@
 
     async function hydrateMomentExtras(profile, uid) {
         const summary = profile?.captain?.summary;
-        if (!summary) return false;
+        if (!summary) return profile;
 
         const needsBench = !summary?.bench_best?.player_name;
         const needsValue = !summary?.starter_best_value?.player_name;
-        if (!needsBench && !needsValue) return false;
-        let updated = false;
+        if (!needsBench && !needsValue) return profile;
 
         try {
             const extras = await requestMomentExtras(uid);
             if (needsBench && extras?.bench_best?.player_name) {
                 summary.bench_best = extras.bench_best;
-                updated = true;
             }
             if (needsValue && extras?.starter_best_value?.player_name) {
                 summary.starter_best_value = extras.starter_best_value;
-                updated = true;
             }
         } catch (error) {
             console.warn("Moment extras hydrate failed:", error);
         }
 
-        return updated;
+        return profile;
     }
 
     async function hydrateHighlightLineups(profile, uid) {
         const summary = profile?.highlights?.summary;
-        if (!summary) return false;
+        if (!summary) return profile;
 
         const targets = [
             summary?.best_day ? {
@@ -223,7 +219,7 @@
             } : null,
         ].filter((item) => item && item.event && !item.hasLineup);
 
-        if (!targets.length) return false;
+        if (!targets.length) return profile;
 
         const results = await Promise.all(
             targets.map(async (target) => {
@@ -237,16 +233,14 @@
             })
         );
 
-        let updated = false;
         for (const result of results) {
             if (!result?.lineup || !Array.isArray(result.lineup?.players) || !result.lineup.players.length) continue;
             if (summary?.[result.key]) {
                 summary[result.key].lineup = result.lineup;
-                updated = true;
             }
         }
 
-        return updated;
+        return profile;
     }
 
     function formatSummaryNumber(value) {
@@ -362,7 +356,7 @@
                     <div class="season-summary-cover-or-title">OR 曲线</div>
                     <div class="season-summary-cover-or-badges">
                         <div class="season-summary-cover-or-badge">
-                            <span class="season-summary-cover-or-badge-label">最终 OR</span>
+                            <span class="season-summary-cover-or-badge-label">最新 OR</span>
                             <span class="season-summary-cover-or-badge-value">#${escapeHtml(formatSummaryNumber(latestPoint?.rank || 0))}</span>
                         </div>
                         <div class="season-summary-cover-or-badge">
@@ -1111,30 +1105,6 @@
         updateUrl(normalizedUid);
     }
 
-    function rerenderProfile(profile) {
-        const { pages } = refs();
-        if (!pages) return;
-        const current = Number(state.currentPage || 0);
-        pages.innerHTML = renderPages(profile);
-        state.currentPage = Math.max(0, Math.min(getPageCount() - 1, current));
-        updateIndicator();
-    }
-
-    async function hydrateDeferred(profile, uid, loadToken) {
-        try {
-            const [momentUpdated, highlightUpdated] = await Promise.all([
-                hydrateMomentExtras(profile, uid),
-                hydrateHighlightLineups(profile, uid),
-            ]);
-            if (state.loadToken !== loadToken) return;
-            if (momentUpdated || highlightUpdated) {
-                rerenderProfile(profile);
-            }
-        } catch (error) {
-            console.warn("Deferred hydrate failed:", error);
-        }
-    }
-
     async function loadSummary(uid) {
         const normalizedUid = String(uid || "").trim();
         const { pages, uidInput } = refs();
@@ -1146,8 +1116,6 @@
         }
 
         state.lastUid = normalizedUid;
-        const loadToken = state.loadToken + 1;
-        state.loadToken = loadToken;
         setHasProfile(false);
         setIntroLoading(true);
         setIntroLeaving(false);
@@ -1158,12 +1126,10 @@
 
         try {
             const profile = await requestSummary(normalizedUid);
-            if (state.loadToken !== loadToken) return;
+            await hydrateMomentExtras(profile, normalizedUid);
+            await hydrateHighlightLineups(profile, normalizedUid);
             await playIntroExit(profile, normalizedUid);
-            if (state.loadToken !== loadToken) return;
-            hydrateDeferred(profile, normalizedUid, loadToken);
         } catch (error) {
-            if (state.loadToken !== loadToken) return;
             console.error("Season summary load failed:", error);
             setIntroLeaving(false);
             setIntroLoading(false);
