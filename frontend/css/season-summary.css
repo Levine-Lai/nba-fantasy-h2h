@@ -3381,3 +3381,64 @@
         gap: 8px;
     }
 }
+
+/* ===== Bru Color Boost: vivid main cards + per-page text accents ===== */
+.season-summary-page-player-details {
+    --ss-text-card-accent: #2f6fff;
+    --ss-text-card-accent-soft: rgba(47, 111, 255, 0.14);
+}
+
+.season-summary-page-transfer {
+    --ss-text-card-accent: #ff7a1a;
+    --ss-text-card-accent-soft: rgba(255, 122, 26, 0.14);
+}
+
+.season-summary-page-captain,
+.season-summary-page-captain-moments {
+    --ss-text-card-accent: #d97706;
+    --ss-text-card-accent-soft: rgba(217, 119, 6, 0.14);
+}
+
+.season-summary-page-highlights {
+    --ss-text-card-accent: #8b5cf6;
+    --ss-text-card-accent-soft: rgba(139, 92, 246, 0.14);
+}
+
+.season-summary-page-closing {
+    --ss-text-card-accent: #3b82f6;
+    --ss-text-card-accent-soft: rgba(59, 130, 246, 0.12);
+}
+
+.season-summary-page-story .season-summary-story-paragraph::before {
+    background: var(--ss-text-card-accent);
+}
+
+.season-summary-page-story .season-summary-story-paragraph::after {
+    background:
+        radial-gradient(circle at 92% 14%, var(--ss-text-card-accent-soft) 0%, transparent 28%),
+        linear-gradient(90deg, var(--ss-text-card-accent-soft) 0%, transparent 18%);
+}
+
+.season-summary-page-player-details .season-summary-story-card-player-stat-total {
+    background: linear-gradient(180deg, #ffe674 0%, #ffd84c 100%);
+}
+
+.season-summary-page-player-details .season-summary-story-card-player-stat-average {
+    background: linear-gradient(180deg, #d6b5ff 0%, #bf93ff 100%);
+}
+
+.season-summary-page-transfer .season-summary-story-cards-transfer .season-summary-story-card:nth-child(1) {
+    background: linear-gradient(180deg, #ffd37d 0%, #ffbc56 100%);
+}
+
+.season-summary-page-transfer .season-summary-story-cards-transfer .season-summary-story-card:nth-child(2) {
+    background: linear-gradient(180deg, #ffc2c7 0%, #ff9ea8 100%);
+}
+
+.season-summary-page-captain .season-summary-story-cards-captain .season-summary-story-card:nth-child(1) {
+    background: linear-gradient(180deg, #ffe58a 0%, #ffd15a 100%);
+}
+
+.season-summary-page-captain .season-summary-story-cards-captain .season-summary-story-card:nth-child(2) {
+    background: linear-gradient(180deg, #d1b4ff 0%, #ba90ff 100%);
+}

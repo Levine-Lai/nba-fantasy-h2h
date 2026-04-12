@@ -78,6 +78,7 @@ function toGeneratedModule(snapshotByUid, generatedAt) {
 }
 
 async function main() {
+  console.log(`Using season summary API base: ${API_BASE}`);
   const members = await fetchLeagueUids(LEAGUE_ID);
   if (!members.length) {
     throw new Error(`No members found for league ${LEAGUE_ID}`);
@@ -120,5 +121,12 @@ async function main() {
 
 main().catch((error) => {
   console.error(error);
+  if (String(error?.message || error || "").includes("fetch failed")) {
+    console.error("\nHint:");
+    console.error(`- Current API base: ${API_BASE}`);
+    console.error("- If you want to use local worker, start it first and clear SEASON_SUMMARY_API_BASE.");
+    console.error("- PowerShell clear current session var: Remove-Item Env:SEASON_SUMMARY_API_BASE -ErrorAction SilentlyContinue");
+    console.error("- Then run from repo root: node scripts\\build-season-summary-snapshot.mjs");
+  }
   process.exit(1);
 });
