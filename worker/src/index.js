@@ -56,7 +56,7 @@ import {
 
 const LEAGUE_ID = 1653;
 const SEASON_SUMMARY_LEAGUE_ID = 1233;
-const SEASON_SUMMARY_CACHE_VERSION = "20260412d";
+const SEASON_SUMMARY_CACHE_VERSION = "20260412e";
 const SEASON_SUMMARY_CACHE_PREFIX = `season_summary:${SEASON_SUMMARY_CACHE_VERSION}:`;
 const SEASON_SUMMARY_PREWARM_CURSOR_KEY = `season_summary_prewarm_cursor:${SEASON_SUMMARY_CACHE_VERSION}`;
 const SEASON_SUMMARY_PREWARM_META_KEY = `season_summary_prewarm_meta:${SEASON_SUMMARY_CACHE_VERSION}`;
@@ -4748,10 +4748,9 @@ async function buildSeasonSummaryMomentExtrasPayload(uidInput) {
   const elements = buildElementsMap(bootstrap);
   const eventMetaById = buildEventMetaById(bootstrap.events || []);
   const rows = getSortedHistoryRows(historyData);
-  const rowEventIds = rows.map((row) => Number(row?.event || 0)).filter(Boolean);
   const extras = await buildSeasonAdditionalMomentRecords(
     uidNumber,
-    rowEventIds,
+    rows,
     bootstrap,
     elements,
     eventMetaById
@@ -4765,15 +4764,19 @@ async function buildSeasonSummaryMomentExtrasPayload(uidInput) {
   };
 }
 
-function buildSeasonMomentPlayerRecord(player, eventId, eventMetaById) {
+function buildSeasonMomentPlayerRecord(player, eventId, eventMetaById, eventHistory = null) {
   const safeEventId = Number(eventId || 0);
   const meta = eventMetaById?.[safeEventId] || {};
-  const stats = player?.stats || {};
-  const basePoints = Number(player?.base_points || 0);
-  const price = Number(player?.now_cost || 0) / 10;
+  const stats = eventHistory || player?.stats || {};
+  const basePoints = eventHistory
+    ? Number(eventHistory?.fantasy_points || 0)
+    : Number(player?.base_points || 0);
+  const price = eventHistory
+    ? Number(eventHistory?.price || 0)
+    : Number(player?.now_cost || 0) / 10;
   const didPlay =
     Number(stats?.minutes || 0) > 0 ||
-    Number(stats?.points || 0) > 0 ||
+    Number(stats?.points || stats?.points_scored || 0) > 0 ||
     Number(stats?.rebounds || 0) > 0 ||
     Number(stats?.assists || 0) > 0 ||
     Number(stats?.steals || 0) > 0 ||
@@ -4797,7 +4800,7 @@ function buildSeasonMomentPlayerRecord(player, eventId, eventMetaById) {
     is_captain: !!player?.is_captain,
     did_play: didPlay,
     minutes: Number(stats?.minutes || 0),
-    points_scored: Number(stats?.points || 0),
+    points_scored: Number(stats?.points || stats?.points_scored || 0),
     rebounds: Number(stats?.rebounds || 0),
     assists: Number(stats?.assists || 0),
     steals: Number(stats?.steals || 0),
@@ -4805,8 +4808,9 @@ function buildSeasonMomentPlayerRecord(player, eventId, eventMetaById) {
   };
 }
 
-async function buildSeasonAdditionalMomentRecords(uidNumber, eventIds, bootstrap, elements, eventMetaById) {
-  const safeEventIds = [...new Set((eventIds || []).map((eventId) => Number(eventId || 0)).filter((eventId) => eventId > 0))];
+async function buildSeasonAdditionalMomentRecords(uidNumber, historyRows, bootstrap, elements, eventMetaById) {
+  const safeRows = Array.isArray(historyRows) ? historyRows : [];
+  const safeEventIds = [...new Set(safeRows.map((row) => Number(row?.event || 0)).filter((eventId) => eventId > 0))];
   if (!uidNumber || !safeEventIds.length) {
     return {
       bench_best: null,
@@ -4815,8 +4819,44 @@ async function buildSeasonAdditionalMomentRecords(uidNumber, eventIds, bootstrap
   }
 
   const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
+  const benchEventSet = new Set(
+    safeRows
+      .filter((row) => Number(row?.points_on_bench || 0) > 0)
+      .map((row) => Number(row?.event || 0))
+      .filter((eventId) => eventId > 0)
+  );
+  const elementHistoryCache = new Map();
   let bestBench = null;
   let bestStarterValue = null;
+
+  const getElementEventHistoryIndex = async (elementId) => {
+    const safeElementId = Number(elementId || 0);
+    if (!safeElementId) return {};
+    if (!elementHistoryCache.has(safeElementId)) {
+      elementHistoryCache.set(safeElementId, (async () => {
+        const res = await fetchJsonSafe(`/element-summary/${safeElementId}/`, 3);
+        if (!res.ok || !res.data) return {};
+        const history = Array.isArray(res.data?.history) ? res.data.history : [];
+        const byRound = {};
+        for (const item of history) {
+          const round = Number(item?.round || 0);
+          if (!round) continue;
+          byRound[round] = {
+            fantasy_points: formatFantasyScore(item?.total_points || 0),
+            price: Number((Number(item?.value || 0) / 10).toFixed(1)),
+            minutes: Number(item?.minutes || 0),
+            points_scored: Number(item?.points_scored || 0),
+            rebounds: Number(item?.rebounds || 0),
+            assists: Number(item?.assists || 0),
+            steals: Number(item?.steals || 0),
+            blocks: Number(item?.blocks || 0),
+          };
+        }
+        return byRound;
+      })());
+    }
+    return await elementHistoryCache.get(safeElementId);
+  };
 
   const pickBetterBench = (candidate) => {
     if (!candidate) return;
@@ -4857,18 +4897,21 @@ async function buildSeasonAdditionalMomentRecords(uidNumber, eventIds, bootstrap
   };
 
   await mapLimit(safeEventIds, 4, async (eventId) => {
-    const [picksRes, liveRes] = await Promise.all([
-      fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 3),
-      fetchJsonSafe(`/event/${eventId}/live/`, 3),
-    ]);
-    if (!picksRes.ok || !liveRes.ok) return null;
+    const picksRes = await fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 3);
+    if (!picksRes.ok) return null;
 
-    const liveElements = buildLiveElementsMap(liveRes.data);
-    const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
+    const picks = buildLivePicksFromPicksData(
+      picksRes.data,
+      elements,
+      {},
+      teamsMetaById
+    );
 
     for (const player of picks) {
-      const record = buildSeasonMomentPlayerRecord(player, eventId, eventMetaById);
-      if (Number(player?.multiplier || 0) <= 0 || Number(player?.lineup_position || 0) > 5) {
+      const historyByRound = await getElementEventHistoryIndex(player?.element_id);
+      const eventHistory = historyByRound?.[Number(eventId || 0)] || null;
+      const record = buildSeasonMomentPlayerRecord(player, eventId, eventMetaById, eventHistory);
+      if (benchEventSet.has(Number(eventId || 0)) && (Number(player?.multiplier || 0) <= 0 || Number(player?.lineup_position || 0) > 5)) {
         pickBetterBench(record);
       }
       if (Number(player?.multiplier || 0) > 0 && Number(record?.price || 0) > 0) {
@@ -5099,7 +5142,7 @@ async function buildSeasonSummaryPayload(uidInput, options = {}) {
   const bestRankMeta = eventMetaById?.[Number(bestRankRow?.event || 0)] || {};
   const additionalMoments = await buildSeasonAdditionalMomentRecords(
     uidNumber,
-    rowEventIds,
+    rows,
     bootstrap,
     elements,
     eventMetaById
