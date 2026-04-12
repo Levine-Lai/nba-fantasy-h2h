@@ -139,7 +139,7 @@
 
     async function requestSummary(uid) {
         const base = (window.__API_BASE__ || "").trim().replace(/\/+$/, "");
-        const target = `${base}/api/season-summary?uid=${encodeURIComponent(uid)}&moments=1&_=${Date.now()}`;
+        const target = `${base}/api/season-summary?uid=${encodeURIComponent(uid)}&_=${Date.now()}`;
         const response = await fetch(target, { cache: "no-store" });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data?.success === false) {
@@ -1060,7 +1060,7 @@
             ${renderPlayerDetailsPage(profile)}
             ${renderTransferPage(profile)}
             ${renderCaptainPage(profile)}
-            ${renderCaptainMomentsPage(profile)}
+            ${renderCaptainMomentsPageLegacy(profile)}
             ${renderHighlightsPage(profile)}
             ${renderClosingPage()}
         `;
