@@ -3306,7 +3306,7 @@
 
 .season-summary-closing-artwork-image {
     display: block;
-    width: min(100%, 520px);
+    width: clamp(108px, 11vw, 156px);
     height: auto;
     object-fit: contain;
 }
