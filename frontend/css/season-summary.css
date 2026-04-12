@@ -2964,3 +2964,219 @@
         line-height: 1.72;
     }
 }
+
+/* ===== Bru Final Polish: Player Stat Cards + OR Chart ===== */
+.season-summary-page-cover {
+    grid-template-columns: minmax(420px, 1.03fr) minmax(360px, 0.97fr);
+    align-items: stretch;
+    gap: clamp(14px, 1.2vw, 20px);
+}
+
+.season-summary-cover-or-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 100%;
+    padding: clamp(10px, 1vw, 14px);
+}
+
+.season-summary-cover-or-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.season-summary-cover-or-title {
+    font-family: "Sora", "Lexend", sans-serif;
+    font-size: clamp(18px, 1.3vw, 22px);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #000;
+}
+
+.season-summary-cover-or-badges {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(110px, 1fr));
+    gap: 8px;
+    width: min(100%, 470px);
+}
+
+.season-summary-cover-or-badge {
+    border: 2px solid #000;
+    border-radius: 10px;
+    box-shadow: 3px 3px 0 #000;
+    background: #fff;
+    padding: 6px 8px;
+    display: grid;
+    gap: 2px;
+}
+
+.season-summary-cover-or-badge:nth-child(1) { background: #ffde59; }
+.season-summary-cover-or-badge:nth-child(2) { background: #cba6f7; }
+.season-summary-cover-or-badge:nth-child(3) { background: #ffb7b7; }
+
+.season-summary-cover-or-badge-label {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: rgba(0, 0, 0, 0.72);
+    letter-spacing: 0.03em;
+}
+
+.season-summary-cover-or-badge-value {
+    font-family: "Sora", "Lexend", sans-serif;
+    font-size: clamp(22px, 1.8vw, 28px);
+    line-height: 1;
+    font-weight: 700;
+    color: #000;
+}
+
+.season-summary-cover-chart-or {
+    height: clamp(320px, 42vh, 440px);
+    padding: 8px;
+}
+
+.season-summary-cover-chart-or svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.season-summary-cover-plot-bg {
+    fill: rgba(255, 222, 89, 0.14);
+    stroke: rgba(0, 0, 0, 0.24);
+    stroke-width: 1.2;
+}
+
+.season-summary-cover-chart-or .season-summary-cover-grid line {
+    stroke: rgba(0, 0, 0, 0.12);
+    stroke-width: 1;
+    stroke-dasharray: 4 5;
+}
+
+.season-summary-cover-chart-or .season-summary-cover-axis {
+    stroke: #000;
+    stroke-width: 2;
+}
+
+.season-summary-cover-chart-or .season-summary-cover-tick {
+    fill: rgba(0, 0, 0, 0.7);
+    font-family: "Lexend", "Sora", sans-serif;
+    font-weight: 700;
+}
+
+.season-summary-cover-chart-or .season-summary-cover-tick-y { font-size: 15px; }
+.season-summary-cover-chart-or .season-summary-cover-tick-x { font-size: 14px; }
+
+.season-summary-cover-point-start {
+    fill: #fff;
+    stroke: #000;
+    stroke-width: 3;
+}
+
+.season-summary-cover-point-latest {
+    fill: #ff5757;
+    stroke: #000;
+    stroke-width: 3;
+}
+
+.season-summary-page-player-details .season-summary-story-cards-player-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(10px, 1.1vw, 16px);
+}
+
+.season-summary-page-player-details .season-summary-story-card-player-stat {
+    min-height: 124px;
+    padding: clamp(12px, 1.2vw, 16px);
+    border: 3px solid #000;
+    border-radius: 14px;
+    box-shadow: 6px 6px 0 #000;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.season-summary-page-player-details .season-summary-story-card-player-stat-total {
+    background: #ffde59;
+}
+
+.season-summary-page-player-details .season-summary-story-card-player-stat-average {
+    background: #cba6f7;
+}
+
+.season-summary-page-player-details .season-summary-story-card-value-player-stat {
+    font-family: "Sora", "Lexend", sans-serif;
+    font-size: clamp(36px, 3.6vw, 58px);
+    line-height: 0.96;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+    color: #000;
+    white-space: nowrap;
+}
+
+@media (max-width: 1280px) {
+    .season-summary-page-cover {
+        grid-template-columns: minmax(360px, 1fr) minmax(320px, 0.98fr);
+    }
+}
+
+@media (max-width: 960px) {
+    .season-summary-page-cover {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .season-summary-cover-or-title {
+        font-size: 17px;
+    }
+
+    .season-summary-cover-or-badges {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    .season-summary-cover-or-badge {
+        padding: 5px 6px;
+        box-shadow: 2px 2px 0 #000;
+    }
+
+    .season-summary-cover-or-badge-label {
+        font-size: 10px;
+    }
+
+    .season-summary-cover-or-badge-value {
+        font-size: 18px;
+    }
+
+    .season-summary-cover-chart-or {
+        height: clamp(255px, 36vh, 330px);
+        padding: 6px;
+    }
+
+    .season-summary-cover-chart-or .season-summary-cover-tick-y { font-size: 11px; }
+    .season-summary-cover-chart-or .season-summary-cover-tick-x { font-size: 10px; }
+
+    .season-summary-page-player-details .season-summary-story-card-player-stat {
+        min-height: 98px;
+        padding: 10px;
+        box-shadow: 4px 4px 0 #000;
+    }
+
+    .season-summary-page-player-details .season-summary-story-card-value-player-stat {
+        font-size: clamp(30px, 8vw, 44px);
+    }
+}
+
+@media (max-width: 480px) {
+    .season-summary-cover-or-badges {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .season-summary-page-player-details .season-summary-story-cards-player-summary {
+        grid-template-columns: 1fr;
+    }
+}

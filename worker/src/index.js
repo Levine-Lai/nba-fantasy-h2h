@@ -5134,7 +5134,7 @@ async function buildSeasonSummaryPayload(uidInput, options = {}) {
     ? (
       overallRank && overallRank < 1000
         ? `恭喜你完成了自己的第一个赛季！没想到第一个赛季就能达到全球第 ${formatDisplayRank(overallRank)} 名的排名，你真是范特西的天赋玩家。`
-        : "恭喜你完成了自己的第一个赛季！排名什么都不重要，能坚持下来才是这个游戏的真谛。"
+        : "恭喜你完成了自己的第一个赛季！排名什么都不重要，能玩得开心才是这个游戏的真谛。"
     )
     : (seasonCount === 2
       ? (
@@ -5143,7 +5143,7 @@ async function buildSeasonSummaryPayload(uidInput, options = {}) {
           : rankDelta > 0
             ? `恭喜你陪这个游戏走过了第二个年头，相比上个赛季还进步了 ${formatDisplayNumber(rankDelta)} 名，看来你逐渐摸清了这个游戏的套路了`
             : rankDelta < 0
-              ? `恭喜你陪这个游戏走过了第二个年头，可惜比上个赛季退步了 ${formatDisplayNumber(Math.abs(rankDelta))} 名，继续努力吧！`
+              ? `恭喜你陪这个游戏走过了第二个年头，可惜比上个赛季退步了 ${formatDisplayNumber(Math.abs(rankDelta))} 名，继续努力吧`
               : "恭喜你陪这个游戏走过了第二个年头，而且和上个赛季保持住了同样的名次。"
       )
       : (

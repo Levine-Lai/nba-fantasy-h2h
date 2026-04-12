@@ -334,46 +334,81 @@
                 { event: 154, gw: 24, rank: 698 },
             ];
         const maxRank = Math.max(...rawPoints.map((item) => Number(item?.rank || 0)), 1);
-        const points = buildCurvePoints(rawPoints, { yMax: maxRank, left: 64, right: 856, top: 42, bottom: 526 });
+        const points = buildCurvePoints(rawPoints, { yMax: maxRank, left: 88, right: 824, top: 76, bottom: 462 });
         const linePath = buildLinePath(points);
-        const areaPath = buildAreaPath(points, 526);
+        const areaPath = buildAreaPath(points, 462);
         const rankTicks = buildNiceTicks(maxRank, 5);
-        const xTicks = sampleXAxisTicks(points, 7);
+        const xTicks = sampleXAxisTicks(points, 6);
         const yMax = Math.max(1, rankTicks[rankTicks.length - 1] || maxRank);
+        const firstPoint = points[0] || null;
+        const latestPoint = points[points.length - 1] || null;
+        const bestPoint = points.length
+            ? points.reduce((best, current) => (current.rank < best.rank ? current : best), points[0])
+            : null;
+        const improveCount = firstPoint && latestPoint ? Number(firstPoint.rank || 0) - Number(latestPoint.rank || 0) : 0;
+        const improveRate = firstPoint && latestPoint && Number(firstPoint.rank || 0) > 0
+            ? (improveCount / Number(firstPoint.rank || 0)) * 100
+            : 0;
 
         return `
-            <aside class="season-summary-cover-panel">
-                <div class="season-summary-cover-chart">
+            <aside class="season-summary-cover-panel season-summary-cover-or-panel">
+                <div class="season-summary-cover-or-head">
+                    <div class="season-summary-cover-or-title">OR 曲线</div>
+                    <div class="season-summary-cover-or-badges">
+                        <div class="season-summary-cover-or-badge">
+                            <span class="season-summary-cover-or-badge-label">最新 OR</span>
+                            <span class="season-summary-cover-or-badge-value">#${escapeHtml(formatSummaryNumber(latestPoint?.rank || 0))}</span>
+                        </div>
+                        <div class="season-summary-cover-or-badge">
+                            <span class="season-summary-cover-or-badge-label">赛季最佳</span>
+                            <span class="season-summary-cover-or-badge-value">#${escapeHtml(formatSummaryNumber(bestPoint?.rank || 0))}</span>
+                        </div>
+                        <div class="season-summary-cover-or-badge">
+                            <span class="season-summary-cover-or-badge-label">累计提升</span>
+                            <span class="season-summary-cover-or-badge-value">
+                                ${improveCount >= 0 ? "↑" : "↓"}${escapeHtml(formatSummaryNumber(Math.abs(improveCount)))}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="season-summary-cover-chart season-summary-cover-chart-or">
                     <svg viewBox="0 0 880 560" preserveAspectRatio="none" aria-label="OR season curve">
                         <defs>
                             <linearGradient id="season-summary-cover-line" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stop-color="#93c5fd"></stop>
-                                <stop offset="50%" stop-color="#60a5fa"></stop>
-                                <stop offset="100%" stop-color="#2563eb"></stop>
+                                <stop offset="0%" stop-color="#000000"></stop>
+                                <stop offset="60%" stop-color="#151515"></stop>
+                                <stop offset="100%" stop-color="#111111"></stop>
                             </linearGradient>
                             <linearGradient id="season-summary-cover-fill" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stop-color="rgba(96, 165, 250, 0.28)"></stop>
-                                <stop offset="100%" stop-color="rgba(96, 165, 250, 0)"></stop>
+                                <stop offset="0%" stop-color="rgba(255, 87, 87, 0.32)"></stop>
+                                <stop offset="100%" stop-color="rgba(255, 87, 87, 0.04)"></stop>
                             </linearGradient>
                         </defs>
+                        <rect x="88" y="76" width="736" height="386" rx="12" ry="12" class="season-summary-cover-plot-bg"></rect>
                         <g class="season-summary-cover-grid">
                             ${rankTicks.map((tick) => {
-                                const y = 42 + (Number(tick || 0) / yMax) * (526 - 42);
-                                return `<line x1="64" y1="${y.toFixed(2)}" x2="856" y2="${y.toFixed(2)}"></line>`;
+                                const y = 76 + (Number(tick || 0) / yMax) * (462 - 76);
+                                return `<line x1="88" y1="${y.toFixed(2)}" x2="824" y2="${y.toFixed(2)}"></line>`;
                             }).join("")}
-                            ${xTicks.map((point) => `<line x1="${point.x.toFixed(2)}" y1="42" x2="${point.x.toFixed(2)}" y2="526"></line>`).join("")}
+                            ${xTicks.map((point) => `<line x1="${point.x.toFixed(2)}" y1="76" x2="${point.x.toFixed(2)}" y2="462"></line>`).join("")}
                         </g>
-                        <line class="season-summary-cover-axis" x1="64" y1="42" x2="64" y2="526"></line>
-                        <line class="season-summary-cover-axis" x1="64" y1="42" x2="856" y2="42"></line>
+                        <line class="season-summary-cover-axis" x1="88" y1="76" x2="88" y2="462"></line>
+                        <line class="season-summary-cover-axis" x1="88" y1="462" x2="824" y2="462"></line>
                         ${rankTicks.map((tick) => {
-                            const y = 42 + (Number(tick || 0) / yMax) * (526 - 42);
-                            return `<text class="season-summary-cover-tick" x="48" y="${y + 6}" text-anchor="end">${escapeHtml(Number(tick || 0).toLocaleString("en-US"))}</text>`;
+                            const y = 76 + (Number(tick || 0) / yMax) * (462 - 76);
+                            return `<text class="season-summary-cover-tick season-summary-cover-tick-y" x="76" y="${y + 5}" text-anchor="end">${escapeHtml(Number(tick || 0).toLocaleString("en-US"))}</text>`;
                         }).join("")}
-                        ${xTicks.map((point) => `<text class="season-summary-cover-tick" x="${point.x.toFixed(2)}" y="28" text-anchor="middle">${escapeHtml(point.gw || "")}</text>`).join("")}
+                        ${xTicks.map((point) => `<text class="season-summary-cover-tick season-summary-cover-tick-x" x="${point.x.toFixed(2)}" y="484" text-anchor="middle">GW${escapeHtml(point.gw || "")}</text>`).join("")}
                         <path d="${areaPath}" fill="url(#season-summary-cover-fill)" opacity="0.58"></path>
-                        <path d="${linePath}" fill="none" stroke="url(#season-summary-cover-line)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="${linePath}" fill="none" stroke="url(#season-summary-cover-line)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                        ${firstPoint ? `<circle cx="${firstPoint.x.toFixed(2)}" cy="${firstPoint.y.toFixed(2)}" r="6.5" class="season-summary-cover-point-start"></circle>` : ""}
+                        ${latestPoint ? `<circle cx="${latestPoint.x.toFixed(2)}" cy="${latestPoint.y.toFixed(2)}" r="7.5" class="season-summary-cover-point-latest"></circle>` : ""}
                     </svg>
                 </div>
+                <p class="season-summary-cover-chart-note">
+                    从赛季初 #${escapeHtml(formatSummaryNumber(firstPoint?.rank || 0))} 到当前 #${escapeHtml(formatSummaryNumber(latestPoint?.rank || 0))}，
+                    累计提升 ${escapeHtml(formatSummaryNumber(Math.abs(improveCount)))} 名（${improveRate >= 0 ? "提升" : "回落"} ${escapeHtml(formatSummaryDecimal(Math.abs(improveRate), 1))}%）。
+                </p>
             </aside>
         `;
     }
@@ -668,10 +703,14 @@
             {
                 label: "赛季总球员数",
                 value: `${formatSummaryNumber(totalUniquePlayers)}人`,
+                cardClass: "season-summary-story-card-player-stat season-summary-story-card-player-stat-total",
+                valueClass: "season-summary-story-card-value-player-stat",
             },
             {
                 label: "球员平均分",
                 value: `${formatSummaryDecimal(averagePlayerScore)}分`,
+                cardClass: "season-summary-story-card-player-stat season-summary-story-card-player-stat-average",
+                valueClass: "season-summary-story-card-value-player-stat",
             },
         ];
 
