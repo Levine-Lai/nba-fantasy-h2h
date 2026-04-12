@@ -767,7 +767,7 @@
         });
     }
 
-    function renderCaptainMomentsPage(profile) {
+    function renderCaptainMomentsPageLegacy(profile) {
         const summary = profile?.captain?.summary || {};
         const bestCaptain = summary.best || null;
         const worstCaptain = summary.worst || null;
@@ -873,6 +873,91 @@
                         <div class="season-summary-page-title">Highlight</div>
                         <div class="season-summary-highlight-stories">
                             ${stories.length ? stories.join("") : `<p class="season-summary-story-paragraph">还没有足够的历史数据</p>`}
+                        </div>
+                    </div>
+                </div>
+            </section>
+        `;
+    }
+
+    function renderCaptainMomentsPage(profile) {
+        const summary = profile?.captain?.summary || {};
+        const bestCaptain = summary.best || null;
+        const worstCaptain = summary.worst || null;
+        const bestBench = summary.bench_best || null;
+        const bestStarterValue = summary.starter_best_value || null;
+        const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+        const formatDateText = (item) => {
+            const datePart = String(item?.date_label || "").trim();
+            const gwDayPart = String(item?.label || "").trim();
+            if (datePart && gwDayPart) return `${datePart} ${gwDayPart}`;
+            return datePart || gwDayPart || "那一天";
+        };
+        const buildStatsText = (item) => `${formatSummaryNumber(item?.points_scored || 0)}分${formatSummaryNumber(item?.rebounds || 0)}篮板${formatSummaryNumber(item?.assists || 0)}助攻${formatSummaryNumber(item?.steals || 0)}抢断${formatSummaryNumber(item?.blocks || 0)}盖帽`;
+        const renderPortrait = (item) => {
+            const safeName = getStoryPlayerName(item);
+            const safeUrl = String(item?.headshot_url || "").trim();
+            if (!safeUrl) {
+                return `<div class="season-summary-captain-moment-portrait"><span class="season-summary-captain-moment-headshot-fallback">${escapeHtml(safeName)}</span></div>`;
+            }
+            return `
+                <div class="season-summary-captain-moment-portrait">
+                    <img
+                        class="season-summary-captain-moment-headshot"
+                        src="${escapeHtml(safeUrl)}"
+                        alt="${escapeHtml(safeName)}"
+                        loading="lazy"
+                        decoding="async"
+                        onerror="this.style.display='none';const fallback=this.nextElementSibling;if(fallback){fallback.style.display='inline-flex';}"
+                    />
+                    <span class="season-summary-captain-moment-headshot-fallback" style="display:none">${escapeHtml(safeName)}</span>
+                </div>
+            `;
+        };
+        const renderMomentArticle = (paragraph, item) => `
+            <article class="season-summary-captain-moment">
+                <p class="season-summary-story-paragraph">${paragraph}</p>
+                ${item ? renderPortrait(item) : ""}
+            </article>
+        `;
+
+        const bestName = getStoryPlayerName(bestCaptain);
+        const bestParagraph = bestCaptain?.captain_name
+            ? `${mark(formatDateText(bestCaptain))}似乎是一个特别的日子，那一天${mark(bestName)}大发神威，砍下了${mark(buildStatsText(bestCaptain))}，拿到了${mark(`${formatSummaryNumber(bestCaptain?.base_points || 0)}分`)}的高分，而你也有如神助，选择了他当作你那一周的队长，这样珍贵的瞬间相信你一定不会忘记😋`
+            : "这个赛季还没有抓到完整的最佳队长记录。";
+
+        const worstName = getStoryPlayerName(worstCaptain);
+        const worstDidPlay = !!worstCaptain?.did_play || Number(worstCaptain?.minutes || 0) > 0 || Number(worstCaptain?.base_points || 0) > 0;
+        const worstParagraph = !worstCaptain?.captain_name
+            ? "这个赛季还没有抓到完整的最低队长记录。"
+            : (worstDidPlay
+                ? `${mark(formatDateText(worstCaptain))}似乎是一个更特别的日子，${mark(worstName)}被你寄予厚望担任队长，却只拿下了${mark(buildStatsText(worstCaptain))}，只有可怜的${mark(`${formatSummaryNumber(worstCaptain?.base_points || 0)}分🥺`)}，相信你那天在心里已经把他骂了无数遍了吧`
+                : `${mark(formatDateText(worstCaptain))}似乎是一个更特别的日子，${mark(worstName)}被你寄予厚望担任队长，却因为赛前突然宣布受伤🤕未能出场，留下一个刺眼的0分任他人嘲笑，相信你那天在心里已经把他骂了无数遍了吧`);
+
+        const benchName = getStoryPlayerName(bestBench);
+        const benchParagraph = bestBench?.player_name
+            ? `${mark(formatDateText(bestBench))}你的心情也许不会太好，因为${mark(benchName)}那天的数据栏是${mark(buildStatsText(bestBench))}，拿到了${mark(`${formatSummaryNumber(bestBench?.fantasy_points || 0)}分`)}，虽然他在你阵容里，但是你却把他放在了替补席，也是你这个赛季替补席单人得分最高的一次，如果能再回到那一天，你会不会选择首发他呢？🤔`
+            : "这个赛季还没有抓到完整的替补席遗憾时刻。";
+
+        const starterValueName = getStoryPlayerName(bestStarterValue);
+        const starterValueParagraph = bestStarterValue?.player_name
+            ? `${mark(formatDateText(bestStarterValue))}你的精心挑选的宝藏球员${mark(starterValueName)}出乎了所有人的意料，拿到了${mark(buildStatsText(bestStarterValue))}，也就是${mark(`${formatSummaryNumber(bestStarterValue?.fantasy_points || 0)}分`)}的 fantasy 得分，${/Jokic$/i.test(String(starterValueName || "")) ? "这场发挥放在任何球星身上都足够亮眼，" : `虽然这个数据对 ${mark("N.Jokic")} 来说可能稀松平常，但对于身价只有${mark(formatSummaryDecimal(bestStarterValue?.price || 0))}的他可是超级大爆发了，`}这也是你赛季首发里 value 最高的一场，你对他的信任也值得一夸👍`
+            : "这个赛季还没有抓到完整的 value 高光时刻。";
+
+        const moments = [
+            renderMomentArticle(bestParagraph, bestCaptain),
+            renderMomentArticle(worstParagraph, worstCaptain),
+            renderMomentArticle(benchParagraph, bestBench),
+            renderMomentArticle(starterValueParagraph, bestStarterValue),
+        ];
+
+        return `
+            <section class="season-summary-page season-summary-page-story season-summary-page-captain-moments">
+                <div class="season-summary-story-main">
+                    <div class="season-summary-story-shell season-summary-captain-moments-copy">
+                        <div class="season-summary-page-title">Moment</div>
+                        <div class="season-summary-captain-moments">
+                            ${moments.join("")}
                         </div>
                     </div>
                 </div>

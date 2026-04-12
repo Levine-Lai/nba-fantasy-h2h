@@ -56,7 +56,7 @@ import {
 
 const LEAGUE_ID = 1653;
 const SEASON_SUMMARY_LEAGUE_ID = 1233;
-const SEASON_SUMMARY_CACHE_VERSION = "20260410c";
+const SEASON_SUMMARY_CACHE_VERSION = "20260412d";
 const SEASON_SUMMARY_CACHE_PREFIX = `season_summary:${SEASON_SUMMARY_CACHE_VERSION}:`;
 const SEASON_SUMMARY_PREWARM_CURSOR_KEY = `season_summary_prewarm_cursor:${SEASON_SUMMARY_CACHE_VERSION}`;
 const SEASON_SUMMARY_PREWARM_META_KEY = `season_summary_prewarm_meta:${SEASON_SUMMARY_CACHE_VERSION}`;
@@ -4729,6 +4729,125 @@ async function buildSeasonHighlightLineupPayload(uidInput, eventInput, captainEn
   };
 }
 
+function buildSeasonMomentPlayerRecord(player, eventId, eventMetaById) {
+  const safeEventId = Number(eventId || 0);
+  const meta = eventMetaById?.[safeEventId] || {};
+  const stats = player?.stats || {};
+  const basePoints = Number(player?.base_points || 0);
+  const price = Number(player?.now_cost || 0) / 10;
+  const didPlay =
+    Number(stats?.minutes || 0) > 0 ||
+    Number(stats?.points || 0) > 0 ||
+    Number(stats?.rebounds || 0) > 0 ||
+    Number(stats?.assists || 0) > 0 ||
+    Number(stats?.steals || 0) > 0 ||
+    Number(stats?.blocks || 0) > 0 ||
+    basePoints > 0;
+
+  return {
+    event: safeEventId,
+    gw: Number(meta?.gw || 0) || null,
+    day: Number(meta?.day || 0) || null,
+    label: toGwDayLabel(meta?.gw, meta?.day),
+    date_label: formatBeijingMonthDayLabel(meta?.deadline_time || null),
+    element_id: Number(player?.element_id || 0) || null,
+    player_name: String(player?.name || `#${player?.element_id || ""}`).trim(),
+    headshot_url: player?.headshot_url || null,
+    team_short: String(player?.team_short || "").trim(),
+    price: Number(price.toFixed(1)),
+    value: Number((price > 0 ? basePoints / price : 0).toFixed(1)),
+    fantasy_points: Number(basePoints.toFixed(1)),
+    lineup_position: Number(player?.lineup_position || 0) || null,
+    is_captain: !!player?.is_captain,
+    did_play: didPlay,
+    minutes: Number(stats?.minutes || 0),
+    points_scored: Number(stats?.points || 0),
+    rebounds: Number(stats?.rebounds || 0),
+    assists: Number(stats?.assists || 0),
+    steals: Number(stats?.steals || 0),
+    blocks: Number(stats?.blocks || 0),
+  };
+}
+
+async function buildSeasonAdditionalMomentRecords(uidNumber, eventIds, bootstrap, elements, eventMetaById) {
+  const safeEventIds = [...new Set((eventIds || []).map((eventId) => Number(eventId || 0)).filter((eventId) => eventId > 0))];
+  if (!uidNumber || !safeEventIds.length) {
+    return {
+      bench_best: null,
+      starter_best_value: null,
+    };
+  }
+
+  const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
+  let bestBench = null;
+  let bestStarterValue = null;
+
+  const pickBetterBench = (candidate) => {
+    if (!candidate) return;
+    if (!bestBench) {
+      bestBench = candidate;
+      return;
+    }
+    if (Number(candidate?.fantasy_points || 0) !== Number(bestBench?.fantasy_points || 0)) {
+      if (Number(candidate?.fantasy_points || 0) > Number(bestBench?.fantasy_points || 0)) bestBench = candidate;
+      return;
+    }
+    if (Number(candidate?.event || 0) !== Number(bestBench?.event || 0)) {
+      if (Number(candidate?.event || 0) < Number(bestBench?.event || 0)) bestBench = candidate;
+      return;
+    }
+    if (Number(candidate?.lineup_position || 0) < Number(bestBench?.lineup_position || 0)) bestBench = candidate;
+  };
+
+  const pickBetterStarterValue = (candidate) => {
+    if (!candidate) return;
+    if (!bestStarterValue) {
+      bestStarterValue = candidate;
+      return;
+    }
+    if (Number(candidate?.value || 0) !== Number(bestStarterValue?.value || 0)) {
+      if (Number(candidate?.value || 0) > Number(bestStarterValue?.value || 0)) bestStarterValue = candidate;
+      return;
+    }
+    if (Number(candidate?.fantasy_points || 0) !== Number(bestStarterValue?.fantasy_points || 0)) {
+      if (Number(candidate?.fantasy_points || 0) > Number(bestStarterValue?.fantasy_points || 0)) bestStarterValue = candidate;
+      return;
+    }
+    if (Number(candidate?.price || 0) !== Number(bestStarterValue?.price || 0)) {
+      if (Number(candidate?.price || 0) < Number(bestStarterValue?.price || 0)) bestStarterValue = candidate;
+      return;
+    }
+    if (Number(candidate?.event || 0) < Number(bestStarterValue?.event || 0)) bestStarterValue = candidate;
+  };
+
+  await mapLimit(safeEventIds, 4, async (eventId) => {
+    const [picksRes, liveRes] = await Promise.all([
+      fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 3),
+      fetchJsonSafe(`/event/${eventId}/live/`, 3),
+    ]);
+    if (!picksRes.ok || !liveRes.ok) return null;
+
+    const liveElements = buildLiveElementsMap(liveRes.data);
+    const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
+
+    for (const player of picks) {
+      const record = buildSeasonMomentPlayerRecord(player, eventId, eventMetaById);
+      if (Number(player?.multiplier || 0) <= 0 || Number(player?.lineup_position || 0) > 5) {
+        pickBetterBench(record);
+      }
+      if (Number(player?.multiplier || 0) > 0 && Number(record?.price || 0) > 0) {
+        pickBetterStarterValue(record);
+      }
+    }
+    return null;
+  });
+
+  return {
+    bench_best: bestBench,
+    starter_best_value: bestStarterValue,
+  };
+}
+
 function computeLeaguePercentileByRank(rank, managerCount) {
   const safeRank = Number(rank || 0);
   const safeCount = Number(managerCount || 0);
@@ -4942,6 +5061,13 @@ async function buildSeasonSummaryPayload(uidInput, options = {}) {
     .filter((row) => getHistoryGameRank(row) > 0)
     .sort((a, b) => getHistoryGameRank(a) - getHistoryGameRank(b))[0] || null;
   const bestRankMeta = eventMetaById?.[Number(bestRankRow?.event || 0)] || {};
+  const additionalMoments = await buildSeasonAdditionalMomentRecords(
+    uidNumber,
+    rowEventIds,
+    bootstrap,
+    elements,
+    eventMetaById
+  );
   const highlightEventIds = [...new Set(
     [Number(bestDayRow?.event || 0), Number(bestRankRow?.event || 0)].filter((value) => value > 0)
   )];
@@ -5215,6 +5341,49 @@ async function buildSeasonSummaryPayload(uidInput, options = {}) {
           gw: Number(lowestOwnershipCaptain.gw || 0) || null,
           day: Number(lowestOwnershipCaptain.day || 0) || null,
           headshot_url: lowestOwnershipCaptain.headshot_url || null,
+        } : null,
+        bench_best: additionalMoments?.bench_best ? {
+          event: Number(additionalMoments.bench_best.event || 0) || null,
+          gw: Number(additionalMoments.bench_best.gw || 0) || null,
+          day: Number(additionalMoments.bench_best.day || 0) || null,
+          label: additionalMoments.bench_best.label || "",
+          date_label: additionalMoments.bench_best.date_label || "",
+          element_id: Number(additionalMoments.bench_best.element_id || 0) || null,
+          player_name: additionalMoments.bench_best.player_name || "",
+          headshot_url: additionalMoments.bench_best.headshot_url || null,
+          team_short: additionalMoments.bench_best.team_short || "",
+          price: Number(additionalMoments.bench_best.price || 0),
+          fantasy_points: Number(additionalMoments.bench_best.fantasy_points || 0),
+          lineup_position: Number(additionalMoments.bench_best.lineup_position || 0) || null,
+          minutes: Number(additionalMoments.bench_best.minutes || 0),
+          points_scored: Number(additionalMoments.bench_best.points_scored || 0),
+          rebounds: Number(additionalMoments.bench_best.rebounds || 0),
+          assists: Number(additionalMoments.bench_best.assists || 0),
+          steals: Number(additionalMoments.bench_best.steals || 0),
+          blocks: Number(additionalMoments.bench_best.blocks || 0),
+          did_play: !!additionalMoments.bench_best.did_play,
+        } : null,
+        starter_best_value: additionalMoments?.starter_best_value ? {
+          event: Number(additionalMoments.starter_best_value.event || 0) || null,
+          gw: Number(additionalMoments.starter_best_value.gw || 0) || null,
+          day: Number(additionalMoments.starter_best_value.day || 0) || null,
+          label: additionalMoments.starter_best_value.label || "",
+          date_label: additionalMoments.starter_best_value.date_label || "",
+          element_id: Number(additionalMoments.starter_best_value.element_id || 0) || null,
+          player_name: additionalMoments.starter_best_value.player_name || "",
+          headshot_url: additionalMoments.starter_best_value.headshot_url || null,
+          team_short: additionalMoments.starter_best_value.team_short || "",
+          price: Number(additionalMoments.starter_best_value.price || 0),
+          value: Number(additionalMoments.starter_best_value.value || 0),
+          fantasy_points: Number(additionalMoments.starter_best_value.fantasy_points || 0),
+          lineup_position: Number(additionalMoments.starter_best_value.lineup_position || 0) || null,
+          minutes: Number(additionalMoments.starter_best_value.minutes || 0),
+          points_scored: Number(additionalMoments.starter_best_value.points_scored || 0),
+          rebounds: Number(additionalMoments.starter_best_value.rebounds || 0),
+          assists: Number(additionalMoments.starter_best_value.assists || 0),
+          steals: Number(additionalMoments.starter_best_value.steals || 0),
+          blocks: Number(additionalMoments.starter_best_value.blocks || 0),
+          did_play: !!additionalMoments.starter_best_value.did_play,
         } : null,
       },
       cards: [
