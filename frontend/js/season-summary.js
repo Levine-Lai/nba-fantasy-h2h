@@ -181,16 +181,12 @@
         const summary = profile?.captain?.summary;
         if (!summary) return profile;
 
-        const needsBench = !summary?.bench_best?.player_name;
-        const needsValue = !summary?.starter_best_value?.player_name;
-        if (!needsBench && !needsValue) return profile;
-
         try {
             const extras = await requestMomentExtras(uid);
-            if (needsBench && extras?.bench_best?.player_name) {
+            if (extras?.bench_best?.player_name) {
                 summary.bench_best = extras.bench_best;
             }
-            if (needsValue && extras?.starter_best_value?.player_name) {
+            if (extras?.starter_best_value?.player_name) {
                 summary.starter_best_value = extras.starter_best_value;
             }
         } catch (error) {
@@ -1105,6 +1101,15 @@
         updateUrl(normalizedUid);
     }
 
+    function rerenderProfile(profile) {
+        const { pages } = refs();
+        if (!pages) return;
+        const previousPage = state.currentPage;
+        pages.innerHTML = renderPages(profile);
+        state.currentPage = Math.max(0, Math.min(getPageCount() - 1, previousPage));
+        updateIndicator();
+    }
+
     async function loadSummary(uid) {
         const normalizedUid = String(uid || "").trim();
         const { pages, uidInput } = refs();
@@ -1126,9 +1131,17 @@
 
         try {
             const profile = await requestSummary(normalizedUid);
-            await hydrateMomentExtras(profile, normalizedUid);
             await hydrateHighlightLineups(profile, normalizedUid);
             await playIntroExit(profile, normalizedUid);
+            hydrateMomentExtras(profile, normalizedUid)
+                .then(() => {
+                    if (state.lastUid === normalizedUid) {
+                        rerenderProfile(profile);
+                    }
+                })
+                .catch((error) => {
+                    console.warn("Moment extras background hydrate failed:", error);
+                });
         } catch (error) {
             console.error("Season summary load failed:", error);
             setIntroLeaving(false);
