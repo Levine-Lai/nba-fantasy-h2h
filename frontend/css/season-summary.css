@@ -2822,6 +2822,31 @@
     --ss-text-card-accent-soft: rgba(100, 116, 139, 0.12);
 }
 
+.season-summary-page-closing .season-summary-story-copy {
+    gap: clamp(22px, 3.2vh, 34px);
+    justify-items: center;
+}
+
+.season-summary-page-closing .season-summary-story-paragraph {
+    width: min(100%, 860px);
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    overflow: visible;
+    text-align: center;
+    color: #223249;
+    font-size: clamp(22px, 2vw, 31px);
+    line-height: 1.8;
+    font-weight: 700;
+}
+
+.season-summary-page-closing .season-summary-story-paragraph::before,
+.season-summary-page-closing .season-summary-story-paragraph::after {
+    display: none;
+}
+
 .season-summary-page-story .season-summary-story-copy {
     gap: 14px;
 }
@@ -2879,6 +2904,13 @@
             0 14px 30px rgba(15, 23, 42, 0.09),
             inset 0 1px 0 rgba(255, 255, 255, 0.84);
     }
+
+    .season-summary-page-closing .season-summary-story-paragraph,
+    .season-summary-page-closing .season-summary-story-paragraph:hover {
+        transform: none;
+        border-color: transparent;
+        box-shadow: none;
+    }
 }
 
 @media (min-width: 769px) {
@@ -2899,25 +2931,10 @@
 
     .season-summary-page-closing .season-summary-story-copy {
         width: min(100%, 920px);
-        justify-items: center;
     }
 
     .season-summary-page-closing .season-summary-story-paragraph {
         width: min(100%, 820px);
-        text-align: center;
-        padding-inline: clamp(24px, 3vw, 42px);
-    }
-
-    .season-summary-page-closing .season-summary-story-paragraph::before {
-        inset: 0;
-        width: auto;
-        height: 6px;
-        border-radius: 22px 22px 0 0;
-    }
-
-    .season-summary-page-closing .season-summary-story-paragraph::after {
-        background:
-            radial-gradient(circle at 50% 0%, var(--ss-text-card-accent-soft) 0%, transparent 34%);
     }
 }
 
@@ -2938,23 +2955,12 @@
     }
 
     .season-summary-page-closing .season-summary-story-copy {
-        justify-items: center;
+        gap: 20px;
     }
 
     .season-summary-page-closing .season-summary-story-paragraph {
-        text-align: center;
         width: 100%;
-    }
-
-    .season-summary-page-closing .season-summary-story-paragraph::before {
-        inset: 0;
-        width: auto;
-        height: 5px;
-        border-radius: 18px 18px 0 0;
-    }
-
-    .season-summary-page-closing .season-summary-story-paragraph::after {
-        background:
-            radial-gradient(circle at 50% 0%, var(--ss-text-card-accent-soft) 0%, transparent 36%);
+        font-size: clamp(18px, 5vw, 24px);
+        line-height: 1.72;
     }
 }
