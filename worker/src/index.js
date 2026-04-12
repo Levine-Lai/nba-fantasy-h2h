@@ -56,7 +56,7 @@ import {
 
 const LEAGUE_ID = 1653;
 const SEASON_SUMMARY_LEAGUE_ID = 1233;
-const SEASON_SUMMARY_CACHE_VERSION = "20260412d";
+const SEASON_SUMMARY_CACHE_VERSION = "20260412e";
 const SEASON_SUMMARY_CACHE_PREFIX = `season_summary:${SEASON_SUMMARY_CACHE_VERSION}:`;
 const SEASON_SUMMARY_PREWARM_CURSOR_KEY = `season_summary_prewarm_cursor:${SEASON_SUMMARY_CACHE_VERSION}`;
 const SEASON_SUMMARY_PREWARM_META_KEY = `season_summary_prewarm_meta:${SEASON_SUMMARY_CACHE_VERSION}`;
@@ -4770,7 +4770,8 @@ function buildSeasonMomentPlayerRecord(player, eventId, eventMetaById) {
   const meta = eventMetaById?.[safeEventId] || {};
   const stats = player?.stats || {};
   const basePoints = Number(player?.base_points || 0);
-  const price = Number(player?.now_cost || 0) / 10;
+  const eventPriceRaw = Number(player?.selling_price || player?.purchase_price || player?.now_cost || 0);
+  const price = eventPriceRaw > 0 ? eventPriceRaw / 10 : 0;
   const didPlay =
     Number(stats?.minutes || 0) > 0 ||
     Number(stats?.points || 0) > 0 ||
@@ -4817,6 +4818,7 @@ async function buildSeasonAdditionalMomentRecords(uidNumber, eventIds, bootstrap
   const teamsMetaById = buildTeamsMetaMap(bootstrap, getTeamVisualMeta);
   let bestBench = null;
   let bestStarterValue = null;
+  const failedEventIds = [];
 
   const pickBetterBench = (candidate) => {
     if (!candidate) return;
@@ -4856,27 +4858,43 @@ async function buildSeasonAdditionalMomentRecords(uidNumber, eventIds, bootstrap
     if (Number(candidate?.event || 0) < Number(bestStarterValue?.event || 0)) bestStarterValue = candidate;
   };
 
-  await mapLimit(safeEventIds, 4, async (eventId) => {
+  const processEvent = async (eventId, retries) => {
     const [picksRes, liveRes] = await Promise.all([
-      fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, 3),
-      fetchJsonSafe(`/event/${eventId}/live/`, 3),
+      fetchJsonSafe(`/entry/${uidNumber}/event/${eventId}/picks/`, retries),
+      fetchJsonSafe(`/event/${eventId}/live/`, retries),
     ]);
-    if (!picksRes.ok || !liveRes.ok) return null;
+    if (!picksRes.ok || !liveRes.ok) return false;
 
     const liveElements = buildLiveElementsMap(liveRes.data);
     const picks = buildLivePicksFromPicksData(picksRes.data, elements, liveElements, teamsMetaById);
 
     for (const player of picks) {
       const record = buildSeasonMomentPlayerRecord(player, eventId, eventMetaById);
-      if (Number(player?.multiplier || 0) <= 0 || Number(player?.lineup_position || 0) > 5) {
+      const lineupPosition = Number(player?.lineup_position || 0);
+      const isStarter = Number(player?.multiplier || 0) > 0 && lineupPosition > 0 && lineupPosition <= 5;
+      const isBench = lineupPosition > 5 || (lineupPosition > 0 && Number(player?.multiplier || 0) <= 0);
+
+      if (isBench) {
         pickBetterBench(record);
       }
-      if (Number(player?.multiplier || 0) > 0 && Number(record?.price || 0) > 0) {
+      if (isStarter && Number(record?.price || 0) > 0) {
         pickBetterStarterValue(record);
       }
     }
+    return true;
+  };
+
+  await mapLimit(safeEventIds, 4, async (eventId) => {
+    const ok = await processEvent(eventId, 4);
+    if (!ok) failedEventIds.push(eventId);
     return null;
   });
+
+  if (failedEventIds.length) {
+    for (const eventId of failedEventIds) {
+      await processEvent(eventId, 8);
+    }
+  }
 
   return {
     bench_best: bestBench,

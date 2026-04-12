@@ -181,16 +181,12 @@
         const summary = profile?.captain?.summary;
         if (!summary) return profile;
 
-        const needsBench = !summary?.bench_best?.player_name;
-        const needsValue = !summary?.starter_best_value?.player_name;
-        if (!needsBench && !needsValue) return profile;
-
         try {
             const extras = await requestMomentExtras(uid);
-            if (needsBench && extras?.bench_best?.player_name) {
+            if (extras?.bench_best?.player_name) {
                 summary.bench_best = extras.bench_best;
             }
-            if (needsValue && extras?.starter_best_value?.player_name) {
+            if (extras?.starter_best_value?.player_name) {
                 summary.starter_best_value = extras.starter_best_value;
             }
         } catch (error) {
@@ -356,7 +352,7 @@
                     <div class="season-summary-cover-or-title">OR 曲线</div>
                     <div class="season-summary-cover-or-badges">
                         <div class="season-summary-cover-or-badge">
-                            <span class="season-summary-cover-or-badge-label">最新 OR</span>
+                            <span class="season-summary-cover-or-badge-label">最终 OR</span>
                             <span class="season-summary-cover-or-badge-value">#${escapeHtml(formatSummaryNumber(latestPoint?.rank || 0))}</span>
                         </div>
                         <div class="season-summary-cover-or-badge">
