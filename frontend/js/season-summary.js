@@ -139,7 +139,7 @@
 
     async function requestSummary(uid) {
         const base = (window.__API_BASE__ || "").trim().replace(/\/+$/, "");
-        const target = `${base}/api/season-summary?uid=${encodeURIComponent(uid)}&_=${Date.now()}`;
+        const target = `${base}/api/season-summary?uid=${encodeURIComponent(uid)}&moments=1&_=${Date.now()}`;
         const response = await fetch(target, { cache: "no-store" });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data?.success === false) {
@@ -1008,12 +1008,12 @@
 
         const benchName = getStoryPlayerName(bestBench);
         const benchParagraph = bestBench?.player_name
-            ? `${mark(formatDateText(bestBench))}你的心情也许不会太好，因为${mark(benchName)}那天的数据栏是${mark(buildStatsText(bestBench))}，拿到了${mark(`${formatSummaryNumber(bestBench?.fantasy_points || 0)}分`)}，虽然他在你阵容里，但是你却把他放在了替补席，也是你这个赛季替补席单人得分最高的一次，如果能再回到那一天，你会不会选择首发他呢？🤔`
+            ? `${mark(formatDateText(bestBench))}你的心情也许不会太好，因为${mark(benchName)}那天的数据栏是${mark(buildStatsText(bestBench))}，拿到了${mark(`${formatSummaryNumber(bestBench?.fantasy_points || 0)}分`)}，但是你却把他放在了替补席，如果能再回到那一天，你会不会选择首发他呢？🤔`
             : "这个赛季还没有抓到完整的替补席遗憾时刻。";
 
         const starterValueName = getStoryPlayerName(bestStarterValue);
         const starterValueParagraph = bestStarterValue?.player_name
-            ? `${mark(formatDateText(bestStarterValue))}你的精心挑选的宝藏球员${mark(starterValueName)}出乎了所有人的意料，拿到了${mark(buildStatsText(bestStarterValue))}，也就是${mark(`${formatSummaryNumber(bestStarterValue?.fantasy_points || 0)}分`)}的 fantasy 得分，${/Jokic$/i.test(String(starterValueName || "")) ? "这场发挥放在任何球星身上都足够亮眼，" : `虽然这个数据对 ${mark("N.Jokic")} 来说可能稀松平常，但对于身价只有${mark(formatSummaryDecimal(bestStarterValue?.price || 0))}的他可是超级大爆发了，`}这也是你赛季首发里 value 最高的一场，你对他的信任也值得一夸👍`
+            ? `${mark(formatDateText(bestStarterValue))}你的精心挑选的宝藏球员${mark(starterValueName)}出乎了所有人的意料，拿到了${mark(buildStatsText(bestStarterValue))}，${/Jokic$/i.test(String(starterValueName || "")) ? "这场发挥放在任何球星身上都足够亮眼，" : `虽然这个数据对 ${mark("N.Jokic")} 来说可能稀松平常，但对于身价只有${mark(formatSummaryDecimal(bestStarterValue?.price || 0))}的他可是超级大爆发了，`}你对他的信任也值得一夸👍`
             : "这个赛季还没有抓到完整的 value 高光时刻。";
 
         const moments = [
@@ -1101,15 +1101,6 @@
         updateUrl(normalizedUid);
     }
 
-    function rerenderProfile(profile) {
-        const { pages } = refs();
-        if (!pages) return;
-        const previousPage = state.currentPage;
-        pages.innerHTML = renderPages(profile);
-        state.currentPage = Math.max(0, Math.min(getPageCount() - 1, previousPage));
-        updateIndicator();
-    }
-
     async function loadSummary(uid) {
         const normalizedUid = String(uid || "").trim();
         const { pages, uidInput } = refs();
@@ -1133,15 +1124,6 @@
             const profile = await requestSummary(normalizedUid);
             await hydrateHighlightLineups(profile, normalizedUid);
             await playIntroExit(profile, normalizedUid);
-            hydrateMomentExtras(profile, normalizedUid)
-                .then(() => {
-                    if (state.lastUid === normalizedUid) {
-                        rerenderProfile(profile);
-                    }
-                })
-                .catch((error) => {
-                    console.warn("Moment extras background hydrate failed:", error);
-                });
         } catch (error) {
             console.error("Season summary load failed:", error);
             setIntroLeaving(false);

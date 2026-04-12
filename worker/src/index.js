@@ -53,6 +53,10 @@ import {
   buildGoodCaptainSummary as buildGoodCaptainSummaryModule,
   refreshManagerMetaState as refreshManagerMetaStateModule,
 } from "./lib/manager-meta.js";
+import {
+  SEASON_SUMMARY_BUNDLED_SNAPSHOT_BY_UID,
+  SEASON_SUMMARY_BUNDLED_SNAPSHOT_GENERATED_AT,
+} from "./generated/season-summary-snapshot.generated.js";
 
 const LEAGUE_ID = 1653;
 const SEASON_SUMMARY_LEAGUE_ID = 1233;
@@ -4919,6 +4923,7 @@ async function buildSeasonSummaryPayload(uidInput, options = {}) {
   if (!uidNumber) {
     throw new Error("uid is required");
   }
+  const includeMomentExtras = !!options?.includeMomentExtras;
 
   const [bootstrap, historyRes, transfersRes, entryRes] = await Promise.all([
     fetchJson("/bootstrap-static/", 1),
@@ -5119,7 +5124,15 @@ async function buildSeasonSummaryPayload(uidInput, options = {}) {
     .filter((row) => getHistoryGameRank(row) > 0)
     .sort((a, b) => getHistoryGameRank(a) - getHistoryGameRank(b))[0] || null;
   const bestRankMeta = eventMetaById?.[Number(bestRankRow?.event || 0)] || {};
-  const additionalMoments = null;
+  const additionalMoments = includeMomentExtras
+    ? await buildSeasonAdditionalMomentRecords(
+      uidNumber,
+      rows,
+      bootstrap,
+      elements,
+      eventMetaById
+    )
+    : null;
   const highlightEventIds = [...new Set(
     [Number(bestDayRow?.event || 0), Number(bestRankRow?.event || 0)].filter((value) => value > 0)
   )];
@@ -5171,6 +5184,7 @@ async function buildSeasonSummaryPayload(uidInput, options = {}) {
   return {
     success: true,
     uid: String(uidNumber),
+    moment_extras_ready: includeMomentExtras,
     managerName,
     teamName,
     seasonLabel,
@@ -5532,6 +5546,19 @@ function getSeasonSummaryCacheKey(uidInput) {
   return uidNumber ? `${SEASON_SUMMARY_CACHE_PREFIX}${uidNumber}` : "";
 }
 
+function getBundledSeasonSummarySnapshot(uidInput) {
+  const uidNumber = uidToNumber(uidInput);
+  if (!uidNumber) return null;
+  const payload = SEASON_SUMMARY_BUNDLED_SNAPSHOT_BY_UID?.[String(uidNumber)] || null;
+  if (!payload?.success) return null;
+  return withSeasonSummaryCacheMeta(payload, {
+    hit: true,
+    key: `bundled:${uidNumber}`,
+    bundled: true,
+    generated_at: SEASON_SUMMARY_BUNDLED_SNAPSHOT_GENERATED_AT || null,
+  });
+}
+
 function getSeasonSummaryMomentsCacheKey(uidInput) {
   const uidNumber = uidToNumber(uidInput);
   return uidNumber ? `${SEASON_SUMMARY_MOMENTS_CACHE_PREFIX}${uidNumber}` : "";
@@ -5636,9 +5663,12 @@ async function fetchSeasonSummaryLeagueUids() {
 
 async function buildCachedSeasonSummaryPayload(env, uidInput, options = {}) {
   const refresh = !!options?.refresh;
+  const includeMomentExtras = !!options?.includeMomentExtras;
   if (!refresh) {
+    const bundled = getBundledSeasonSummarySnapshot(uidInput);
+    if (bundled) return bundled;
     const cached = await readSeasonSummaryCache(env, uidInput);
-    if (cached) return cached;
+    if (cached && (!includeMomentExtras || cached?.moment_extras_ready === true)) return cached;
   }
 
   const payload = await buildSeasonSummaryPayload(uidInput, options);
@@ -5792,6 +5822,7 @@ export default {
           );
         }
         const refresh = isTruthyQueryValue(url.searchParams.get("refresh"));
+        const includeMomentExtras = isTruthyQueryValue(url.searchParams.get("moments")) || isTruthyQueryValue(url.searchParams.get("include_moments"));
         if (refresh && !isAuthorizedRefreshRequest(url, env)) {
           return jsonResponse(
             { success: false, error: "unauthorized" },
@@ -5801,7 +5832,7 @@ export default {
         }
         try {
           return jsonResponse(
-            await buildCachedSeasonSummaryPayload(env, uid, { refresh }),
+            await buildCachedSeasonSummaryPayload(env, uid, { refresh, includeMomentExtras }),
             200,
             { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
           );
