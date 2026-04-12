@@ -15,3 +15,5 @@ but you've requested "2026-03-22". Falling back to "2026-03-17"...
 Features enabled by your requested compatibility date may not be available.
 Upgrade to `wrangler@4.81.1` to remove this warning.
 [wrangler:info] Ready on http://127.0.0.1:8787
+[wrangler:info] GET /api/season-summary 200 OK (348188ms)
+[wrangler:info] GET /api/season-summary 200 OK (495864ms)
