@@ -4729,6 +4729,42 @@ async function buildSeasonHighlightLineupPayload(uidInput, eventInput, captainEn
   };
 }
 
+async function buildSeasonSummaryMomentExtrasPayload(uidInput) {
+  const uidNumber = uidToNumber(uidInput);
+  if (!uidNumber) {
+    throw new Error("uid is required");
+  }
+
+  const [bootstrap, historyRes] = await Promise.all([
+    fetchJson("/bootstrap-static/", 1),
+    fetchJsonSafe(`/entry/${uidNumber}/history/`, 1),
+  ]);
+
+  if (!historyRes.ok || !historyRes.data) {
+    throw new Error(`entry ${uidNumber} history not found`);
+  }
+
+  const historyData = historyRes.data;
+  const elements = buildElementsMap(bootstrap);
+  const eventMetaById = buildEventMetaById(bootstrap.events || []);
+  const rows = getSortedHistoryRows(historyData);
+  const rowEventIds = rows.map((row) => Number(row?.event || 0)).filter(Boolean);
+  const extras = await buildSeasonAdditionalMomentRecords(
+    uidNumber,
+    rowEventIds,
+    bootstrap,
+    elements,
+    eventMetaById
+  );
+
+  return {
+    success: true,
+    uid: String(uidNumber),
+    bench_best: extras?.bench_best || null,
+    starter_best_value: extras?.starter_best_value || null,
+  };
+}
+
 function buildSeasonMomentPlayerRecord(player, eventId, eventMetaById) {
   const safeEventId = Number(eventId || 0);
   const meta = eventMetaById?.[safeEventId] || {};
@@ -5749,6 +5785,32 @@ export default {
           );
         } catch (error) {
           const message = String(error?.message || error || "highlight lineup failed");
+          const status = /not found|required/i.test(message) ? 404 : 500;
+          return jsonResponse(
+            { success: false, error: message },
+            status,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
+        }
+      }
+
+      if (path === "/api/season-summary-moments") {
+        const uid = url.searchParams.get("uid") || url.searchParams.get("entry_id");
+        if (!uid) {
+          return jsonResponse(
+            { success: false, error: "uid is required" },
+            400,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
+        }
+        try {
+          return jsonResponse(
+            await buildSeasonSummaryMomentExtrasPayload(uid),
+            200,
+            { "cache-control": "no-store, no-cache, must-revalidate, max-age=0" }
+          );
+        } catch (error) {
+          const message = String(error?.message || error || "season summary moments failed");
           const status = /not found|required/i.test(message) ? 404 : 500;
           return jsonResponse(
             { success: false, error: message },

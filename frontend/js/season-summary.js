@@ -163,6 +163,43 @@
         return data?.lineup || null;
     }
 
+    async function requestMomentExtras(uid) {
+        const normalizedUid = String(uid || "").trim();
+        if (!normalizedUid) return null;
+
+        const base = (window.__API_BASE__ || "").trim().replace(/\/+$/, "");
+        const target = `${base}/api/season-summary-moments?uid=${encodeURIComponent(normalizedUid)}&_=${Date.now()}`;
+        const response = await fetch(target, { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data?.success === false) {
+            throw new Error(data?.error || `Moment extras request failed: ${response.status}`);
+        }
+        return data || null;
+    }
+
+    async function hydrateMomentExtras(profile, uid) {
+        const summary = profile?.captain?.summary;
+        if (!summary) return profile;
+
+        const needsBench = !summary?.bench_best?.player_name;
+        const needsValue = !summary?.starter_best_value?.player_name;
+        if (!needsBench && !needsValue) return profile;
+
+        try {
+            const extras = await requestMomentExtras(uid);
+            if (needsBench && extras?.bench_best?.player_name) {
+                summary.bench_best = extras.bench_best;
+            }
+            if (needsValue && extras?.starter_best_value?.player_name) {
+                summary.starter_best_value = extras.starter_best_value;
+            }
+        } catch (error) {
+            console.warn("Moment extras hydrate failed:", error);
+        }
+
+        return profile;
+    }
+
     async function hydrateHighlightLineups(profile, uid) {
         const summary = profile?.highlights?.summary;
         if (!summary) return profile;
@@ -1050,6 +1087,7 @@
 
         try {
             const profile = await requestSummary(normalizedUid);
+            await hydrateMomentExtras(profile, normalizedUid);
             await hydrateHighlightLineups(profile, normalizedUid);
             await playIntroExit(profile, normalizedUid);
         } catch (error) {
