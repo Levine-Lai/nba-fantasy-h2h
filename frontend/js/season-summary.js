@@ -880,6 +880,23 @@
         `;
     }
 
+    function renderClosingPage() {
+        return `
+            <section class="season-summary-page season-summary-page-story season-summary-page-closing">
+                <div class="season-summary-story-main">
+                    <div class="season-summary-story-shell season-summary-closing-copy">
+                        <div class="season-summary-story-copy">
+                            <p class="season-summary-story-paragraph">随着最后一颗球从指尖投出，25-26赛季常规赛也落下帷幕</p>
+                            <p class="season-summary-story-paragraph">所有积分榜和排名都尘埃落定，不知道你是否对这个结果感到满意呢</p>
+                            <p class="season-summary-story-paragraph">是享受与朋友们嬉笑怒骂的瞬间，还是对接下来的长草期感到枯燥和无聊，又或者是转为对季后赛的期待</p>
+                            <p class="season-summary-story-paragraph">不管怎样，感谢你一个赛季的坚持，让这些冰冷的数据都显得有意义了起来，期待我们在下一个时刻的相遇</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        `;
+    }
+
     function renderPages(profile) {
         return `
             ${renderCoverPage(profile)}
@@ -888,6 +905,7 @@
             ${renderCaptainPage(profile)}
             ${renderCaptainMomentsPage(profile)}
             ${renderHighlightsPage(profile)}
+            ${renderClosingPage()}
         `;
     }
 

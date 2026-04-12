@@ -2817,6 +2817,11 @@
     --ss-text-card-accent-soft: rgba(219, 39, 119, 0.11);
 }
 
+.season-summary-page-closing {
+    --ss-text-card-accent: #475569;
+    --ss-text-card-accent-soft: rgba(100, 116, 139, 0.12);
+}
+
 .season-summary-page-story .season-summary-story-copy {
     gap: 14px;
 }
@@ -2885,6 +2890,35 @@
     .season-summary-page-captain-moments .season-summary-captain-moment {
         gap: 14px;
     }
+
+    .season-summary-page-closing .season-summary-story-shell {
+        justify-content: center;
+        min-height: min(100%, 100%);
+        padding-top: clamp(32px, 8vh, 92px);
+    }
+
+    .season-summary-page-closing .season-summary-story-copy {
+        width: min(100%, 920px);
+        justify-items: center;
+    }
+
+    .season-summary-page-closing .season-summary-story-paragraph {
+        width: min(100%, 820px);
+        text-align: center;
+        padding-inline: clamp(24px, 3vw, 42px);
+    }
+
+    .season-summary-page-closing .season-summary-story-paragraph::before {
+        inset: 0;
+        width: auto;
+        height: 6px;
+        border-radius: 22px 22px 0 0;
+    }
+
+    .season-summary-page-closing .season-summary-story-paragraph::after {
+        background:
+            radial-gradient(circle at 50% 0%, var(--ss-text-card-accent-soft) 0%, transparent 34%);
+    }
 }
 
 @media (max-width: 768px) {
@@ -2901,5 +2935,26 @@
     .season-summary-page-story .season-summary-story-paragraph::before {
         width: 5px;
         border-radius: 18px 0 0 18px;
+    }
+
+    .season-summary-page-closing .season-summary-story-copy {
+        justify-items: center;
+    }
+
+    .season-summary-page-closing .season-summary-story-paragraph {
+        text-align: center;
+        width: 100%;
+    }
+
+    .season-summary-page-closing .season-summary-story-paragraph::before {
+        inset: 0;
+        width: auto;
+        height: 5px;
+        border-radius: 18px 18px 0 0;
+    }
+
+    .season-summary-page-closing .season-summary-story-paragraph::after {
+        background:
+            radial-gradient(circle at 50% 0%, var(--ss-text-card-accent-soft) 0%, transparent 36%);
     }
 }
