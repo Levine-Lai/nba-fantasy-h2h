@@ -2089,7 +2089,10 @@ async function buildFreshManagerPanelPayload(baseState, uid) {
       )
     : (previous.captain_used || { used: false, label: "None", day: null, captain_name: null, captain_points: null });
 
-  if (activeChip === "phcapt" && Array.isArray(picksData?.picks)) {
+  const canHydrateCaptainFromCurrentPicks =
+    activeChip === "phcapt" &&
+    (!captainChipEvent?.event || Number(captainChipEvent.event) === Number(currentEvent || 0));
+  if (canHydrateCaptainFromCurrentPicks && Array.isArray(picksData?.picks)) {
     if (!eventLiveCache[currentEvent]) {
       const liveRes = await fetchJsonSafe(`/event/${currentEvent}/live/`, 2);
       if (liveRes.ok) eventLiveCache[currentEvent] = buildLiveElementsMap(liveRes.data);
@@ -3342,7 +3345,10 @@ async function buildState(previousState = null, targetUids = UID_LIST) {
     };
     });
 
-    if (activeChip === "phcapt") {
+    const canHydrateCaptainFromCurrentPicks =
+      activeChip === "phcapt" &&
+      (!captainChipEvent?.event || Number(captainChipEvent.event) === Number(currentEvent || 0));
+    if (canHydrateCaptainFromCurrentPicks) {
       const captainPick = picks.find((pick) => pick?.is_captain);
       if (captainPick) {
         const captainDay = Number(captainUsed?.day || currentMeta?.day || 0) || null;

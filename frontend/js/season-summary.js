@@ -1037,6 +1037,91 @@
         `;
     }
 
+    function renderCaptainMomentsPageV2(profile) {
+        const summary = profile?.captain?.summary || {};
+        const bestCaptain = summary.best || null;
+        const worstCaptain = summary.worst || null;
+        const bestBench = summary.bench_best || null;
+        const bestStarterValue = summary.starter_best_value || null;
+        const mark = (value) => `<strong class="season-summary-transfer-emphasis">${escapeHtml(value)}</strong>`;
+        const formatDateText = (item) => {
+            const datePart = String(item?.date_label || "").trim();
+            const gwDayPart = String(item?.label || "").trim();
+            if (datePart && gwDayPart) return `${datePart} ${gwDayPart}`;
+            return datePart || gwDayPart || "那一天";
+        };
+        const buildStatsText = (item) => `${formatSummaryNumber(item?.points_scored || 0)}分${formatSummaryNumber(item?.rebounds || 0)}篮板${formatSummaryNumber(item?.assists || 0)}助攻${formatSummaryNumber(item?.steals || 0)}抢断${formatSummaryNumber(item?.blocks || 0)}盖帽`;
+        const renderPortrait = (item) => {
+            const safeName = getStoryPlayerName(item);
+            const safeUrl = String(item?.headshot_url || "").trim();
+            if (!safeUrl) {
+                return `<div class="season-summary-captain-moment-portrait"><span class="season-summary-captain-moment-headshot-fallback">${escapeHtml(safeName)}</span></div>`;
+            }
+            return `
+                <div class="season-summary-captain-moment-portrait">
+                    <img
+                        class="season-summary-captain-moment-headshot"
+                        src="${escapeHtml(safeUrl)}"
+                        alt="${escapeHtml(safeName)}"
+                        loading="lazy"
+                        decoding="async"
+                        onerror="this.style.display='none';const fallback=this.nextElementSibling;if(fallback){fallback.style.display='inline-flex';}"
+                    />
+                    <span class="season-summary-captain-moment-headshot-fallback" style="display:none">${escapeHtml(safeName)}</span>
+                </div>
+            `;
+        };
+        const renderMomentArticle = (paragraph, item) => `
+            <article class="season-summary-captain-moment">
+                <p class="season-summary-story-paragraph">${paragraph}</p>
+                ${item ? renderPortrait(item) : ""}
+            </article>
+        `;
+
+        const bestName = getStoryPlayerName(bestCaptain);
+        const bestParagraph = bestCaptain?.captain_name
+            ? `${mark(formatDateText(bestCaptain))}也许是你这赛季最得意的一天，那天${mark(bestName)}打出了${mark(buildStatsText(bestCaptain))}，拿到了${mark(`${formatSummaryNumber(bestCaptain?.base_points || 0)}分`)}，而你也稳稳把他戴上了队长袖标，这种人准到位的时刻，当然值得被记住。`
+            : "这个赛季还没有抓到完整的最佳队长时刻。";
+
+        const worstName = getStoryPlayerName(worstCaptain);
+        const worstDidPlay = !!worstCaptain?.did_play || Number(worstCaptain?.minutes || 0) > 0 || Number(worstCaptain?.base_points || 0) > 0;
+        const worstParagraph = !worstCaptain?.captain_name
+            ? "这个赛季还没有抓到完整的最难受队长时刻。"
+            : (worstDidPlay
+                ? `${mark(formatDateText(worstCaptain))}大概就是你最想叹气的一次选择。那天${mark(worstName)}只交出了${mark(buildStatsText(worstCaptain))}，最后只拿到${mark(`${formatSummaryNumber(worstCaptain?.base_points || 0)}分`)}，回头看当然会觉得可惜。`
+                : `${mark(formatDateText(worstCaptain))}大概就是你最无奈的一次 Captain 记忆。那天${mark(worstName)}赛前突然未能出场，留下了刺眼的${mark("0分")}，这种时刻确实很难不让人破防。`);
+
+        const benchName = getStoryPlayerName(bestBench);
+        const benchParagraph = bestBench?.player_name
+            ? `${mark(formatDateText(bestBench))}你的心情也许不会太好，因为${mark(benchName)}那天的数据栏是${mark(buildStatsText(bestBench))}，拿到了${mark(`${formatSummaryNumber(bestBench?.fantasy_points || 0)}分`)}，虽然他在你阵容里，但是你却把他放在了替补席，如果能再回到那一天，你会不会选择首发他呢？🤔`
+            : "这个赛季还没有抓到完整的替补席遗憾时刻。";
+
+        const starterValueName = getStoryPlayerName(bestStarterValue);
+        const starterValueParagraph = bestStarterValue?.player_name
+            ? `${mark(formatDateText(bestStarterValue))}你的精心挑选的宝藏球员${mark(starterValueName)}出乎了所有人的意料，拿到了${mark(buildStatsText(bestStarterValue))}，虽然这个数据对${mark("N.Jokic")}来说可能稀松平常，但对于他来说可是打出了${mark(`${formatSummaryDecimal(bestStarterValue?.value || 0)}倍`)}的身价，你对他的信任也值得一夸👍`
+            : "这个赛季还没有抓到完整的 value 最高时刻。";
+
+        const moments = [
+            renderMomentArticle(bestParagraph, bestCaptain),
+            renderMomentArticle(worstParagraph, worstCaptain),
+            renderMomentArticle(benchParagraph, bestBench),
+            renderMomentArticle(starterValueParagraph, bestStarterValue),
+        ];
+
+        return `
+            <section class="season-summary-page season-summary-page-story season-summary-page-captain-moments">
+                <div class="season-summary-story-main">
+                    <div class="season-summary-story-shell season-summary-captain-moments-copy">
+                        <div class="season-summary-page-title">Moment</div>
+                        <div class="season-summary-captain-moments">
+                            ${moments.join("")}
+                        </div>
+                    </div>
+                </div>
+            </section>
+        `;
+    }
+
     function renderClosingPageLegacyOriginal() {
         return `
             <section class="season-summary-page season-summary-page-story season-summary-page-closing">
@@ -1060,7 +1145,7 @@
             ${renderPlayerDetailsPage(profile)}
             ${renderTransferPage(profile)}
             ${renderCaptainPage(profile)}
-            ${renderCaptainMomentsPageLegacy(profile)}
+            ${renderCaptainMomentsPageV2(profile)}
             ${renderHighlightsPage(profile)}
             ${renderClosingPage()}
         `;
@@ -1101,6 +1186,13 @@
             return "这个 Fantasy ID 没有查到数据，可以换一个再试。";
         }
         return text || "加载失败";
+    }
+
+    function refreshCaptainMomentsPage(profile) {
+        const current = document.querySelector(".season-summary-page-captain-moments");
+        if (!current) return;
+        current.outerHTML = renderCaptainMomentsPageV2(profile);
+        updateIndicator();
     }
 
     async function playIntroExit(profile, normalizedUid) {
@@ -1150,6 +1242,14 @@
             const profile = await requestSummary(normalizedUid);
             await hydrateHighlightLineups(profile, normalizedUid);
             await playIntroExit(profile, normalizedUid);
+            hydrateMomentExtras(profile, normalizedUid)
+                .then((hydratedProfile) => {
+                    if (state.lastUid !== normalizedUid) return;
+                    refreshCaptainMomentsPage(hydratedProfile);
+                })
+                .catch((error) => {
+                    console.warn("Moment extras background hydrate failed:", error);
+                });
         } catch (error) {
             console.error("Season summary load failed:", error);
             setIntroLeaving(false);

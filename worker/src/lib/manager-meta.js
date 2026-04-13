@@ -204,10 +204,10 @@ export async function refreshManagerMetaState(env, existingState = null, options
       !Array.isArray(previous?.players) ||
       previous.players.length === 0 ||
       previous?.fetch_status?.picks_ok !== true;
-    const shouldFetchHistory =
-      eventChanged ||
-      previous?.fetch_status?.history_ok !== true ||
-      !previous?.chip_status;
+    // Chips and captain usage can change within the same event before deadline,
+    // so manager-meta refreshes should always re-read history instead of relying
+    // on same-event cached chip_status.
+    const shouldFetchHistory = true;
     const shouldFetchTransfers = true;
 
     let picksRes = shouldFetchPicks
@@ -268,10 +268,18 @@ export async function refreshManagerMetaState(env, existingState = null, options
       ? (captainChipEvent?.event ? currentWeek : null)
       : (Number(previous.captain_week || 0) || null);
     const activeChip = String(picksData?.active_chip || (eventChanged ? "" : (previous?.active_chip || ""))).toLowerCase();
-    const shouldResolveCaptainDetails = !lightweightCaptainDetails && hasHistoryData && (
-      eventChanged ||
+    const captainDetailsMissing =
       !previous?.captain_used?.used ||
       !previous?.captain_used?.captain_name ||
+      previous?.captain_used?.captain_points === null ||
+      previous?.captain_used?.captain_points === undefined;
+    const isCaptainChipOnCurrentEvent =
+      Number(captainChipEvent?.event || 0) === Number(currentEvent || 0);
+    const shouldResolveCaptainDetails = hasHistoryData && !!captainChipEvent?.event && (
+      !lightweightCaptainDetails ||
+      eventChanged ||
+      captainDetailsMissing ||
+      isCaptainChipOnCurrentEvent ||
       Number(previous?.captain_week || 0) !== Number(captainWeek || 0)
     );
     let captainUsed = hasHistoryData
@@ -313,7 +321,10 @@ export async function refreshManagerMetaState(env, existingState = null, options
     };
     if (picksData) {
       players = buildLivePicksFromPicksData(picksData, elements, liveElements, teamsMetaById);
-      if (activeChip === "phcapt") {
+      const canHydrateCaptainFromCurrentPicks =
+        activeChip === "phcapt" &&
+        (!captainChipEvent?.event || Number(captainChipEvent.event) === Number(currentEvent || 0));
+      if (canHydrateCaptainFromCurrentPicks) {
         const captainPick = players.find((pick) => pick?.is_captain);
         if (captainPick) {
           const captainDay = Number(captainUsed?.day || currentMeta?.day || 0) || null;
