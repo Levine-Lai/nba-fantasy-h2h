@@ -163,13 +163,17 @@
         return data?.lineup || null;
     }
 
-    async function requestMomentExtras(uid) {
+    async function requestMomentExtras(uid, options = {}) {
         const normalizedUid = String(uid || "").trim();
         if (!normalizedUid) return null;
 
         const base = (window.__API_BASE__ || "").trim().replace(/\/+$/, "");
         const target = `${base}/api/season-summary-moments?uid=${encodeURIComponent(normalizedUid)}&_=${Date.now()}`;
-        const response = await fetch(target, { cache: "no-store" });
+        const requestUrl = new URL(target, window.location.origin);
+        if (options?.refresh) {
+            requestUrl.searchParams.set("refresh", "1");
+        }
+        const response = await fetch(requestUrl.toString(), { cache: "no-store" });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data?.success === false) {
             throw new Error(data?.error || `Moment extras request failed: ${response.status}`);
@@ -182,7 +186,14 @@
         if (!summary) return profile;
 
         try {
-            const extras = await requestMomentExtras(uid);
+            let extras = await requestMomentExtras(uid);
+            const missingBench = !extras?.bench_best?.player_name;
+            const missingStarterValue = !extras?.starter_best_value?.player_name;
+
+            if (missingBench || missingStarterValue) {
+                extras = await requestMomentExtras(uid, { refresh: true });
+            }
+
             if (extras?.bench_best?.player_name) {
                 summary.bench_best = extras.bench_best;
             }
