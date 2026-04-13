@@ -673,9 +673,18 @@
         if (!matchedTemplate) return "";
 
         const exampleTransfer = favoriteTimeSlot?.example_transfer || {};
+        const normalizeExampleTime = (value, hourHint) => {
+            const raw = String(value || "").trim();
+            if (!raw) return "凌晨还";
+            if (/^\d{1,2}:\d{2}$/.test(raw)) return raw;
+            if (/^:\d{2}$/.test(raw)) return `${hourHint}:${raw.slice(1)}`;
+            if (/^\d{1,2}$/.test(raw)) return `${hourHint}:${raw.padStart(2, "0")}`;
+            return raw;
+        };
+
         return fillTemplate(matchedTemplate.text, {
             slot: slotLabel,
-            example_time: String(exampleTransfer?.time_label || "凌晨还"),
+            example_time: normalizeExampleTime(exampleTransfer?.time_label, startHour),
             example_player: String(exampleTransfer?.player_in_name || "那个人"),
         });
     }
@@ -761,7 +770,7 @@
 
         const paragraphOne = `这个赛季总共转会${mark(formatSummaryNumber(totalTransfers))}次，${transferEveryWeek ? "并且每一周都坚持换人，相信最终的排名没有辜负你的努力~" : "机智的你选择以逸待劳，并不是把 FT 用完才是最好的选择。"}${penaltyPoints > 200 ? `整个赛季一共扣过${mark(`-${formatSummaryNumber(penaltyPoints)}`)}分，大胆而奔放的操作决定了你的上限。` : `整个赛季一共扣过${mark(`-${formatSummaryNumber(penaltyPoints)}`)}分，谨慎精确才是你的代名词。`}`;
         const paragraphTwo = mostIn?.name && mostOut?.name
-            ? `${renderInlinePlayerMention(mostIn, "", true)}被你换进来了${mark(formatSummaryNumber(mostIn.count))}次，是你心心念念的那个人吗？希望他的表现没有让你失望；而${renderInlinePlayerMention(mostOut, "", true)}被你送走了${mark(formatSummaryNumber(mostOut.count))}次，想必他的表现你也看在眼里吧。`
+            ? `${renderInlinePlayerMention(mostIn, "", true)}被你换进来了${mark(formatSummaryNumber(mostIn.count))}次，看来他是你心心念念的那个，希望他的表现没有让你失望；而${renderInlinePlayerMention(mostOut, "", true)}被你送走了${mark(formatSummaryNumber(mostOut.count))}次，想必他的表现你也看在眼里。`
             : "这个赛季你换人的节奏很有个人风格，人来人往之间，喜爱和犹豫都写在每一笔转会里。";
         const paragraphThree = buildTransferTimingParagraph(favoriteDay, favoriteTimeSlot);
 
@@ -1091,7 +1100,7 @@
 
         const bestName = getStoryPlayerName(bestCaptain);
         const bestParagraph = bestCaptain?.captain_name
-            ? `${mark(formatDateText(bestCaptain))}也许是你这赛季最得意的一天，那天${mark(bestName)}打出了${mark(buildStatsText(bestCaptain))}，拿到了${mark(`${formatSummaryNumber(bestCaptain?.base_points || 0)}分`)}，而你也稳稳把他戴上了队长袖标，这种人准到位的时刻，当然值得被记住。`
+            ? `${mark(formatDateText(bestCaptain))}似乎是一个特别的日子，那一天${mark(bestName)}大发神威，砍下了${mark(buildStatsText(bestCaptain))}，拿到了${mark(`${formatSummaryNumber(bestCaptain?.base_points || 0)}分`)}的高分，而你也有如神助，选择了他当作你那一周的队长，这种珍贵的瞬间相信你一定不会忘记😄`
             : "这个赛季还没有抓到完整的最佳队长时刻。";
 
         const worstName = getStoryPlayerName(worstCaptain);
@@ -1099,8 +1108,8 @@
         const worstParagraph = !worstCaptain?.captain_name
             ? "这个赛季还没有抓到完整的最难受队长时刻。"
             : (worstDidPlay
-                ? `${mark(formatDateText(worstCaptain))}大概就是你最想叹气的一次选择。那天${mark(worstName)}只交出了${mark(buildStatsText(worstCaptain))}，最后只拿到${mark(`${formatSummaryNumber(worstCaptain?.base_points || 0)}分`)}，回头看当然会觉得可惜。`
-                : `${mark(formatDateText(worstCaptain))}大概就是你最无奈的一次 Captain 记忆。那天${mark(worstName)}赛前突然未能出场，留下了刺眼的${mark("0分")}，这种时刻确实很难不让人破防。`);
+                ? `${mark(formatDateText(worstCaptain))}似乎是一个更特别的日子，${mark(worstName)}被你寄予厚望，却只拿下了${mark(buildStatsText(worstCaptain))}，只有可怜的${mark(`${formatSummaryNumber(worstCaptain?.base_points || 0)}分`)}，相信你那天在心里已经把他骂了无数遍了吧`
+                : `${mark(formatDateText(worstCaptain))}似乎是一个更特别的日子，${mark(worstName)}被你寄予厚望，却因为赛前突发受伤🤕，留下一个刺眼的0分任人嘲笑，相信你那天在心里已经把他骂了无数遍了吧`);
 
         const benchName = getStoryPlayerName(bestBench);
         const benchParagraph = bestBench?.player_name
