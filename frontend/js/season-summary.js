@@ -770,7 +770,7 @@
 
         const paragraphOne = `这个赛季总共转会${mark(formatSummaryNumber(totalTransfers))}次，${transferEveryWeek ? "并且每一周都坚持换人，相信最终的排名没有辜负你的努力~" : "机智的你选择以逸待劳，并不是把 FT 用完才是最好的选择。"}${penaltyPoints > 200 ? `整个赛季一共扣过${mark(`-${formatSummaryNumber(penaltyPoints)}`)}分，大胆而奔放的操作决定了你的上限。` : `整个赛季一共扣过${mark(`-${formatSummaryNumber(penaltyPoints)}`)}分，谨慎精确才是你的代名词。`}`;
         const paragraphTwo = mostIn?.name && mostOut?.name
-            ? `${renderInlinePlayerMention(mostIn, "", true)}被你换进来了${mark(formatSummaryNumber(mostIn.count))}次，看来他是你心心念念的那个，希望他的表现没有让你失望；而${renderInlinePlayerMention(mostOut, "", true)}被你送走了${mark(formatSummaryNumber(mostOut.count))}次，想必他的表现你也看在眼里。`
+            ? `${renderInlinePlayerMention(mostIn, "", true)}被你换进来了${mark(formatSummaryNumber(mostIn.count))}次，看来他是你心心念念的那个人，希望他的表现没有让你失望；而${renderInlinePlayerMention(mostOut, "", true)}被你送走了${mark(formatSummaryNumber(mostOut.count))}次，想必他的表现你也看在眼里。`
             : "这个赛季你换人的节奏很有个人风格，人来人往之间，喜爱和犹豫都写在每一笔转会里。";
         const paragraphThree = buildTransferTimingParagraph(favoriteDay, favoriteTimeSlot);
 

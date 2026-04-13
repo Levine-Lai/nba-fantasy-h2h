@@ -859,7 +859,9 @@ const Render = {
 
     eventInfo(name) {
         const element = document.getElementById("event-info");
-        if (element) element.textContent = `${name} - League #1653`;
+        if (element) {
+            element.innerHTML = `赛季结束啦~请查收属于你的<a href="/season-summary/">赛季总结</a>`;
+        }
     },
 
     gameCount(count) {
