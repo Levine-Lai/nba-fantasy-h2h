@@ -145,12 +145,11 @@
             <div class="playin-player-card ${getPlayerCardClass(player, state.activeView)}">
                 <div class="playin-player-team-code">${escapeHtml(teamCode)}</div>
                 ${player?.is_captain ? '<span class="playin-captain-chip">C</span>' : ""}
-                <div class="playin-player-top playin-player-inline">
+                <div class="playin-player-top">
                     ${player?.headshot_url
                         ? `<img class="playin-player-avatar" src="${escapeHtml(player.headshot_url)}" alt="${escapeHtml(player.display_name || "")}" data-fallback="${escapeHtml(initialsFromName(player.display_name || player.english_name || ""))}" loading="lazy" decoding="async" onerror="this.onerror=null;const fallback=document.createElement('span');fallback.className='playin-player-avatar-fallback';fallback.textContent=this.getAttribute('data-fallback')||'NBA';this.replaceWith(fallback);">`
                         : `<span class="playin-player-avatar-fallback">${escapeHtml(initialsFromName(player.display_name || player.english_name || ""))}</span>`}
                     <div class="playin-player-name">${escapeHtml(player?.display_name || player?.english_name || "-")}</div>
-                    <div class="playin-player-score-inline">${escapeHtml(formatScore(displayScore || 0))}</div>
                 </div>
                 <div class="playin-player-score-band">
                     <div class="playin-player-score-value">${escapeHtml(formatScore(displayScore || 0))}</div>

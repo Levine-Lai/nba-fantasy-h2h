@@ -2729,10 +2729,6 @@ body {
     -webkit-box-orient: vertical;
 }
 
-.playin-player-score-inline {
-    display: none;
-}
-
 .playin-player-score-band {
     margin-top: 8px;
     margin-left: -8px;
@@ -2846,8 +2842,8 @@ body {
     }
 
     .playin-player-card {
-        min-height: auto;
-        padding: 6px 4px;
+        min-height: 142px;
+        padding: 8px 4px 0;
         border-radius: 10px;
     }
 
@@ -2866,47 +2862,120 @@ body {
     }
 
     .playin-player-top {
-        gap: 4px;
-        padding-top: 0;
+        gap: 6px;
+        padding-top: 14px;
     }
 
     .playin-player-avatar,
     .playin-player-avatar-fallback {
-        width: 28px;
-        height: 28px;
-        flex-basis: 28px;
-        border-radius: 8px;
+        width: 42px;
+        height: 42px;
+        flex-basis: 42px;
+        border-radius: 10px;
     }
 
     .playin-player-name {
-        flex: 1 1 auto;
-        width: auto;
-        font-size: 7px;
-        line-height: 1;
-        padding: 0;
-        text-align: left;
-        display: block;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-    }
-
-    .playin-player-inline {
-        flex-direction: row;
-        align-items: center;
-        justify-content: flex-start;
+        font-size: 9px;
+        line-height: 1.1;
+        width: 100%;
+        padding: 0 2px;
+        text-align: center;
+        display: -webkit-box;
+        white-space: normal;
     }
 
     .playin-player-score-band {
+        display: block;
+        margin-left: -4px;
+        margin-right: -4px;
+        padding: 6px 4px 7px;
+        border-top-width: 2px;
+    }
+
+    .playin-player-score-value {
+        font-size: 20px;
+    }
+
+    .playin-manager-header {
+        grid-template-columns: 36px minmax(0, 1fr) auto;
+        gap: 6px;
+        padding: 10px 8px;
+        align-items: center;
+    }
+
+    .playin-rank-badge {
+        width: 36px;
+        height: 36px;
+        border-radius: 11px;
+    }
+
+    .playin-rank-number {
+        font-size: 14px;
+    }
+
+    .playin-rank-delta {
+        margin-top: 1px;
+        font-size: 7px;
+    }
+
+    .playin-manager-main {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .playin-manager-name {
+        flex: 1 1 auto;
+        min-width: 0;
+        gap: 4px;
+        font-size: 11px;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .playin-manager-name > span:first-child {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .playin-pill {
+        padding: 2px 5px;
+        font-size: 8px;
+        flex: 0 0 auto;
+    }
+
+    .playin-manager-split {
+        margin-top: 0;
+        flex: 0 0 auto;
+        gap: 4px;
+        font-size: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .playin-score-panel {
+        min-width: auto;
+        flex-direction: row;
+        gap: 4px;
+        align-items: center;
+        justify-self: end;
+    }
+
+    .playin-score-label {
         display: none;
     }
 
-    .playin-player-score-inline {
-        display: block;
-        flex: 0 0 auto;
+    .playin-score-value {
+        font-size: 18px;
+    }
+
+    .playin-score-arrow {
         font-size: 11px;
-        line-height: 1;
-        font-weight: 900;
-        color: #244e9e;
     }
 }
 
