@@ -49,55 +49,41 @@
     </div>
 
     <!-- Main Container -->
-    <div class="container page-view home-layout active" id="page-home">
-        <!-- Column 1: H2H -->
-        <div class="column h2h-column">
-            <div class="col-header">
-                <div class="col-title">Live H2H</div>
-                <span class="col-badge" id="match-count">-</span>
-            </div>
-            <div class="h2h-list" id="h2h-list">
-                <div class="loading"><div class="spinner"></div>Loading...</div>
-            </div>
-        </div>
-
-        <!-- Column 2: Games + Trends -->
-        <div class="column side-column">
-            <div class="col-header">
-                <div class="col-title">Today's Fixtures</div>
-                <span class="col-badge" id="game-count">-</span>
-            </div>
-            <div class="game-list" id="game-list">
-                <div class="loading"><div class="spinner"></div>Loading...</div>
-            </div>
-            <div class="trend-wrap">
-                <div class="trend-title">Chips Used</div>
-                <div id="chips-used-summary" class="chips-summary-card">
-                    <div class="trend-empty">Loading chips data...</div>
+    <div class="container page-view playin-layout active" id="page-home">
+        <div class="column playin-column">
+            <div class="playin-hero">
+                <div class="playin-hero-copy">
+                    <div class="playin-kicker">Play-In Fantasy</div>
+                    <h2 class="playin-title">附加赛排行榜</h2>
+                    <p class="playin-subtitle">固定 10 人阵容，5 名首发 + 5 名替补 + 1 名队长。默认展示总分，Day 1 为第一轮累计，Day 2 为第二轮累计。</p>
                 </div>
-                <div class="trend-title">Good Captain</div>
-                <div id="good-captain-summary" class="good-captain-card">
-                    <div class="trend-empty">Loading captain choices...</div>
-                </div>
-                <div class="trend-head">
-                    <div class="trend-title">Weekly Transfers</div>
-                    <div class="trend-switch" id="transfer-direction-switch">
-                        <button class="trend-switch-btn active" data-transfer-direction="in" type="button">In</button>
-                        <button class="trend-switch-btn" data-transfer-direction="out" type="button">Out</button>
-                        <button class="trend-switch-btn" data-transfer-direction="diagram" type="button" hidden>Diagram</button>
+                <div class="playin-meta">
+                    <div class="playin-meta-card">
+                        <span class="playin-meta-label">计分公式</span>
+                        <span class="playin-meta-value">PTS×1 REB×1 AST×2 STL×3 BLK×3</span>
+                    </div>
+                    <div class="playin-meta-card">
+                        <span class="playin-meta-label">替补规则</span>
+                        <span class="playin-meta-value">首发未出场按替补顺序递补</span>
                     </div>
                 </div>
-                <div id="trend-transfer-card" class="trend-bar-card">
-                    <div id="trend-transfer-table" class="trend-bar-list"></div>
+            </div>
+
+            <div class="playin-toolbar">
+                <div class="playin-switch" id="playin-view-switch">
+                    <button class="playin-switch-btn active" data-playin-view="total" type="button">总分</button>
+                    <button class="playin-switch-btn" data-playin-view="day1" type="button">Day 1</button>
+                    <button class="playin-switch-btn" data-playin-view="day2" type="button">Day 2</button>
                 </div>
-                <div class="trend-title">Ownership Top 10</div>
-                <div id="ownership-card" class="trend-bar-card trend-bar-card-purple">
-                    <div id="ownership-top" class="trend-bar-list"></div>
-                </div>
-                <div class="trend-title">Special Guy (Average Team Select%)</div>
-                <div id="special-guy-summary" class="special-guy-card">
-                    <div class="trend-empty">Loading special guy data...</div>
-                </div>
+                <div class="playin-status" id="playin-status">正在加载附加赛排行榜...</div>
+            </div>
+
+            <div class="playin-schedule" id="playin-schedule">
+                <div class="loading"><div class="spinner"></div>Loading...</div>
+            </div>
+
+            <div class="playin-board" id="playin-board">
+                <div class="loading"><div class="spinner"></div>Loading...</div>
             </div>
         </div>
     </div>
@@ -235,5 +221,6 @@
     </div>
 
     <script src="/js/app.js"></script>
+    <script src="/js/playin.js"></script>
 </body>
 </html>

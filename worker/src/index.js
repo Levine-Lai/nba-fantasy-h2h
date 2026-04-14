@@ -59,6 +59,7 @@ import {
 } from "./generated/season-summary-snapshot.generated.js";
 
 const LEAGUE_ID = 1653;
+const H2H_SITE_FROZEN = true;
 const SEASON_SUMMARY_LEAGUE_ID = 1233;
 const SEASON_SUMMARY_CACHE_VERSION = "20260412e";
 const SEASON_SUMMARY_CACHE_PREFIX = `season_summary:${SEASON_SUMMARY_CACHE_VERSION}:`;
@@ -3698,6 +3699,47 @@ async function getState(env) {
   }
 }
 
+function buildFrozenH2HUnavailablePayload() {
+  return {
+    success: false,
+    frozen: true,
+    error: "Frozen H2H snapshot is unavailable in KV.",
+  };
+}
+
+function buildFrozenInjuriesFallback() {
+  return {
+    current_event: null,
+    current_event_name: null,
+    next_event: null,
+    next_event_name: null,
+    target_date: null,
+    games_count: 0,
+    teams: [],
+    updated_at: null,
+    cache_ttl_minutes: null,
+    frozen: true,
+  };
+}
+
+function buildFrozenTeamAttackDefenseFallback() {
+  return {
+    period_label: "Frozen",
+    start_date: null,
+    end_date: null,
+    updated_at: null,
+    teams: [],
+    pace_chart: {
+      source: "frozen",
+      source_label: "Frozen",
+      period_label: "Frozen",
+      metric_note: "",
+      teams: [],
+    },
+    frozen: true,
+  };
+}
+
 function buildManagerFutureSchedule(payload, dayContexts, fixtureLookupByEvent) {
   const players = Array.isArray(payload?.players) ? payload.players : [];
   const currentEvent = Number(payload?.current_event || 0);
@@ -3773,6 +3815,9 @@ function buildManagerFutureSchedule(payload, dayContexts, fixtureLookupByEvent) 
 async function getInjuriesPayload(env, options = {}) {
   const force = !!options.force;
   const cached = await getInjuryCache(env);
+  if (H2H_SITE_FROZEN) {
+    return cached || buildFrozenInjuriesFallback();
+  }
   const now = Date.now();
   const cachedAt = Date.parse(cached?.updated_at || "") || 0;
   if (!force && cached && cachedAt && now - cachedAt < INJURY_CACHE_TTL_MS) {
@@ -3969,6 +4014,9 @@ async function fetchSeasonPaceDiffTeams() {
 async function getTeamAttackDefensePayload(env, options = {}) {
   const force = !!options.force;
   const cached = await getTeamAttackDefenseCache(env);
+  if (H2H_SITE_FROZEN) {
+    return cached || buildFrozenTeamAttackDefenseFallback();
+  }
   const todayKey = getBeijingDateKey();
   if (!force && cached?.end_date === todayKey && Array.isArray(cached?.teams) && cached.teams.length > 0) {
     return cached;
@@ -5772,6 +5820,16 @@ export default {
           const token = url.searchParams.get("token");
           if (token !== auth) return jsonResponse({ success: false, error: "unauthorized" }, 401);
         }
+        if (H2H_SITE_FROZEN) {
+          const frozenState = await getState(env);
+          return jsonResponse({
+            success: true,
+            frozen: true,
+            mode: "frozen",
+            current_event_name: frozenState?.current_event_name || null,
+            refresh_meta: frozenState?.refresh_meta || null,
+          });
+        }
         const rawMode = url.searchParams.get("mode");
         const mode = String(rawMode || "meta").toLowerCase();
         let state;
@@ -5909,12 +5967,33 @@ export default {
       }
 
       let state = await getState(env);
-      if (!state) {
+      if (!state && !H2H_SITE_FROZEN) {
         state = await refreshState(env, { full: true });
       }
-      state = normalizeStateChipStatus(state);
+      if (state) {
+        state = normalizeStateChipStatus(state);
+      }
+
+      const requiresH2HState =
+        path === "/api/state" ||
+        path === "/api/fixtures" ||
+        path === "/api/h2h" ||
+        path === "/api/h2h-standings" ||
+        path === "/api/classic-rankings" ||
+        path === "/api/trends/transfers" ||
+        path === "/api/fdr" ||
+        path === "/api/health" ||
+        path.startsWith("/api/fixture/") ||
+        path.startsWith("/api/picks/");
+
+      if (requiresH2HState && !state) {
+        return jsonResponse(buildFrozenH2HUnavailablePayload(), 503);
+      }
 
       if (path === "/api/state") {
+        if (H2H_SITE_FROZEN) {
+          return jsonResponse(state);
+        }
         const useFreshH2H = url.searchParams.get("fresh_h2h") === "1";
         let responseState = state;
         if (useFreshH2H) {
@@ -5963,21 +6042,31 @@ export default {
       if (path === "/api/classic-rankings") return jsonResponse(state.classic_rankings || []);
       if (path.startsWith("/api/fixture/")) {
         const id = Number(path.split("/").pop());
-        const currentFixtureIds = new Set((state?.fixtures?.games || []).map((game) => Number(game?.id || 0)).filter(Boolean));
-        const isCurrentFixture = currentFixtureIds.has(id);
         let payload = state.fixture_details[String(id)] || state.fixture_details[id] || {};
-        if (isCurrentFixture) {
-          const freshFixtures = await buildCurrentFixturePayload(state);
-          payload = freshFixtures.fixture_details[String(id)] || freshFixtures.fixture_details[id] || payload;
-        } else if (!payload || !payload.home_players) {
-          const freshFixtures = await buildCurrentFixturePayload(state);
-          payload = freshFixtures.fixture_details[String(id)] || freshFixtures.fixture_details[id] || {};
+        if (!H2H_SITE_FROZEN) {
+          const currentFixtureIds = new Set((state?.fixtures?.games || []).map((game) => Number(game?.id || 0)).filter(Boolean));
+          const isCurrentFixture = currentFixtureIds.has(id);
+          if (isCurrentFixture) {
+            const freshFixtures = await buildCurrentFixturePayload(state);
+            payload = freshFixtures.fixture_details[String(id)] || freshFixtures.fixture_details[id] || payload;
+          } else if (!payload || !payload.home_players) {
+            const freshFixtures = await buildCurrentFixturePayload(state);
+            payload = freshFixtures.fixture_details[String(id)] || freshFixtures.fixture_details[id] || {};
+          }
         }
         return jsonResponse(payload);
       }
       if (path.startsWith("/api/picks/")) {
         const uid = normalizeUid(Number(path.split("/").pop()));
         let payload = state.picks_by_uid[uid] || {};
+        if (H2H_SITE_FROZEN) {
+          debugUid("api_response", uid, {
+            total_live: payload.total_live || 0,
+            event_total: payload.event_total || 0,
+            players: summarizePlayersForDebug(payload.players || []),
+          });
+          return jsonResponse(payload);
+        }
         const forceFresh = url.searchParams.get("fresh") === "1";
         const panelOnly = url.searchParams.get("panel") === "1";
         const eventChanged = Number(payload?.current_event || 0) !== Number(state?.current_event || 0);
@@ -6050,6 +6139,7 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
+    if (H2H_SITE_FROZEN) return;
     const scheduledAt = event?.scheduledTime || Date.now();
     const date = new Date(scheduledAt);
     const utcMinute = Number(new Intl.DateTimeFormat("en-GB", {

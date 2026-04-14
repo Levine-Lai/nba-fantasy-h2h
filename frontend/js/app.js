@@ -1,5 +1,23 @@
 ﻿const API_BASE = (window.__API_BASE__ || "").trim().replace(/\/+$/, "");
 
+const H2H_FROZEN_MODE = true;
+const H2H_FROZEN_DATA_PATHS = Object.freeze({
+    state: "/data/h2h-frozen-state.json",
+    injuries: "/data/h2h-frozen-injuries.json",
+    teamAttackDefense: "/data/h2h-frozen-team-attack-defense.json",
+    playerOptions: "/data/h2h-frozen-player-options.json",
+    defaultPlayerReference: "/data/h2h-frozen-player-reference-nikola-jokic.json",
+});
+
+async function fetchLocalJson(path) {
+    const response = await fetch(path, { cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.success === false) {
+        throw new Error(data?.error || `Request failed: ${response.status}`);
+    }
+    return data;
+}
+
 const API = {
     async fetch(url, options = {}) {
         const target = /^https?:\/\//.test(url) ? url : `${API_BASE}${url}`;
@@ -18,10 +36,16 @@ const API = {
     },
 
     async getStateCached() {
+        if (H2H_FROZEN_MODE) {
+            return fetchLocalJson(H2H_FROZEN_DATA_PATHS.state);
+        }
         return (await this.fetch("/api/state")).json();
     },
 
     async getStateFresh() {
+        if (H2H_FROZEN_MODE) {
+            return this.getStateCached();
+        }
         return (await this.fetch("/api/state?fresh_h2h=1")).json();
     },
 
@@ -39,14 +63,24 @@ const API = {
     },
 
     async getInjuries() {
+        if (H2H_FROZEN_MODE) {
+            return fetchLocalJson(H2H_FROZEN_DATA_PATHS.injuries);
+        }
         return (await this.fetch("/api/injuries")).json();
     },
 
     async getPlayerReference(player = "nikola-jokic") {
+        const normalizedPlayer = String(player || "").trim().toLowerCase();
+        if (H2H_FROZEN_MODE && (!normalizedPlayer || normalizedPlayer === "nikola-jokic" || normalizedPlayer === "jokic")) {
+            return fetchLocalJson(H2H_FROZEN_DATA_PATHS.defaultPlayerReference);
+        }
         return (await this.fetch(`/api/player-reference?player=${encodeURIComponent(player)}`)).json();
     },
 
     async getTeamAttackDefense() {
+        if (H2H_FROZEN_MODE) {
+            return fetchLocalJson(H2H_FROZEN_DATA_PATHS.teamAttackDefense);
+        }
         return (await this.fetch("/api/team-attack-defense")).json();
     },
 
@@ -55,10 +89,20 @@ const API = {
     },
 
     async getPlayerOptions() {
+        if (H2H_FROZEN_MODE) {
+            return fetchLocalJson(H2H_FROZEN_DATA_PATHS.playerOptions);
+        }
         return (await this.fetch("/api/player-options")).json();
     },
 
     async refresh() {
+        if (H2H_FROZEN_MODE) {
+            return {
+                success: true,
+                frozen: true,
+                current_event_name: "H2H Frozen Snapshot",
+            };
+        }
         return (await this.fetch("/api/refresh", { method: "POST" })).json();
     },
 };
@@ -847,9 +891,16 @@ function renderTransferDiagram(picksByUid) {
 }
 
 const Render = {
-    updateTime() {
+    updateTime(value = null) {
         const element = document.getElementById("update-time");
         if (!element) return;
+        if (H2H_FROZEN_MODE) {
+            const label = value
+                ? new Date(value).toLocaleString("zh-CN", { hour12: false })
+                : "Frozen";
+            element.textContent = `Frozen · ${label}`;
+            return;
+        }
         element.textContent = new Date().toLocaleTimeString("zh-CN", {
             hour: "2-digit",
             minute: "2-digit",
@@ -877,8 +928,9 @@ const Render = {
     refreshButton(state, text) {
         const button = document.getElementById("refresh-btn");
         if (!button) return;
-        button.disabled = state === "loading";
+        button.disabled = H2H_FROZEN_MODE || state === "loading";
         button.textContent = text;
+        button.title = H2H_FROZEN_MODE ? "常规赛已结束，H2H 面板已冻结为当前静态快照" : "";
     },
 
     transferTrends(data, picksByUid = {}) {
@@ -1751,10 +1803,16 @@ const App = {
         Render.goodCaptain(state?.good_captain_summary || []);
         Render.specialGuy(state?.picks_by_uid || {});
         Render.rankings(state || {});
-        Render.updateTime();
+        Render.updateTime(state?.generated_at || state?.updated_at || null);
+        Render.refreshButton("idle", H2H_FROZEN_MODE ? "Frozen" : "Refresh");
     },
 
     async getLineupCached(uid, options = {}) {
+        const normalizedUid = String(uid);
+        const cachedPayload = this.latestPicksByUid?.[normalizedUid] || this.latestPicksByUid?.[Number(uid)] || null;
+        if (H2H_FROZEN_MODE && cachedPayload) {
+            return cachedPayload;
+        }
         if (options?.fresh === true) {
             return API.getLineup(uid, options);
         }
@@ -1776,6 +1834,10 @@ const App = {
     },
 
     scheduleAutoRefresh(state) {
+        if (H2H_FROZEN_MODE) {
+            this.clearRefreshTimer();
+            return;
+        }
         this.clearRefreshTimer();
         const delay = getNextRefreshDelay(state?.fixtures);
         if (!delay) return;
@@ -1786,6 +1848,7 @@ const App = {
     },
 
     async loadLiveUpdate() {
+        if (H2H_FROZEN_MODE) return;
         try {
             const state = await API.getStateFresh();
             if (state) {
@@ -1801,20 +1864,12 @@ const App = {
     async loadAll() {
         try {
             this.lineupCache.clear();
-            let state = null;
-            try {
-                state = await API.getStateFresh();
-            } catch (freshError) {
-                console.warn("Initial fresh state load failed:", freshError);
-                try {
-                    state = await API.getStateCached();
-                } catch (error) {
-                    console.warn("[API Fallback] /api/state fallback failed", error);
-                }
-            }
+            const state = await API.getStateCached();
             if (state) {
                 this.applyState(state);
-                this.scheduleAutoRefresh(state);
+                if (!H2H_FROZEN_MODE) {
+                    this.scheduleAutoRefresh(state);
+                }
             }
         } catch (error) {
             console.error("LoadAll error:", error);
@@ -1851,6 +1906,7 @@ const App = {
                 panel.innerHTML = `<div class="transfer-panel-title">${escapeHtml(teamName)} This Week</div><div class="loading"><div class="spinner"></div>Loading...</div>`;
             }
             if (canUseCached) return;
+            if (H2H_FROZEN_MODE) return;
 
             const data = await this.getLineupCached(uid, { fresh: true, panelOnly: true });
             panel.innerHTML = renderTransferRecords(teamName, data.transfer_records || [], side, data.captain_used || null);
@@ -1869,16 +1925,6 @@ const App = {
     async showGameDetail(fixtureId) {
         Render.modalLoading("game-modal", "game-body", "game-title");
         try {
-            const freshPayload = await API.getGameDetail(fixtureId);
-            if (
-                freshPayload &&
-                Array.isArray(freshPayload.home_players) &&
-                Array.isArray(freshPayload.away_players) &&
-                (freshPayload.home_players.length > 0 || freshPayload.away_players.length > 0)
-            ) {
-                Render.gameDetail(freshPayload);
-                return;
-            }
             const localPayload = this.latestFixtureDetails?.[String(fixtureId)] || this.latestFixtureDetails?.[Number(fixtureId)];
             if (
                 localPayload &&
@@ -1888,6 +1934,18 @@ const App = {
             ) {
                 Render.gameDetail(localPayload);
                 return;
+            }
+            if (!H2H_FROZEN_MODE) {
+                const freshPayload = await API.getGameDetail(fixtureId);
+                if (
+                    freshPayload &&
+                    Array.isArray(freshPayload.home_players) &&
+                    Array.isArray(freshPayload.away_players) &&
+                    (freshPayload.home_players.length > 0 || freshPayload.away_players.length > 0)
+                ) {
+                    Render.gameDetail(freshPayload);
+                    return;
+                }
             }
             Render.modalError("game-body", "No data");
         } catch (error) {
@@ -1909,6 +1967,14 @@ const App = {
     async showLineupDual(uid1, name1, uid2, name2) {
         Render.modalLoading("lineup-modal", "lineup-body", "lineup-title", `${name1} VS ${name2}`);
         try {
+            if (H2H_FROZEN_MODE) {
+                const [cached1, cached2] = await Promise.all([
+                    this.getLineupCached(uid1),
+                    this.getLineupCached(uid2),
+                ]);
+                Render.lineup(cached1, name1, true, cached2, name2);
+                return;
+            }
             const [data1, data2] = await Promise.all([
                 this.getLineupCached(uid1, { fresh: true }),
                 this.getLineupCached(uid2, { fresh: true }),
@@ -1930,6 +1996,10 @@ const App = {
     },
 
     async manualRefresh() {
+        if (H2H_FROZEN_MODE) {
+            Render.refreshButton("idle", "Frozen");
+            return;
+        }
         Render.refreshButton("loading", "Refreshing...");
         this.clearRefreshTimer();
         try {
@@ -2252,6 +2322,7 @@ const App = {
 
     init() {
         document.addEventListener("DOMContentLoaded", () => {
+            Render.refreshButton("idle", H2H_FROZEN_MODE ? "Frozen" : "Refresh");
             this.bindEvents();
             this.loadAll();
         });
