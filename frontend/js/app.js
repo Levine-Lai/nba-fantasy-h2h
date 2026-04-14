@@ -107,6 +107,10 @@ const API = {
     },
 };
 
+function isPlayInHomepage() {
+    return !!document.getElementById("playin-board");
+}
+
 // Update this snapshot when a gameweek closes.
 const GW24_LAST_STANDINGS = [
     { rank: 1, uid: "2", team_name: "大吉鲁", gw: 24, won: 17, draw: 1, lost: 6, diff: 2289, points: 52 },
@@ -892,6 +896,7 @@ function renderTransferDiagram(picksByUid) {
 
 const Render = {
     updateTime(value = null) {
+        if (isPlayInHomepage()) return;
         const element = document.getElementById("update-time");
         if (!element) return;
         if (H2H_FROZEN_MODE) {
@@ -909,6 +914,7 @@ const Render = {
     },
 
     eventInfo(name) {
+        if (isPlayInHomepage()) return;
         const element = document.getElementById("event-info");
         if (element) {
             element.innerHTML = `赛季结束啦~请查收属于你的<a href="/season-summary/">赛季总结</a>`;

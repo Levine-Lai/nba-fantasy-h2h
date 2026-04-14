@@ -5,6 +5,75 @@ const PLAYIN_SCHEDULE_URL = "https://nba-prod-us-east-1-mediaops-stats.s3.amazon
 const PLAYIN_BOXSCORE_URL_PREFIX = "https://nba-prod-us-east-1-mediaops-stats.s3.amazonaws.com/NBA/liveData/boxscore/boxscore_";
 const REMOTE_HEADSHOT_URL_PREFIX = "https://cdn.nba.com/headshots/nba/latest/520x380/";
 const CACHE_CONTROL = "no-store, no-cache, must-revalidate, max-age=0";
+const TEAM_LOGO_BY_TRICODE = {
+  ATL: "/nba-team-logos/hawks.png",
+  BOS: "/nba-team-logos/celtics.png",
+  BKN: "/nba-team-logos/nets.png",
+  CHA: "/nba-team-logos/hornets.png",
+  CHI: "/nba-team-logos/bulls.png",
+  CLE: "/nba-team-logos/cavaliers.png",
+  DAL: "/nba-team-logos/mavericks.png",
+  DEN: "/nba-team-logos/nuggets.png",
+  DET: "/nba-team-logos/pistons.png",
+  GSW: "/nba-team-logos/warriors.png",
+  HOU: "/nba-team-logos/rockets.png",
+  IND: "/nba-team-logos/pacers.png",
+  LAC: "/nba-team-logos/clippers.png",
+  LAL: "/nba-team-logos/lakers.png",
+  MEM: "/nba-team-logos/grizzlies.png",
+  MIA: "/nba-team-logos/heat.png",
+  MIL: "/nba-team-logos/bucks.png",
+  MIN: "/nba-team-logos/timberwolves.png",
+  NOP: "/nba-team-logos/pelicans.png",
+  NYK: "/nba-team-logos/knicks.png",
+  OKC: "/nba-team-logos/thunder.png",
+  ORL: "/nba-team-logos/magic.png",
+  PHI: "/nba-team-logos/sixers.png",
+  PHX: "/nba-team-logos/suns.png",
+  POR: "/nba-team-logos/blazers.png",
+  SAC: "/nba-team-logos/kings.png",
+  SAS: "/nba-team-logos/spurs.png",
+  TOR: "/nba-team-logos/raptors.png",
+  UTA: "/nba-team-logos/jazz.png",
+  WAS: "/nba-team-logos/wizards.png",
+};
+
+function getTeamLogoUrl(team = {}) {
+  const tricode = String(team?.teamTricode || team?.tricode || "").trim().toUpperCase();
+  return TEAM_LOGO_BY_TRICODE[tricode] || "/nba-team-logos/_.png";
+}
+
+function formatBeijingDateTime(value = "") {
+  const timestamp = Date.parse(value || "");
+  if (!Number.isFinite(timestamp)) {
+    return {
+      dateLabel: "",
+      timeLabel: "",
+      fullLabel: "",
+    };
+  }
+  const formatter = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(new Date(timestamp));
+  const getValue = (type) => parts.find((item) => item.type === type)?.value || "";
+  const month = getValue("month");
+  const day = getValue("day");
+  const hour = getValue("hour");
+  const minute = getValue("minute");
+  const dateLabel = month && day ? `${month}/${day}` : "";
+  const timeLabel = hour && minute ? `${hour}:${minute}` : "";
+  return {
+    dateLabel,
+    timeLabel,
+    fullLabel: dateLabel && timeLabel ? `${dateLabel} ${timeLabel}` : (dateLabel || timeLabel),
+  };
+}
 
 function normalizeNameKey(value = "") {
   return String(value || "")
@@ -68,6 +137,7 @@ function normalizeScheduleTeam(team = {}) {
     shortName: name || "TBD",
     fullName,
     score: Number(team?.score || 0),
+    logoUrl: getTeamLogoUrl(team),
   };
 }
 
@@ -81,19 +151,26 @@ function normalizeScheduleGames(schedulePayload = {}) {
     const parsedDate = parseDateParts(gameDate);
     return (Array.isArray(dateEntry?.games) ? dateEntry.games : [])
       .filter((game) => /play-in tournament/i.test(String(game?.gameLabel || "")))
-      .map((game) => ({
-        gameId: String(game?.gameId || "").trim(),
-        conference: String(game?.gameSubLabel || "").trim() || "Play-In",
-        gameLabel: String(game?.gameLabel || "").trim() || "Play-In Tournament",
-        gameDate,
-        isoDate: parsedDate?.isoDate || "",
-        displayDate: toDisplayDate(gameDate),
-        gameDateTimeUTC: String(game?.gameDateTimeUTC || game?.gameDateTimeEst || "").trim(),
-        gameStatus: Number(game?.gameStatus || 0),
-        gameStatusText: String(game?.gameStatusText || "").trim(),
-        awayTeam: normalizeScheduleTeam(game?.awayTeam),
-        homeTeam: normalizeScheduleTeam(game?.homeTeam),
-      }));
+      .map((game) => {
+        const gameDateTimeUTC = String(game?.gameDateTimeUTC || game?.gameDateTimeEst || "").trim();
+        const beijing = formatBeijingDateTime(gameDateTimeUTC);
+        return {
+          gameId: String(game?.gameId || "").trim(),
+          conference: String(game?.gameSubLabel || "").trim() || "Play-In",
+          gameLabel: String(game?.gameLabel || "").trim() || "Play-In Tournament",
+          gameDate,
+          isoDate: parsedDate?.isoDate || "",
+          displayDate: toDisplayDate(gameDate),
+          gameDateTimeUTC,
+          beijingDateLabel: beijing.dateLabel,
+          beijingTimeLabel: beijing.timeLabel,
+          beijingDateTimeLabel: beijing.fullLabel,
+          gameStatus: Number(game?.gameStatus || 0),
+          gameStatusText: String(game?.gameStatusText || "").trim(),
+          awayTeam: normalizeScheduleTeam(game?.awayTeam),
+          homeTeam: normalizeScheduleTeam(game?.homeTeam),
+        };
+      });
   });
 
   games.sort((left, right) => {
@@ -444,11 +521,91 @@ function buildScheduleCards(games = []) {
     conference: game.conference,
     label: game.gameLabel,
     displayDate: game.displayDate,
+    beijingDateLabel: game.beijingDateLabel,
+    beijingTimeLabel: game.beijingTimeLabel,
+    beijingDateTimeLabel: game.beijingDateTimeLabel,
     status: game.gameStatusText,
     gameStatus: game.gameStatus,
     awayTeam: game.awayTeam,
     homeTeam: game.homeTeam,
   }));
+}
+
+function buildPlaceholderPlayerRow(label = "比赛未开始") {
+  return {
+    name: label,
+    position_name: "-",
+    points: 0,
+    rebounds: 0,
+    assists: 0,
+    steals: 0,
+    blocks: 0,
+    fantasy: 0,
+  };
+}
+
+function normalizeBoxscorePlayer(player = {}) {
+  return {
+    name: String(player?.name || [player?.firstName, player?.familyName].filter(Boolean).join(" ") || "-").trim() || "-",
+    position_name: String(player?.position || "-").trim() || "-",
+    points: Number(player?.statistics?.points || 0),
+    rebounds: Number(player?.statistics?.reboundsTotal || 0),
+    assists: Number(player?.statistics?.assists || 0),
+    steals: Number(player?.statistics?.steals || 0),
+    blocks: Number(player?.statistics?.blocks || 0),
+    fantasy: calculateFantasyScore(player?.statistics || {}),
+  };
+}
+
+function buildGameTitle(scheduleGame = {}) {
+  const away = scheduleGame?.awayTeam?.fullName || "TBD";
+  const home = scheduleGame?.homeTeam?.fullName || "TBD";
+  return `${away} @ ${home}`;
+}
+
+export async function buildPlayInGameDetailPayload(gameId) {
+  const normalizedId = String(gameId || "").trim();
+  if (!normalizedId) {
+    throw new Error("gameId is required");
+  }
+
+  const schedulePayload = await fetchSchedulePayload();
+  const normalizedSchedule = normalizeScheduleGames(schedulePayload);
+  const scheduleGame = normalizedSchedule.games.find((game) => game.gameId === normalizedId);
+  if (!scheduleGame) {
+    throw new Error("game not found");
+  }
+
+  let boxscorePayload = null;
+  try {
+    boxscorePayload = await fetchJsonUrl(`${PLAYIN_BOXSCORE_URL_PREFIX}${normalizedId}.json`, 1);
+  } catch (error) {
+    boxscorePayload = null;
+  }
+
+  const game = boxscorePayload?.game || {};
+  const homeTeamPayload = game?.homeTeam || {};
+  const awayTeamPayload = game?.awayTeam || {};
+  const homePlayers = Array.isArray(homeTeamPayload?.players) ? homeTeamPayload.players.map(normalizeBoxscorePlayer) : [];
+  const awayPlayers = Array.isArray(awayTeamPayload?.players) ? awayTeamPayload.players.map(normalizeBoxscorePlayer) : [];
+  const hasPlayerData = homePlayers.length > 0 || awayPlayers.length > 0;
+
+  return {
+    success: true,
+    game_id: normalizedId,
+    title: buildGameTitle(scheduleGame),
+    game_status: Number(game?.gameStatus || scheduleGame?.gameStatus || 0),
+    game_status_text: String(game?.gameStatusText || scheduleGame?.status || "").trim(),
+    game_time_bj: scheduleGame.beijingDateTimeLabel || "",
+    home_team: scheduleGame.homeTeam.fullName,
+    away_team: scheduleGame.awayTeam.fullName,
+    home_logo_url: scheduleGame.homeTeam.logoUrl,
+    away_logo_url: scheduleGame.awayTeam.logoUrl,
+    home_score: Number(homeTeamPayload?.score ?? scheduleGame.homeTeam.score ?? 0),
+    away_score: Number(awayTeamPayload?.score ?? scheduleGame.awayTeam.score ?? 0),
+    home_players: hasPlayerData ? homePlayers : [buildPlaceholderPlayerRow()],
+    away_players: hasPlayerData ? awayPlayers : [buildPlaceholderPlayerRow()],
+  };
 }
 
 export async function buildPlayInLeaderboardPayload() {
