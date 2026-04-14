@@ -134,61 +134,26 @@
         return "is-dnp";
     }
 
-    function describePlayerStatus(player, viewKey) {
-        if (viewKey === "total") {
-            const day1 = getPlayerBucket(player, "day1");
-            const day2 = getPlayerBucket(player, "day2");
-            if (day1.effective > 0 || day2.effective > 0) {
-                return `D1 ${formatScore(day1.effective)} · D2 ${formatScore(day2.effective)}`;
-            }
-            if (day1.raw > 0 || day2.raw > 0) {
-                return `未计入 · D1 ${formatScore(day1.raw)} · D2 ${formatScore(day2.raw)}`;
-            }
-            return "未出场";
-        }
-
-        const bucket = getPlayerBucket(player, viewKey);
-        if (bucket.status === "sub") {
-            return `替补递补 · 顶替首发 #${bucket.subbedInFor}`;
-        }
-        if (bucket.status === "counted") {
-            return bucket.captainApplied ? "计分中 · 队长 1.5x" : "计分中";
-        }
-        if (bucket.raw > 0) {
-            return "已出场 · 未计入";
-        }
-        return "未出场";
-    }
-
     function renderPlayerCard(player) {
         const bucket = getPlayerBucket(player, state.activeView);
         const displayScore = state.activeView === "total"
             ? player?.scores?.total?.effective
             : (bucket.effective || bucket.raw);
+        const teamCode = String(player?.team_code || "").trim() || "NBA";
 
         return `
             <div class="playin-player-card ${getPlayerCardClass(player, state.activeView)}">
+                <div class="playin-player-team-code">${escapeHtml(teamCode)}</div>
                 ${player?.is_captain ? '<span class="playin-captain-chip">C</span>' : ""}
                 <div class="playin-player-top">
                     ${player?.headshot_url
                         ? `<img class="playin-player-avatar" src="${escapeHtml(player.headshot_url)}" alt="${escapeHtml(player.display_name || "")}" data-fallback="${escapeHtml(initialsFromName(player.display_name || player.english_name || ""))}" loading="lazy" decoding="async" onerror="this.onerror=null;const fallback=document.createElement('span');fallback.className='playin-player-avatar-fallback';fallback.textContent=this.getAttribute('data-fallback')||'NBA';this.replaceWith(fallback);">`
                         : `<span class="playin-player-avatar-fallback">${escapeHtml(initialsFromName(player.display_name || player.english_name || ""))}</span>`}
-                    <div class="playin-player-copy">
-                        <div class="playin-player-name">${escapeHtml(player?.display_name || player?.english_name || "-")}</div>
-                        <div class="playin-player-team">
-                            <img src="${escapeHtml(player?.team_logo_url || "/nba-team-logos/_.png")}" alt="" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/nba-team-logos/_.png';">
-                            <span>${escapeHtml(player?.team_name_cn || player?.team_name_en || player?.team_code || "NBA")}</span>
-                        </div>
-                    </div>
+                    <div class="playin-player-name">${escapeHtml(player?.display_name || player?.english_name || "-")}</div>
                 </div>
-                <div class="playin-player-score">
-                    <div>
-                        <div class="playin-player-score-label">${state.activeView === "total" ? "总计" : "本页计分"}</div>
-                        <div class="playin-player-score-value">${escapeHtml(formatScore(displayScore || 0))}</div>
-                    </div>
-                    <div class="playin-player-score-label">${player?.price ? `$${Number(player.price).toFixed(1)}` : ""}</div>
+                <div class="playin-player-score-band">
+                    <div class="playin-player-score-value">${escapeHtml(formatScore(displayScore || 0))}</div>
                 </div>
-                <div class="playin-player-meta">${escapeHtml(describePlayerStatus(player, state.activeView))}</div>
             </div>
         `;
     }
@@ -202,7 +167,6 @@
                     <section class="playin-roster-block">
                         <div class="playin-roster-title">
                             <div class="playin-roster-heading">首发</div>
-                            <div class="playin-roster-note">未出场球员按替补顺序递补</div>
                         </div>
                         <div class="playin-player-row">
                             ${starters.map(renderPlayerCard).join("")}
@@ -211,7 +175,6 @@
                     <section class="playin-roster-block">
                         <div class="playin-roster-title">
                             <div class="playin-roster-heading">替补</div>
-                            <div class="playin-roster-note">卡片已压缩，移动端保持一行五张</div>
                         </div>
                         <div class="playin-player-row">
                             ${bench.map(renderPlayerCard).join("")}
@@ -256,7 +219,6 @@
                                 <div class="playin-manager-name">
                                     <span>${escapeHtml(entry?.manager_name || "-")}</span>
                                     <span class="playin-pill">${escapeHtml(`${entry?.roster_size || 0}/10`)}</span>
-                                    ${entry?.is_complete ? "" : '<span class="playin-pill warn">阵容未满</span>'}
                                 </div>
                                 <div class="playin-manager-split">
                                     <span>Day 1 ${escapeHtml(formatScore(entry?.scores?.day1 || 0))}</span>
@@ -507,7 +469,7 @@
         if (!refs().board || !refs().schedule) return;
         const eventInfo = document.getElementById("event-info");
         if (eventInfo) {
-            eventInfo.textContent = "附加赛排行榜已上线。";
+            eventInfo.innerHTML = '赛季结束啦~请查收属于你的<a href="/season-summary/?token=040517">赛季总结</a>';
         }
         bindEvents();
         loadLeaderboard();
