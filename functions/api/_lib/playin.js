@@ -422,6 +422,17 @@ function createEmptyBucketLine() {
   };
 }
 
+function applyLivePresence(target, liveEntry) {
+  const raw = Number(liveEntry?.raw || 0);
+  target.raw = raw;
+  target.played = !!liveEntry?.played;
+  target.stats = liveEntry?.live?.stats || target.stats;
+  target._headshotUrl = liveEntry?.live?.headshotUrl || target._headshotUrl || null;
+  if (!target.counted) {
+    target.status = target.played ? "played" : "dnp";
+  }
+}
+
 function hydrateRosterForBuckets(manager, bucketPlayers, options = {}) {
   const day1SettlementClosed = !!options.day1SettlementClosed;
   const roster = (manager?.roster || []).map((player) => ({
@@ -448,6 +459,10 @@ function hydrateRosterForBuckets(manager, bucketPlayers, options = {}) {
     const starters = liveMatches.filter((item) => item.player.role === "starter").sort((a, b) => a.player.slot - b.player.slot);
     const bench = liveMatches.filter((item) => item.player.role === "bench").sort((a, b) => a.player.slot - b.player.slot);
     const availableBench = [...bench];
+
+    for (const liveMatch of liveMatches) {
+      applyLivePresence(liveMatch.player.scores[bucketKey], liveMatch);
+    }
 
     for (const starter of starters) {
       if (starter.played) {
