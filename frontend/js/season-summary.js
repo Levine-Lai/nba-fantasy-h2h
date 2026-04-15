@@ -158,6 +158,73 @@
         });
     }
 
+    function rasterizeImageToSquareDataUrl(img, size = 160, mode = "contain") {
+        const naturalWidth = Number(img.naturalWidth || 0);
+        const naturalHeight = Number(img.naturalHeight || 0);
+        if (!naturalWidth || !naturalHeight) return null;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext("2d");
+        if (!context) return null;
+
+        context.clearRect(0, 0, size, size);
+
+        const imageRatio = naturalWidth / naturalHeight;
+        const targetRatio = 1;
+        let drawWidth = size;
+        let drawHeight = size;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        if (mode === "cover") {
+            if (imageRatio > targetRatio) {
+                drawHeight = size;
+                drawWidth = drawHeight * imageRatio;
+                offsetX = (size - drawWidth) / 2;
+            } else {
+                drawWidth = size;
+                drawHeight = drawWidth / imageRatio;
+                offsetY = (size - drawHeight) / 2;
+            }
+        } else {
+            if (imageRatio > targetRatio) {
+                drawWidth = size;
+                drawHeight = drawWidth / imageRatio;
+                offsetY = (size - drawHeight) / 2;
+            } else {
+                drawHeight = size;
+                drawWidth = drawHeight * imageRatio;
+                offsetX = (size - drawWidth) / 2;
+            }
+        }
+
+        try {
+            context.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+            return canvas.toDataURL("image/png");
+        } catch (error) {
+            console.warn("Headshot rasterize failed:", error);
+            return null;
+        }
+    }
+
+    function rasterizeExportInlineHeadshots(root) {
+        const images = Array.from(root?.querySelectorAll?.(".season-summary-inline-player-image") || []);
+        images.forEach((img) => {
+            if (img.dataset.exportRasterized === "1") return;
+            const dataUrl = rasterizeImageToSquareDataUrl(img, 160, "contain");
+            if (!dataUrl) return;
+            img.src = dataUrl;
+            img.dataset.exportRasterized = "1";
+            img.style.width = "100%";
+            img.style.height = "100%";
+            img.style.maxWidth = "100%";
+            img.style.maxHeight = "100%";
+            img.style.objectFit = "fill";
+        });
+    }
+
     async function ensureHtml2Canvas() {
         if (typeof window.html2canvas === "function") {
             return window.html2canvas;
@@ -192,6 +259,12 @@
         document.body.appendChild(link);
         link.click();
         link.remove();
+    }
+
+    function getExportRenderWidth(root) {
+        const target = root?.querySelector?.(".season-summary-export-frame") || root;
+        const measuredWidth = Math.ceil(target?.getBoundingClientRect?.().width || 0);
+        return measuredWidth || 430;
     }
 
     function setStatus(message = "", type = "") {
@@ -1399,8 +1472,10 @@
                 document.fonts?.ready || Promise.resolve(),
                 waitForImages(exportStage),
             ]);
+            rasterizeExportInlineHeadshots(exportStage);
             normalizeExportInlineHeadshots(exportStage);
             await waitForNextFrame(3);
+            const exportWidth = getExportRenderWidth(exportStage);
 
             if (exportMode === "multi") {
                 const frames = Array.from(exportStage.querySelectorAll(".season-summary-export-frame"));
@@ -1411,8 +1486,8 @@
                         backgroundColor: null,
                         useCORS: true,
                         scale: Math.max(2, Math.min(3, window.devicePixelRatio || 1)),
-                        width: 430,
-                        windowWidth: 430,
+                        width: exportWidth,
+                        windowWidth: exportWidth,
                         scrollX: 0,
                         scrollY: 0,
                     });
@@ -1427,8 +1502,8 @@
                     backgroundColor: null,
                     useCORS: true,
                     scale: Math.max(2, Math.min(3, window.devicePixelRatio || 1)),
-                    width: 430,
-                    windowWidth: 430,
+                    width: exportWidth,
+                    windowWidth: exportWidth,
                     scrollX: 0,
                     scrollY: 0,
                 });
