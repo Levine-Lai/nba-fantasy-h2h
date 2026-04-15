@@ -137,7 +137,7 @@
     function renderPlayerCard(player) {
         const bucket = getPlayerBucket(player, state.activeView);
         const displayScore = state.activeView === "total"
-            ? player?.scores?.total?.effective
+            ? (player?.scores?.total?.effective || player?.scores?.total?.raw)
             : (bucket.effective || bucket.raw);
         const teamCode = String(player?.team_code || "").trim() || "NBA";
 
