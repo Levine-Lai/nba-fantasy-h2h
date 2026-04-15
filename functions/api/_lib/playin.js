@@ -2,9 +2,11 @@ import { fetchJsonUrl } from "../../../worker/src/lib/http.js";
 import { PLAYIN_ROSTER_DATA } from "./playin-data.generated.js";
 
 const PLAYIN_SCHEDULE_URL = "https://nba-prod-us-east-1-mediaops-stats.s3.amazonaws.com/NBA/staticData/scheduleLeagueV2_1.json";
+const TODAYS_SCOREBOARD_URL = "https://nba-prod-us-east-1-mediaops-stats.s3.amazonaws.com/NBA/liveData/scoreboard/todaysScoreboard_00.json";
 const PLAYIN_BOXSCORE_URL_PREFIX = "https://nba-prod-us-east-1-mediaops-stats.s3.amazonaws.com/NBA/liveData/boxscore/boxscore_";
 const REMOTE_HEADSHOT_URL_PREFIX = "https://cdn.nba.com/headshots/nba/latest/520x380/";
 const CACHE_CONTROL = "no-store, no-cache, must-revalidate, max-age=0";
+const DAY1_SETTLEMENT_BJ = "2026-04-16T14:00:00+08:00";
 const TEAM_LOGO_BY_TRICODE = {
   ATL: "/nba-team-logos/hawks.png",
   BOS: "/nba-team-logos/celtics.png",
@@ -139,6 +141,45 @@ function normalizeScheduleTeam(team = {}) {
     score: Number(team?.score || 0),
     logoUrl: getTeamLogoUrl(team),
   };
+}
+
+function mergeScheduleWithScoreboard(scheduleGames = [], scoreboardPayload = {}) {
+  const liveGames = Array.isArray(scoreboardPayload?.scoreboard?.games)
+    ? scoreboardPayload.scoreboard.games
+    : [];
+  const liveById = new Map(
+    liveGames
+      .map((game) => [String(game?.gameId || "").trim(), game])
+      .filter(([gameId]) => gameId)
+  );
+
+  return scheduleGames.map((scheduleGame) => {
+    const liveGame = liveById.get(scheduleGame.gameId);
+    if (!liveGame) {
+      return scheduleGame;
+    }
+
+    const beijing = formatBeijingDateTime(liveGame?.gameTimeUTC || scheduleGame.gameDateTimeUTC || "");
+    return {
+      ...scheduleGame,
+      gameDateTimeUTC: String(liveGame?.gameTimeUTC || scheduleGame.gameDateTimeUTC || "").trim(),
+      beijingDateLabel: beijing.dateLabel || scheduleGame.beijingDateLabel,
+      beijingTimeLabel: beijing.timeLabel || scheduleGame.beijingTimeLabel,
+      beijingDateTimeLabel: beijing.fullLabel || scheduleGame.beijingDateTimeLabel,
+      gameStatus: Number(liveGame?.gameStatus || scheduleGame.gameStatus || 0),
+      gameStatusText: String(liveGame?.gameStatusText || scheduleGame.gameStatusText || "").trim(),
+      awayTeam: {
+        ...scheduleGame.awayTeam,
+        ...normalizeScheduleTeam(liveGame?.awayTeam),
+        score: Number(liveGame?.awayTeam?.score ?? scheduleGame.awayTeam?.score ?? 0),
+      },
+      homeTeam: {
+        ...scheduleGame.homeTeam,
+        ...normalizeScheduleTeam(liveGame?.homeTeam),
+        score: Number(liveGame?.homeTeam?.score ?? scheduleGame.homeTeam?.score ?? 0),
+      },
+    };
+  });
 }
 
 function normalizeScheduleGames(schedulePayload = {}) {
@@ -301,6 +342,11 @@ function buildBucketPlayers(boxscoreMap, scheduleGames) {
   return buckets;
 }
 
+function isDay1SettlementClosed(now = Date.now()) {
+  const cutoff = Date.parse(DAY1_SETTLEMENT_BJ);
+  return Number.isFinite(cutoff) && now >= cutoff;
+}
+
 function scoreLiveMatch(playerName, teamCode, bucketPlayer) {
   const targetKeys = buildNameKeys(playerName);
   const targetPrimary = normalizeNameKey(playerName);
@@ -376,7 +422,8 @@ function createEmptyBucketLine() {
   };
 }
 
-function hydrateRosterForBuckets(manager, bucketPlayers) {
+function hydrateRosterForBuckets(manager, bucketPlayers, options = {}) {
+  const day1SettlementClosed = !!options.day1SettlementClosed;
   const roster = (manager?.roster || []).map((player) => ({
     ...player,
     scores: {
@@ -407,6 +454,12 @@ function hydrateRosterForBuckets(manager, bucketPlayers) {
         applyBucketScore(starter.player.scores[bucketKey], starter, null);
         continue;
       }
+
+      const allowReplacement = bucketKey !== "day1" || day1SettlementClosed;
+      if (!allowReplacement) {
+        continue;
+      }
+
       const replacementIndex = availableBench.findIndex((item) => item.played);
       if (replacementIndex >= 0) {
         const replacement = availableBench.splice(replacementIndex, 1)[0];
@@ -497,6 +550,15 @@ async function fetchSchedulePayload() {
   return fetchJsonUrl(PLAYIN_SCHEDULE_URL, 1);
 }
 
+async function fetchTodayScoreboardPayload() {
+  try {
+    return await fetchJsonUrl(TODAYS_SCOREBOARD_URL, 1);
+  } catch (error) {
+    console.warn(`[playin-scoreboard] failed: ${String(error?.message || error || "unknown")}`);
+    return null;
+  }
+}
+
 async function fetchBoxscores(games = []) {
   const payloads = await Promise.all(
     games
@@ -570,7 +632,12 @@ export async function buildPlayInGameDetailPayload(gameId) {
   }
 
   const schedulePayload = await fetchSchedulePayload();
-  const normalizedSchedule = normalizeScheduleGames(schedulePayload);
+  const scoreboardPayload = await fetchTodayScoreboardPayload();
+  const scheduleBase = normalizeScheduleGames(schedulePayload);
+  const normalizedSchedule = {
+    ...scheduleBase,
+    games: mergeScheduleWithScoreboard(scheduleBase.games, scoreboardPayload),
+  };
   const scheduleGame = normalizedSchedule.games.find((game) => game.gameId === normalizedId);
   if (!scheduleGame) {
     throw new Error("game not found");
@@ -610,10 +677,16 @@ export async function buildPlayInGameDetailPayload(gameId) {
 
 export async function buildPlayInLeaderboardPayload() {
   const schedulePayload = await fetchSchedulePayload();
-  const normalizedSchedule = normalizeScheduleGames(schedulePayload);
+  const scheduleBase = normalizeScheduleGames(schedulePayload);
+  const scoreboardPayload = await fetchTodayScoreboardPayload();
+  const normalizedSchedule = {
+    ...scheduleBase,
+    games: mergeScheduleWithScoreboard(scheduleBase.games, scoreboardPayload),
+  };
   const views = decorateViews(normalizedSchedule.views);
   const boxscoreMap = await fetchBoxscores(normalizedSchedule.games);
   const bucketPlayers = buildBucketPlayers(boxscoreMap, normalizedSchedule.games);
+  const day1SettlementClosed = isDay1SettlementClosed();
 
   const managerEntries = (PLAYIN_ROSTER_DATA?.managers || []).map((manager) =>
     hydrateRosterForBuckets(
@@ -626,7 +699,8 @@ export async function buildPlayInLeaderboardPayload() {
         },
         ranks: {},
       },
-      bucketPlayers
+      bucketPlayers,
+      { day1SettlementClosed }
     )
   );
 
@@ -647,6 +721,8 @@ export async function buildPlayInLeaderboardPayload() {
     success: true,
     generated_at: new Date().toISOString(),
     source_generated_at: PLAYIN_ROSTER_DATA?.generated_at || null,
+    day1_settlement_bj: DAY1_SETTLEMENT_BJ,
+    day1_settlement_closed: day1SettlementClosed,
     views,
     schedule: {
       total_games: normalizedSchedule.games.length,

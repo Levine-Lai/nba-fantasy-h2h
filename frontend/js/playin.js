@@ -352,7 +352,6 @@
                     <thead>
                         <tr>
                             <th>Player</th>
-                            <th>Pos</th>
                             <th>PTS</th>
                             <th>REB</th>
                             <th>AST</th>
@@ -365,7 +364,6 @@
                         ${(players || []).map((player) => `
                             <tr>
                                 <td class="player-name">${escapeHtml(player.name || "-")}</td>
-                                <td>${escapeHtml(player.position_name || "-")}</td>
                                 <td>${escapeHtml(player.points ?? 0)}</td>
                                 <td>${escapeHtml(player.rebounds ?? 0)}</td>
                                 <td>${escapeHtml(player.assists ?? 0)}</td>
