@@ -2303,11 +2303,23 @@ body {
     color: #64748b;
 }
 
-.playin-schedule {
+.playin-main-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+    grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+    margin-top: 10px;
+}
+
+.playin-schedule-panel {
+    position: sticky;
+    top: 92px;
+}
+
+.playin-schedule {
+    display: flex;
+    flex-direction: column;
     gap: 14px;
-    margin-top: 6px;
 }
 
 .playin-schedule-group {
@@ -2758,6 +2770,14 @@ body {
     .playin-toolbar {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .playin-main-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .playin-schedule-panel {
+        position: static;
     }
 
     .playin-board-intro,
