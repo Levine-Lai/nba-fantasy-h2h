@@ -44,6 +44,8 @@
     const state = {
         currentPage: 0,
         lastUid: "",
+        profile: null,
+        exporting: false,
     };
 
     function isStandalonePage() {
@@ -73,6 +75,78 @@
             prevBtn: document.getElementById("season-summary-prev-btn"),
             nextBtn: document.getElementById("season-summary-next-btn"),
         };
+    }
+
+    function setExportFeedback(message = "", type = "") {
+        const note = document.querySelector(".season-summary-book [data-season-summary-export-note]");
+        if (!note) return;
+        note.className = `season-summary-closing-export-note${type ? ` ${type}` : ""}`;
+        note.textContent = message;
+    }
+
+    function setExportButtonState({ loading = false, label = "导出赛季总结图片" } = {}) {
+        const button = document.querySelector(".season-summary-book [data-season-summary-export]");
+        if (!button) return;
+        button.disabled = !!loading;
+        button.classList.toggle("is-exporting", !!loading);
+        const labelNode = button.querySelector("[data-export-label]");
+        if (labelNode) {
+            labelNode.textContent = label;
+        } else {
+            button.textContent = label;
+        }
+    }
+
+    function waitForNextFrame(count = 2) {
+        return new Promise((resolve) => {
+            const step = (remaining) => {
+                if (remaining <= 0) {
+                    resolve();
+                    return;
+                }
+                window.requestAnimationFrame(() => step(remaining - 1));
+            };
+            step(Math.max(1, Number(count || 0)));
+        });
+    }
+
+    function waitForImages(root) {
+        const images = Array.from(root?.querySelectorAll?.("img") || []);
+        if (!images.length) return Promise.resolve();
+        return Promise.all(
+            images.map((img) => new Promise((resolve) => {
+                img.loading = "eager";
+                img.decoding = "sync";
+                if (img.complete) {
+                    resolve();
+                    return;
+                }
+                const done = () => resolve();
+                img.addEventListener("load", done, { once: true });
+                img.addEventListener("error", done, { once: true });
+            }))
+        );
+    }
+
+    async function ensureHtml2Canvas() {
+        if (typeof window.html2canvas === "function") {
+            return window.html2canvas;
+        }
+        throw new Error("导出组件加载失败，请刷新页面后重试");
+    }
+
+    function buildExportFileName() {
+        const teamName = String(state.profile?.teamName || state.profile?.cover?.display_name || "").trim();
+        const safeTeamName = teamName
+            .replace(/[^\w\u4e00-\u9fa5-]+/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-|-$/g, "");
+        const safeUid = String(state.lastUid || "season-summary")
+            .replace(/[^\w-]+/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-|-$/g, "");
+        const baseName = [safeTeamName, safeUid].filter(Boolean).join("-") || "season-summary";
+        return `${baseName}-mobile.png`;
     }
 
     function setStatus(message = "", type = "") {
@@ -1190,6 +1264,12 @@
                                     decoding="async"
                                 />
                             </div>
+                            <div class="season-summary-closing-export">
+                                <button class="season-summary-export-trigger" type="button" data-season-summary-export>
+                                    <span data-export-label>导出赛季总结图片</span>
+                                </button>
+                                <p class="season-summary-closing-export-note" data-season-summary-export-note></p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1211,8 +1291,72 @@
     function refreshCaptainMomentsPage(profile) {
         const current = document.querySelector(".season-summary-page-captain-moments");
         if (!current) return;
+        state.profile = profile;
         current.outerHTML = renderCaptainMomentsPageV2(profile);
         updateIndicator();
+    }
+
+    async function exportSeasonSummaryImage() {
+        if (state.exporting) return;
+        if (!state.profile) {
+            setExportFeedback("请先生成赛季总结内容", "error");
+            return;
+        }
+
+        let exportStage = null;
+
+        try {
+            const html2canvas = await ensureHtml2Canvas();
+            state.exporting = true;
+            setExportFeedback("正在整理移动端长图…", "loading");
+            setExportButtonState({ loading: true, label: "正在导出…" });
+
+            exportStage = document.createElement("div");
+            exportStage.className = "season-summary-export-surface";
+            exportStage.setAttribute("aria-hidden", "true");
+            exportStage.innerHTML = `
+                <div class="season-summary-export-phone">
+                    <div class="season-summary-export-stack">
+                        ${renderPages(state.profile)}
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(exportStage);
+
+            const exportRoot = exportStage.querySelector(".season-summary-export-phone");
+            await Promise.all([
+                document.fonts?.ready || Promise.resolve(),
+                waitForImages(exportStage),
+            ]);
+            await waitForNextFrame(3);
+
+            setExportFeedback("正在生成图片…", "loading");
+            const canvas = await html2canvas(exportRoot, {
+                backgroundColor: null,
+                useCORS: true,
+                scale: Math.max(2, Math.min(3, window.devicePixelRatio || 1)),
+                width: 430,
+                windowWidth: 430,
+                scrollX: 0,
+                scrollY: 0,
+            });
+
+            const link = document.createElement("a");
+            link.href = canvas.toDataURL("image/png");
+            link.download = buildExportFileName();
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            setExportFeedback("图片已开始下载", "success");
+        } catch (error) {
+            console.error("Season summary export failed:", error);
+            setExportFeedback(`导出失败：${String(error?.message || error || "请稍后重试")}`, "error");
+        } finally {
+            exportStage?.remove();
+            state.exporting = false;
+            setExportButtonState({ loading: false, label: "导出赛季总结图片" });
+        }
     }
 
     async function playIntroExit(profile, normalizedUid) {
@@ -1260,6 +1404,7 @@
 
         try {
             const profile = await requestSummary(normalizedUid);
+            state.profile = profile;
             await hydrateHighlightLineups(profile, normalizedUid);
             await playIntroExit(profile, normalizedUid);
             hydrateMomentExtras(profile, normalizedUid)
@@ -1276,6 +1421,7 @@
             setIntroLoading(false);
             setProfileEntering(false);
             setHasProfile(false);
+            state.profile = null;
             setStatus(getLoadErrorMessage(error), "error");
         }
     }
@@ -1294,6 +1440,13 @@
 
         nextBtn?.addEventListener("click", () => {
             goToPage(state.currentPage + 1);
+        });
+
+        document.addEventListener("click", (event) => {
+            const trigger = event.target.closest("[data-season-summary-export]");
+            if (!trigger) return;
+            event.preventDefault();
+            exportSeasonSummaryImage();
         });
 
         document.addEventListener("keydown", (event) => {
@@ -1325,5 +1478,6 @@
     window.SeasonSummaryPage = {
         load: loadSummary,
         goToPage,
+        exportImage: exportSeasonSummaryImage,
     };
 }());

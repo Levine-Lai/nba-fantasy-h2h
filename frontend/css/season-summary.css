@@ -3456,3 +3456,395 @@
 .season-summary-page-captain .season-summary-story-cards-captain .season-summary-story-card:nth-child(2) {
     background: linear-gradient(180deg, #d1b4ff 0%, #ba90ff 100%);
 }
+
+.season-summary-closing-export {
+    display: grid;
+    gap: 8px;
+    justify-items: center;
+    margin-top: clamp(8px, 1.8vh, 18px);
+}
+
+.season-summary-export-trigger {
+    min-width: min(100%, 320px);
+    padding: 14px 24px;
+    border: 1px solid rgba(59, 130, 246, 0.18);
+    border-radius: 999px;
+    background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 52%, #60a5fa 100%);
+    color: #f8fbff;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    box-shadow: 0 16px 34px rgba(29, 78, 216, 0.24);
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+.season-summary-export-trigger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 38px rgba(29, 78, 216, 0.28);
+}
+
+.season-summary-export-trigger:disabled,
+.season-summary-export-trigger.is-exporting {
+    cursor: progress;
+    opacity: 0.86;
+    transform: none;
+}
+
+.season-summary-closing-export-note {
+    min-height: 1.4em;
+    margin: 0;
+    color: #5b6b80;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.season-summary-closing-export-note.loading {
+    color: #2563eb;
+}
+
+.season-summary-closing-export-note.success {
+    color: #15803d;
+}
+
+.season-summary-closing-export-note.error {
+    color: #b91c1c;
+}
+
+.season-summary-export-surface {
+    position: fixed;
+    left: -10000px;
+    top: 0;
+    width: 430px;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.season-summary-export-phone {
+    width: 430px;
+    padding: 10px 8px 20px;
+    background:
+        radial-gradient(circle at 8% 2%, rgba(67, 103, 178, 0.16), transparent 42%),
+        radial-gradient(circle at 92% 96%, rgba(34, 110, 124, 0.11), transparent 44%),
+        linear-gradient(180deg, #f3f6fb 0%, #edf2f8 46%, #f7f9fc 100%);
+}
+
+.season-summary-export-stack {
+    display: grid;
+    gap: 12px;
+}
+
+.season-summary-export-surface .season-summary-page {
+    position: relative;
+    inset: auto;
+    min-height: 0;
+    padding: 8px 10px 10px;
+    gap: 8px;
+    align-content: start;
+    opacity: 1 !important;
+    transform: none !important;
+    pointer-events: auto;
+    overflow: visible;
+}
+
+.season-summary-export-surface .season-summary-page.active {
+    z-index: auto;
+}
+
+.season-summary-export-surface .season-summary-page-cover {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    overflow: visible;
+}
+
+.season-summary-export-surface .season-summary-page-highlights,
+.season-summary-export-surface .season-summary-page-captain-moments {
+    overflow: visible;
+    scrollbar-width: none;
+}
+
+.season-summary-export-surface .season-summary-cover-main {
+    gap: 10px;
+    padding: 0 2px 0;
+}
+
+.season-summary-export-surface .season-summary-cover-title {
+    font-size: clamp(30px, 8.8vw, 42px);
+}
+
+.season-summary-export-surface .season-summary-cover-subtitle {
+    font-size: clamp(18px, 5.2vw, 24px);
+}
+
+.season-summary-export-surface .season-summary-cover-stats {
+    gap: 8px;
+}
+
+.season-summary-export-surface .season-summary-cover-stat {
+    min-height: 82px;
+    padding: 10px 10px 9px;
+    border-radius: 18px;
+}
+
+.season-summary-export-surface .season-summary-cover-stat-label,
+.season-summary-export-surface .season-summary-story-card-label {
+    font-size: 13px;
+}
+
+.season-summary-export-surface .season-summary-cover-stat-value {
+    font-size: clamp(24px, 6.4vw, 34px);
+    letter-spacing: -0.03em;
+}
+
+.season-summary-export-surface .season-summary-cover-stat-value-compact {
+    font-size: clamp(22px, 5.9vw, 30px);
+}
+
+.season-summary-export-surface .season-summary-cover-stat-value-tight {
+    font-size: clamp(20px, 5.3vw, 27px);
+    letter-spacing: -0.01em;
+}
+
+.season-summary-export-surface .season-summary-cover-stat:first-child .season-summary-cover-stat-value {
+    font-size: clamp(21px, 5.9vw, 29px);
+}
+
+.season-summary-export-surface .season-summary-cover-message {
+    max-width: 100%;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.season-summary-export-surface .season-summary-cover-followup {
+    max-width: 100%;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.season-summary-export-surface .season-summary-cover-panel {
+    min-height: 248px;
+    padding: 8px;
+    border-radius: 24px;
+    gap: 10px;
+}
+
+.season-summary-export-surface .season-summary-cover-chart {
+    border-radius: 18px;
+}
+
+.season-summary-export-surface .season-summary-cover-chart-note {
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.season-summary-export-surface .season-summary-cover-tick {
+    font-size: 13px;
+}
+
+.season-summary-export-surface .season-summary-cover-or-badges {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    gap: 6px;
+}
+
+.season-summary-export-surface .season-summary-cover-or-badge {
+    padding: 5px 6px;
+    box-shadow: 2px 2px 0 #000;
+}
+
+.season-summary-export-surface .season-summary-cover-chart-or {
+    min-height: 228px;
+    height: 260px;
+}
+
+.season-summary-export-surface .season-summary-story-main {
+    height: auto;
+    min-height: 0;
+    align-items: stretch;
+}
+
+.season-summary-export-surface .season-summary-story-shell,
+.season-summary-export-surface .season-summary-captain-copy,
+.season-summary-export-surface .season-summary-highlights-copy {
+    width: 100%;
+    gap: 10px;
+}
+
+.season-summary-export-surface .season-summary-page-highlights .season-summary-story-shell,
+.season-summary-export-surface .season-summary-page-captain-moments .season-summary-story-shell {
+    padding-bottom: 0;
+}
+
+.season-summary-export-surface .season-summary-page-title {
+    margin: 0;
+    padding-top: 2px;
+    font-size: 42px;
+    line-height: 1.04;
+}
+
+.season-summary-export-surface .season-summary-story-cards-player,
+.season-summary-export-surface .season-summary-story-cards-captain,
+.season-summary-export-surface .season-summary-story-cards-transfer,
+.season-summary-export-surface .season-summary-page-player-details .season-summary-story-cards-player-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.season-summary-export-surface .season-summary-story-cards-highlights {
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.season-summary-export-surface .season-summary-story-card {
+    min-height: 74px;
+    padding: 10px;
+    border-radius: 18px;
+}
+
+.season-summary-export-surface .season-summary-story-card-value {
+    margin-top: auto;
+    font-size: clamp(32px, 8vw, 44px);
+}
+
+.season-summary-export-surface .season-summary-story-card-value-time-slot {
+    font-size: clamp(14px, 3.8vw, 18px);
+}
+
+.season-summary-export-surface .season-summary-story-card-headshot {
+    width: min(100%, 72px);
+}
+
+.season-summary-export-surface .season-summary-story-card-value-avatar {
+    min-height: 72px;
+}
+
+.season-summary-export-surface .season-summary-story-copy {
+    gap: 10px;
+}
+
+.season-summary-export-surface .season-summary-story-paragraph {
+    font-size: 13.5px;
+    line-height: 1.8;
+}
+
+.season-summary-export-surface .season-summary-inline-player {
+    width: 3.8em;
+    height: 3.8em;
+    margin: 0 0.16em;
+    vertical-align: -1.02em;
+}
+
+.season-summary-export-surface .season-summary-highlight-stories {
+    gap: 14px;
+}
+
+.season-summary-export-surface .season-summary-captain-moments {
+    gap: 16px;
+}
+
+.season-summary-export-surface .season-summary-highlight-cards {
+    --season-highlight-card-width: 92px;
+    --season-highlight-card-height: 148px;
+    gap: 12px;
+    padding: 0;
+}
+
+.season-summary-export-surface .season-summary-highlight-row-front,
+.season-summary-export-surface .season-summary-highlight-row-back {
+    gap: 10px;
+}
+
+.season-summary-export-surface .season-summary-highlight-card-logo-wrap {
+    top: 6px;
+    left: 6px;
+    width: 22px;
+    height: 22px;
+}
+
+.season-summary-export-surface .season-summary-highlight-card-team {
+    top: 6px;
+    right: 6px;
+    font-size: 15px;
+}
+
+.season-summary-export-surface .season-summary-highlight-card-captain {
+    top: 5px;
+    right: 5px;
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+}
+
+.season-summary-export-surface .season-summary-highlight-card-captain + .season-summary-highlight-card-team {
+    right: 27px;
+}
+
+.season-summary-export-surface .season-summary-highlight-card-logo-fallback {
+    font-size: 10px;
+}
+
+.season-summary-export-surface .season-summary-highlight-card-visual {
+    inset: 26px 0 52px;
+}
+
+.season-summary-export-surface .season-summary-highlight-card-headshot {
+    max-width: 70px;
+    max-height: 78px;
+}
+
+.season-summary-export-surface .season-summary-highlight-card-headshot-fallback {
+    width: 54px;
+    height: 54px;
+    font-size: 20px;
+}
+
+.season-summary-export-surface .season-summary-captain-moment-headshot,
+.season-summary-export-surface .season-summary-captain-moment-headshot-fallback {
+    width: min(100%, 92px);
+}
+
+.season-summary-export-surface .season-summary-highlight-card-bar {
+    bottom: 50px;
+}
+
+.season-summary-export-surface .season-summary-highlight-card-name {
+    bottom: 29px;
+    height: 21px;
+    font-size: 10px;
+}
+
+.season-summary-export-surface .season-summary-highlight-card-score {
+    height: 29px;
+    font-size: 20px;
+}
+
+.season-summary-export-surface .season-summary-highlight-card-score-wide {
+    font-size: 16px;
+}
+
+.season-summary-export-surface .season-summary-page-closing .season-summary-story-copy {
+    width: 100%;
+    gap: 20px;
+}
+
+.season-summary-export-surface .season-summary-page-closing .season-summary-story-paragraph {
+    width: 100%;
+    text-align: left;
+    font-size: clamp(17px, 4.9vw, 22px);
+    line-height: 1.74;
+}
+
+.season-summary-export-surface .season-summary-closing-artwork {
+    width: 100%;
+    margin-top: 0;
+}
+
+.season-summary-export-surface .season-summary-closing-artwork-image {
+    width: 112px;
+}
+
+.season-summary-export-surface .season-summary-closing-export {
+    display: none;
+}
