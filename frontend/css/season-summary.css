@@ -3851,6 +3851,13 @@
     font-size: 20px;
 }
 
+.season-summary-export-surface .season-summary-captain-moment-portrait {
+    width: 92px;
+    height: 92px;
+    flex: 0 0 92px;
+    margin-inline: auto;
+}
+
 .season-summary-export-surface .season-summary-captain-moment-headshot,
 .season-summary-export-surface .season-summary-captain-moment-headshot-fallback {
     width: 92px;
