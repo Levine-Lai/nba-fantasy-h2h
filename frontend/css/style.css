@@ -2533,9 +2533,22 @@ body {
     display: flex;
     gap: 14px;
     flex-wrap: wrap;
+}
+
+.playin-day-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #fff7cc 0%, #ffef9f 100%);
+    border: 1px solid rgba(250, 204, 21, 0.35);
+    color: #854d0e;
     font-size: 12px;
-    font-weight: 700;
-    color: #64748b;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .playin-score-panel {
@@ -2929,9 +2942,15 @@ body {
         margin-top: 0;
         flex: 0 0 auto;
         gap: 4px;
-        font-size: 8px;
         white-space: nowrap;
         overflow: hidden;
+    }
+
+    .playin-day-chip {
+        min-height: 20px;
+        padding: 4px 6px;
+        border-radius: 8px;
+        font-size: 8px;
     }
 
     .playin-score-panel {

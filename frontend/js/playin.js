@@ -207,11 +207,10 @@
                             <div class="playin-manager-main">
                                 <div class="playin-manager-name">
                                     <span>${escapeHtml(entry?.manager_name || "-")}</span>
-                                    <span class="playin-pill">${escapeHtml(`${entry?.roster_size || 0}/10`)}</span>
                                 </div>
                                 <div class="playin-manager-split">
-                                    <span>Day 1 ${escapeHtml(formatScore(entry?.scores?.day1 || 0))}</span>
-                                    <span>Day 2 ${escapeHtml(formatScore(entry?.scores?.day2 || 0))}</span>
+                                    <span class="playin-day-chip">Day 1 ${escapeHtml(formatScore(entry?.scores?.day1 || 0))}</span>
+                                    <span class="playin-day-chip">Day 2 ${escapeHtml(formatScore(entry?.scores?.day2 || 0))}</span>
                                 </div>
                             </div>
                             <div class="playin-score-panel">
