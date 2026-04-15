@@ -3459,46 +3459,80 @@
 
 .season-summary-closing-export {
     display: grid;
-    gap: 8px;
+    gap: 10px;
     justify-items: center;
     margin-top: clamp(8px, 1.8vh, 18px);
 }
 
+.season-summary-closing-export-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    width: min(100%, 560px);
+}
+
 .season-summary-export-trigger {
-    min-width: min(100%, 320px);
-    padding: 14px 24px;
-    border: 1px solid rgba(59, 130, 246, 0.18);
-    border-radius: 999px;
-    background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 52%, #60a5fa 100%);
-    color: #f8fbff;
+    width: 100%;
+    min-height: 74px;
+    padding: 12px 16px 14px;
+    border: 3px solid #000000;
+    border-radius: 22px;
+    color: #000000;
     font-family: inherit;
-    font-size: 15px;
-    font-weight: 800;
-    letter-spacing: 0.02em;
-    box-shadow: 0 16px 34px rgba(29, 78, 216, 0.24);
+    display: grid;
+    justify-items: start;
+    align-content: center;
+    gap: 2px;
+    text-align: left;
+    box-shadow: 5px 5px 0 #000000;
     cursor: pointer;
     transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
 
+.season-summary-export-trigger-multi {
+    background: linear-gradient(180deg, #ffde59 0%, #ffd34a 100%);
+}
+
+.season-summary-export-trigger-long {
+    background: linear-gradient(180deg, #cba6f7 0%, #b88cf4 100%);
+}
+
+.season-summary-export-trigger-kicker {
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.season-summary-export-trigger-label {
+    font-size: 22px;
+    line-height: 1.02;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+}
+
 .season-summary-export-trigger:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 20px 38px rgba(29, 78, 216, 0.28);
+    transform: translate(-4px, -4px);
+    box-shadow: 9px 9px 0 #000000;
 }
 
 .season-summary-export-trigger:disabled,
 .season-summary-export-trigger.is-exporting {
     cursor: progress;
     opacity: 0.86;
-    transform: none;
+    transform: translate(0, 0);
+    box-shadow: 3px 3px 0 #000000;
 }
 
 .season-summary-closing-export-note {
     min-height: 1.4em;
     margin: 0;
-    color: #5b6b80;
+    color: rgba(0, 0, 0, 0.68);
     font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
 .season-summary-closing-export-note.loading {
@@ -3522,18 +3556,18 @@
     z-index: -1;
 }
 
-.season-summary-export-phone {
+.season-summary-export-stack {
+    display: grid;
+    gap: 14px;
+}
+
+.season-summary-export-frame {
     width: 430px;
     padding: 10px 8px 20px;
     background:
         radial-gradient(circle at 8% 2%, rgba(67, 103, 178, 0.16), transparent 42%),
         radial-gradient(circle at 92% 96%, rgba(34, 110, 124, 0.11), transparent 44%),
         linear-gradient(180deg, #f3f6fb 0%, #edf2f8 46%, #f7f9fc 100%);
-}
-
-.season-summary-export-stack {
-    display: grid;
-    gap: 12px;
 }
 
 .season-summary-export-surface .season-summary-page {
@@ -3713,7 +3747,11 @@
 }
 
 .season-summary-export-surface .season-summary-story-card-headshot {
-    width: min(100%, 72px);
+    width: 72px;
+    height: 72px;
+    max-width: 72px;
+    max-height: 72px;
+    object-fit: cover;
 }
 
 .season-summary-export-surface .season-summary-story-card-value-avatar {
@@ -3732,8 +3770,15 @@
 .season-summary-export-surface .season-summary-inline-player {
     width: 3.8em;
     height: 3.8em;
+    flex: 0 0 auto;
     margin: 0 0.16em;
     vertical-align: -1.02em;
+}
+
+.season-summary-export-surface .season-summary-inline-player-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
 .season-summary-export-surface .season-summary-highlight-stories {
@@ -3790,8 +3835,11 @@
 }
 
 .season-summary-export-surface .season-summary-highlight-card-headshot {
+    width: auto;
+    height: auto;
     max-width: 70px;
     max-height: 78px;
+    object-fit: contain;
 }
 
 .season-summary-export-surface .season-summary-highlight-card-headshot-fallback {
@@ -3802,7 +3850,14 @@
 
 .season-summary-export-surface .season-summary-captain-moment-headshot,
 .season-summary-export-surface .season-summary-captain-moment-headshot-fallback {
-    width: min(100%, 92px);
+    width: 92px;
+    height: 92px;
+    max-width: 92px;
+    max-height: 92px;
+}
+
+.season-summary-export-surface .season-summary-captain-moment-headshot {
+    object-fit: cover;
 }
 
 .season-summary-export-surface .season-summary-highlight-card-bar {
@@ -3847,4 +3902,27 @@
 
 .season-summary-export-surface .season-summary-closing-export {
     display: none;
+}
+
+@media (max-width: 768px) {
+    .season-summary-closing-export-actions {
+        width: 100%;
+        gap: 10px;
+    }
+
+    .season-summary-export-trigger {
+        min-height: 68px;
+        padding: 11px 12px 13px;
+        border-radius: 18px;
+        box-shadow: 4px 4px 0 #000000;
+    }
+
+    .season-summary-export-trigger:hover {
+        transform: none;
+        box-shadow: 4px 4px 0 #000000;
+    }
+
+    .season-summary-export-trigger-label {
+        font-size: 18px;
+    }
 }
