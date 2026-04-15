@@ -2303,23 +2303,11 @@ body {
     color: #64748b;
 }
 
-.playin-main-grid {
-    display: grid;
-    grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
-    gap: 18px;
-    align-items: start;
-    margin-top: 10px;
-}
-
-.playin-schedule-panel {
-    position: sticky;
-    top: 92px;
-}
-
 .playin-schedule {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
     gap: 14px;
+    margin-top: 6px;
 }
 
 .playin-schedule-group {
@@ -2519,7 +2507,7 @@ body {
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 900;
     color: #0f172a;
 }
@@ -2772,14 +2760,6 @@ body {
         align-items: stretch;
     }
 
-    .playin-main-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .playin-schedule-panel {
-        position: static;
-    }
-
     .playin-board-intro,
     .playin-manager-header {
         flex-direction: column;
@@ -2916,7 +2896,7 @@ body {
         flex: 1 1 auto;
         min-width: 0;
         gap: 4px;
-        font-size: 11px;
+        font-size: 13px;
         flex-wrap: nowrap;
         white-space: nowrap;
         overflow: hidden;
