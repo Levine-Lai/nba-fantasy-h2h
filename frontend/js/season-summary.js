@@ -134,6 +134,30 @@
         );
     }
 
+    function normalizeExportInlineHeadshots(root) {
+        const images = Array.from(root?.querySelectorAll?.(".season-summary-inline-player-image") || []);
+        images.forEach((img) => {
+            const shell = img.closest(".season-summary-inline-player");
+            if (!shell) return;
+            const shellRect = shell.getBoundingClientRect();
+            const shellHeight = Math.max(1, Math.round(shellRect.height || 0));
+            const naturalWidth = Number(img.naturalWidth || 0);
+            const naturalHeight = Number(img.naturalHeight || 0);
+            if (!shellHeight || !naturalWidth || !naturalHeight) return;
+
+            const aspectRatio = naturalWidth / naturalHeight;
+            const widthByHeight = shellHeight * aspectRatio;
+            const finalWidth = Math.min(shellRect.width || widthByHeight, widthByHeight);
+
+            img.style.width = `${Math.max(1, finalWidth)}px`;
+            img.style.height = `${shellHeight}px`;
+            img.style.maxWidth = "100%";
+            img.style.maxHeight = "100%";
+            img.style.objectFit = "fill";
+            img.style.flex = "0 0 auto";
+        });
+    }
+
     async function ensureHtml2Canvas() {
         if (typeof window.html2canvas === "function") {
             return window.html2canvas;
@@ -1375,6 +1399,7 @@
                 document.fonts?.ready || Promise.resolve(),
                 waitForImages(exportStage),
             ]);
+            normalizeExportInlineHeadshots(exportStage);
             await waitForNextFrame(3);
 
             if (exportMode === "multi") {

@@ -3776,9 +3776,12 @@
 }
 
 .season-summary-export-surface .season-summary-inline-player-image {
-    width: 100%;
+    width: auto;
     height: 100%;
-    object-fit: contain;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: fill;
+    display: block;
 }
 
 .season-summary-export-surface .season-summary-highlight-stories {
