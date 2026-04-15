@@ -2483,38 +2483,19 @@ body {
     width: 56px;
     height: 56px;
     border-radius: 18px;
-    background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);
-    color: #fff;
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    color: #1d4ed8;
     display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
-    box-shadow: 0 14px 28px rgba(29, 78, 216, 0.18);
+    box-shadow: 0 12px 24px rgba(147, 197, 253, 0.28);
+    border: 1px solid rgba(147, 197, 253, 0.65);
 }
 
 .playin-rank-number {
     font-size: 22px;
     font-weight: 900;
     line-height: 1;
-}
-
-.playin-rank-delta {
-    margin-top: 4px;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-}
-
-.playin-rank-delta.up {
-    color: #86efac;
-}
-
-.playin-rank-delta.down {
-    color: #fecaca;
-}
-
-.playin-rank-delta.same {
-    color: rgba(255, 255, 255, 0.76);
 }
 
 .playin-manager-main {
@@ -2911,11 +2892,6 @@ body {
 
     .playin-rank-number {
         font-size: 14px;
-    }
-
-    .playin-rank-delta {
-        margin-top: 1px;
-        font-size: 7px;
     }
 
     .playin-manager-main {

@@ -98,15 +98,6 @@
         }, {});
     }
 
-    function getRankDelta(managerKey, viewKey, currentRank) {
-        const previousRank = state.previousRanks?.[viewKey]?.[managerKey];
-        if (!previousRank) return { text: "NEW", className: "same" };
-        const movement = previousRank - currentRank;
-        if (movement > 0) return { text: `↑${movement}`, className: "up" };
-        if (movement < 0) return { text: `↓${Math.abs(movement)}`, className: "down" };
-        return { text: "—", className: "same" };
-    }
-
     function getPlayerBucket(player, viewKey) {
         return player?.scores?.[viewKey] || {
             raw: 0,
@@ -206,14 +197,12 @@
             ${entries.length ? entries.map((entry, index) => {
                 const managerKey = String(entry?.manager_key || index);
                 const rank = index + 1;
-                const delta = getRankDelta(managerKey, state.activeView, rank);
                 const expanded = state.expandedManagers.has(managerKey);
                 return `
                     <article class="playin-manager ${expanded ? "is-open" : ""}" data-manager-key="${escapeHtml(managerKey)}">
                         <button class="playin-manager-header" type="button" data-manager-toggle="${escapeHtml(managerKey)}">
                             <div class="playin-rank-badge">
-                                <div class="playin-rank-number">#${rank}</div>
-                                <div class="playin-rank-delta ${delta.className}">${escapeHtml(delta.text)}</div>
+                                <div class="playin-rank-number">${rank}</div>
                             </div>
                             <div class="playin-manager-main">
                                 <div class="playin-manager-name">
