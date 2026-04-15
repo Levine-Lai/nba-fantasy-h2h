@@ -225,6 +225,22 @@
         });
     }
 
+    function rasterizeExportMomentHeadshots(root) {
+        const images = Array.from(root?.querySelectorAll?.(".season-summary-captain-moment-headshot") || []);
+        images.forEach((img) => {
+            if (img.dataset.exportRasterized === "1") return;
+            const dataUrl = rasterizeImageToSquareDataUrl(img, 184, "cover");
+            if (!dataUrl) return;
+            img.src = dataUrl;
+            img.dataset.exportRasterized = "1";
+            img.style.width = "100%";
+            img.style.height = "100%";
+            img.style.maxWidth = "100%";
+            img.style.maxHeight = "100%";
+            img.style.objectFit = "fill";
+        });
+    }
+
     async function ensureHtml2Canvas() {
         if (typeof window.html2canvas === "function") {
             return window.html2canvas;
@@ -1144,7 +1160,7 @@
         if (bestRank) {
             stories.push(`
                 <div class="season-summary-highlight-story">
-                    <p class="season-summary-story-paragraph">${mark(formatHighlightLabel(bestRank))}则是一个更特殊一个特殊的日子，你拿到了${mark(`${formatSummaryNumber(bestRank.points)}分`)}，最关键的是单日OR为${mark(formatSummaryNumber(bestRank.game_rank || 0))}，比起一场比赛的输赢，这种站上更高位置的瞬间更像赛季里真正的高光</p>
+                    <p class="season-summary-story-paragraph">${mark(formatHighlightLabel(bestRank))}则是一个更值得纪念的日子，你拿到了${mark(`${formatSummaryNumber(bestRank.points)}分`)}，最关键的是单日OR为${mark(formatSummaryNumber(bestRank.game_rank || 0))}，比起一场比赛的输赢，这种站上更高位置的瞬间更像赛季里真正的高光</p>
                     ${renderHighlightPlayerCards(bestRank?.lineup)}
                 </div>
             `);
@@ -1473,6 +1489,7 @@
                 waitForImages(exportStage),
             ]);
             rasterizeExportInlineHeadshots(exportStage);
+            rasterizeExportMomentHeadshots(exportStage);
             normalizeExportInlineHeadshots(exportStage);
             await waitForNextFrame(3);
             const exportWidth = getExportRenderWidth(exportStage);

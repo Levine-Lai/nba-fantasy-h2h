@@ -3860,7 +3860,11 @@
 }
 
 .season-summary-export-surface .season-summary-captain-moment-headshot {
+    width: 100%;
+    height: 100%;
     object-fit: cover;
+    border-radius: 999px;
+    display: block;
 }
 
 .season-summary-export-surface .season-summary-highlight-card-bar {
