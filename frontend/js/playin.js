@@ -102,6 +102,7 @@
         return player?.scores?.[viewKey] || {
             raw: 0,
             effective: 0,
+            hasGame: false,
             played: false,
             counted: false,
             status: "dnp",
@@ -111,25 +112,30 @@
         };
     }
 
+    function getRosterViewKey(viewKey) {
+        return viewKey === "total" ? "day2" : viewKey;
+    }
+
     function getPlayerCardClass(player, viewKey) {
-        if (viewKey === "total") {
-            const day1 = getPlayerBucket(player, "day1");
-            const day2 = getPlayerBucket(player, "day2");
-            if (day1.status === "sub" || day2.status === "sub") return "is-sub";
-            if (day1.counted || day2.counted) return "is-counted";
-            return "is-dnp";
+        const bucket = getPlayerBucket(player, getRosterViewKey(viewKey));
+        const classes = [];
+        if (bucket.status === "sub") {
+            classes.push("is-sub");
+        } else if (bucket.counted) {
+            classes.push("is-counted");
+        } else {
+            classes.push("is-dnp");
         }
-        const bucket = getPlayerBucket(player, viewKey);
-        if (bucket.status === "sub") return "is-sub";
-        if (bucket.counted) return "is-counted";
-        return "is-dnp";
+        if (getRosterViewKey(viewKey) === "day2" && bucket.hasGame && bucket.counted) {
+            classes.push("is-today-effective");
+        }
+        return classes.join(" ");
     }
 
     function renderPlayerCard(player) {
-        const bucket = getPlayerBucket(player, state.activeView);
-        const displayScore = state.activeView === "total"
-            ? (player?.scores?.total?.effective || player?.scores?.total?.raw)
-            : (bucket.effective || bucket.raw);
+        const rosterViewKey = getRosterViewKey(state.activeView);
+        const bucket = getPlayerBucket(player, rosterViewKey);
+        const displayScore = bucket.effective || bucket.raw;
         const teamCode = String(player?.team_code || "").trim() || "NBA";
 
         return `
@@ -185,7 +191,9 @@
         }
 
         const entries = getSortedEntries(state.activeView);
-        const subtitle = state.payload?.views?.[state.activeView]?.subtitle || "";
+        const subtitle = state.activeView === "total"
+            ? "总分排行，展开查看 Day 2 实时有效阵容"
+            : (state.payload?.views?.[state.activeView]?.subtitle || "");
 
         board.innerHTML = `
             <div class="playin-board-intro">

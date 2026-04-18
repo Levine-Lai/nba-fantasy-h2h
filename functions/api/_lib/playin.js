@@ -342,6 +342,23 @@ function buildBucketPlayers(boxscoreMap, scheduleGames) {
   return buckets;
 }
 
+function buildBucketTeamCodes(scheduleGames = []) {
+  const buckets = {
+    day1: new Set(),
+    day2: new Set(),
+  };
+
+  for (const game of scheduleGames) {
+    const bucketKey = game?.bucketKey === "day2" ? "day2" : "day1";
+    const awayCode = String(game?.awayTeam?.tricode || "").trim().toUpperCase();
+    const homeCode = String(game?.homeTeam?.tricode || "").trim().toUpperCase();
+    if (awayCode) buckets[bucketKey].add(awayCode);
+    if (homeCode) buckets[bucketKey].add(homeCode);
+  }
+
+  return buckets;
+}
+
 function isDay1SettlementClosed(now = Date.now()) {
   const cutoff = Date.parse(DAY1_SETTLEMENT_BJ);
   return Number.isFinite(cutoff) && now >= cutoff;
@@ -385,13 +402,24 @@ function similarity(left = "", right = "") {
 }
 
 function resolveBucketPlayer(draftedPlayer, bucketPlayers = []) {
+  const personId = String(draftedPlayer?.person_id || "").trim();
+  if (personId) {
+    const exactPersonMatch = bucketPlayers.find((bucketPlayer) => String(bucketPlayer?.personId || "").trim() === personId);
+    if (exactPersonMatch) return exactPersonMatch;
+  }
+
   const englishName = String(draftedPlayer?.english_name || "").trim();
   if (!englishName) return null;
+
+  const normalizedTeamCode = String(draftedPlayer?.team_code || "").trim().toUpperCase();
+  const sameTeamPlayers = normalizedTeamCode
+    ? bucketPlayers.filter((bucketPlayer) => String(bucketPlayer?.teamCode || "").trim().toUpperCase() === normalizedTeamCode)
+    : bucketPlayers;
 
   let bestMatch = null;
   let bestScore = 0;
 
-  for (const bucketPlayer of bucketPlayers) {
+  for (const bucketPlayer of sameTeamPlayers) {
     const score = scoreLiveMatch(englishName, draftedPlayer?.team_code, bucketPlayer);
     if (score > bestScore) {
       bestScore = score;
@@ -407,6 +435,7 @@ function createEmptyBucketLine() {
   return {
     raw: 0,
     effective: 0,
+    hasGame: false,
     played: false,
     counted: false,
     subbedInFor: null,
@@ -423,18 +452,63 @@ function createEmptyBucketLine() {
 }
 
 function applyLivePresence(target, liveEntry) {
+  target.hasGame = !!liveEntry?.hasGame;
   const raw = Number(liveEntry?.raw || 0);
   target.raw = raw;
   target.played = !!liveEntry?.played;
   target.stats = liveEntry?.live?.stats || target.stats;
   target._headshotUrl = liveEntry?.live?.headshotUrl || target._headshotUrl || null;
   if (!target.counted) {
-    target.status = target.played ? "played" : "dnp";
+    target.status = target.hasGame ? (target.played ? "played" : "scheduled") : "dnp";
   }
+}
+
+function getBenchSortValue(player = {}) {
+  const benchOrder = Number(player?.bench_order ?? 0);
+  if (Number.isFinite(benchOrder) && benchOrder > 0) return benchOrder;
+  return Number(player?.slot || 0);
+}
+
+function applyScheduledBucketScores(manager, bucketKey, liveMatches = []) {
+  const starters = liveMatches
+    .filter((item) => item.player.role === "starter" && item.hasGame)
+    .sort((left, right) => Number(left?.player?.slot || 0) - Number(right?.player?.slot || 0));
+  const bench = liveMatches
+    .filter((item) => item.player.role === "bench" && item.hasGame)
+    .sort((left, right) =>
+      getBenchSortValue(left?.player) - getBenchSortValue(right?.player) ||
+      Number(left?.player?.slot || 0) - Number(right?.player?.slot || 0)
+    );
+  const missingStarterSlots = liveMatches
+    .filter((item) => item.player.role === "starter" && !item.hasGame)
+    .sort((left, right) => Number(left?.player?.slot || 0) - Number(right?.player?.slot || 0))
+    .map((item) => Number(item?.player?.slot || 0))
+    .filter(Boolean);
+  const selected = starters.slice(0, 5);
+
+  for (const benchPlayer of bench) {
+    if (selected.length >= 5) break;
+    selected.push(benchPlayer);
+  }
+
+  let benchReplacementIndex = 0;
+  for (const item of selected) {
+    const subbedInFor = item.player.role === "bench"
+      ? (missingStarterSlots[benchReplacementIndex] || null)
+      : null;
+    if (item.player.role === "bench") {
+      benchReplacementIndex += 1;
+    }
+    applyBucketScore(item.player.scores[bucketKey], item, subbedInFor);
+  }
+
+  const bucketTotal = selected.reduce((sum, item) => sum + Number(item?.player?.scores?.[bucketKey]?.effective || 0), 0);
+  manager.scores[bucketKey] = Number(bucketTotal.toFixed(1));
 }
 
 function hydrateRosterForBuckets(manager, bucketPlayers, options = {}) {
   const day1SettlementClosed = !!options.day1SettlementClosed;
+  const bucketTeamCodes = options.bucketTeamCodes || { day1: new Set(), day2: new Set() };
   const roster = (manager?.roster || []).map((player) => ({
     ...player,
     scores: {
@@ -446,11 +520,14 @@ function hydrateRosterForBuckets(manager, bucketPlayers, options = {}) {
 
   for (const bucketKey of ["day1", "day2"]) {
     const liveMatches = roster.map((player) => {
-      const live = resolveBucketPlayer(player, bucketPlayers[bucketKey] || []);
+      const normalizedTeamCode = String(player?.team_code || "").trim().toUpperCase();
+      const hasGame = !!normalizedTeamCode && !!bucketTeamCodes?.[bucketKey]?.has?.(normalizedTeamCode);
+      const live = hasGame ? resolveBucketPlayer(player, bucketPlayers[bucketKey] || []) : null;
       const base = live?.fantasyScore || 0;
       return {
         player,
         live,
+        hasGame,
         raw: Number(base.toFixed(1)),
         played: !!live?.played,
       };
@@ -462,6 +539,11 @@ function hydrateRosterForBuckets(manager, bucketPlayers, options = {}) {
 
     for (const liveMatch of liveMatches) {
       applyLivePresence(liveMatch.player.scores[bucketKey], liveMatch);
+    }
+
+    if (bucketKey === "day2") {
+      applyScheduledBucketScores(manager, bucketKey, liveMatches);
+      continue;
     }
 
     for (const starter of starters) {
@@ -701,6 +783,7 @@ export async function buildPlayInLeaderboardPayload() {
   const views = decorateViews(normalizedSchedule.views);
   const boxscoreMap = await fetchBoxscores(normalizedSchedule.games);
   const bucketPlayers = buildBucketPlayers(boxscoreMap, normalizedSchedule.games);
+  const bucketTeamCodes = buildBucketTeamCodes(normalizedSchedule.games);
   const day1SettlementClosed = isDay1SettlementClosed();
 
   const managerEntries = (PLAYIN_ROSTER_DATA?.managers || []).map((manager) =>
@@ -715,7 +798,7 @@ export async function buildPlayInLeaderboardPayload() {
         ranks: {},
       },
       bucketPlayers,
-      { day1SettlementClosed }
+      { day1SettlementClosed, bucketTeamCodes }
     )
   );
 

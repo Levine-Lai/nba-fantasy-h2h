@@ -2626,6 +2626,12 @@ body {
     opacity: 1;
 }
 
+.playin-player-card.is-today-effective {
+    border-color: rgba(244, 196, 48, 0.98);
+    background: linear-gradient(180deg, #fff9db 0%, #fff3bf 100%);
+    box-shadow: 0 10px 22px rgba(202, 138, 4, 0.16);
+}
+
 .playin-player-team-code {
     position: absolute;
     top: 10px;
